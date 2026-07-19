@@ -6,6 +6,20 @@ qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de d
 > PRD / modèle conceptuel : [`docs/PRD.md`](docs/PRD.md). Objectif à terme : migration vers
 > `harry-sdlc-ai-factory` (gates→HITL, agents→heavy drivers, `run-ticket`→`TicketWorkflow`).
 
+## Quickstart
+```bash
+git clone <repo-url> harry-sdlc-local && cd harry-sdlc-local
+make install     # symlinke l'engine dans ~/.claude + crée la commande globale `sdlc`
+make test        # 27 tests (déterministe, offline)
+
+# 1 projet = 1 repo data
+sdlc init-project SAMPLE --path ../sample-proj-sdlc-local --repos app-repo,web-repo
+sdlc --project SAMPLE list                # data prête (vide)
+```
+Puis, dans **Claude Code** : `/harry techlead` → `/scope <une idée>` → `/refine` → `/spec-tech` → `/implement`,
+puis « **lance run-ticket sur <TICKET>** » (tronçon autonome). Détail : **§ Découverte pas à pas** ci-dessous.
+Prérequis : Python 3.11+ ; Claude Code pour les slash-commands & workflows.
+
 ## Les 4 couches (rappel)
 1. **Méthode/lifecycle** · 2. **Mémoire/état** (repo data) · 3. **Chef interactif** (Harry, session) ·
 4. **Fleet + orchestration** (agents + Workflow). Agents à contextes **isolés** → mémoire + coordination
