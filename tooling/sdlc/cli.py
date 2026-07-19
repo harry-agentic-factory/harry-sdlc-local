@@ -45,6 +45,9 @@ def run(argv: list[str] | None = None) -> dict:
     a = sub.add_parser("set-status"); a.add_argument("story"); a.add_argument("status")
     a = sub.add_parser("link"); a.add_argument("story"); a.add_argument("kind"); a.add_argument("path")
     a = sub.add_parser("migrate"); a.add_argument("--workspace")
+    a = sub.add_parser("init-project"); a.add_argument("prefix"); a.add_argument("--path", required=True); a.add_argument("--repos")
+    a = sub.add_parser("register"); a.add_argument("prefix"); a.add_argument("path")
+    sub.add_parser("projects")
 
     args = p.parse_args(argv)
 
@@ -52,6 +55,15 @@ def run(argv: list[str] | None = None) -> dict:
         from .migrations import apply_migrations
         ws = args.workspace or resolve_workspace(args.project)
         return apply_migrations(ws)
+    if args.cmd == "init-project":
+        from .project import init_project
+        return init_project(args.prefix, args.path, _csv(args.repos))
+    if args.cmd == "register":
+        from .project import register_project
+        return {"prefix": args.prefix, "registered": register_project(args.prefix, args.path)}
+    if args.cmd == "projects":
+        from .project import list_projects
+        return {"projects": list_projects()}
 
     s = _sdlc(args.project)
 

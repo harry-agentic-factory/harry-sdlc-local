@@ -14,3 +14,11 @@ version:
 # Usage : make migrate PROJECT=HIA   (ou WORKSPACE=/chemin/vers/<projet>-sdlc-local)
 migrate:
 	cd tooling && python3 -m sdlc.cli $(if $(PROJECT),--project $(PROJECT)) migrate $(if $(WORKSPACE),--workspace $(WORKSPACE))
+
+projects:  ## Liste les projets enregistrés
+	cd tooling && python3 -m sdlc.cli projects
+
+# Initialise un nouveau repo data + l'enregistre.
+# Usage : make new-project PREFIX=TAL DIR=../../talenteo/talenteo-sdlc-local REPOS=talenteo-ui,talenteo-brain
+new-project:
+	cd tooling && python3 -m sdlc.cli init-project $(PREFIX) --path $(DIR) $(if $(REPOS),--repos $(REPOS))

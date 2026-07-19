@@ -16,6 +16,9 @@ from typing import Callable
 # (from_version, to_version, fn) — chaînées. Ex. futur : ("0.1.0", "0.2.0", _m_add_field)
 MIGRATIONS: list[tuple[str, str, Callable[[Path], None]]] = []
 
+# Version de schéma DATA cible (découplée de la VERSION d'engine : n'avance QUE si migration data).
+LATEST_SCHEMA = MIGRATIONS[-1][1] if MIGRATIONS else "0.1.0"
+
 
 def engine_version() -> str:
     v = Path(__file__).resolve().parents[3] / "VERSION"   # tooling/sdlc/migrations -> racine engine
@@ -50,4 +53,4 @@ def apply_migrations(workspace: str | Path) -> dict:
         data["schemaVersion"] = cur
         p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
     return {"engine": engine_version(), "schemaVersion": cur, "applied": applied,
-            "up_to_date": cur == engine_version()}
+            "up_to_date": cur == LATEST_SCHEMA}
