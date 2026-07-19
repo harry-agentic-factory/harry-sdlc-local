@@ -102,6 +102,7 @@ L'engine est **sans état** ; la data est **git-trackée** (persistante, version
 sdlc --project HIA create-epic  HIA-TOUR "Découverte"
 sdlc --project HIA create-ticket HIA-TOUR HIA-TOUR-1 "socle"
 cat  ../hia-sdlc-local/HIA-TOUR/stories/HIA-TOUR-1/status.json   # le fichier vient d'être créé (persistance)
+sdlc --project HIA link HIA-TOUR-1 spec_tech HIA-TOUR/stories/HIA-TOUR-1/spec-tech.md  # attache un artefact (enregistré dans status.json)
 sdlc --project HIA set-status HIA-TOUR-1 spec_func              # OK — transition valide
 sdlc --project HIA set-status HIA-TOUR-1 done                   # ❌ REFUSÉ — saut interdit (le garde-fou)
 rm -rf ../hia-sdlc-local/HIA-TOUR                               # data jetable
@@ -121,9 +122,10 @@ rm -rf ../hia-sdlc-local/HIA-DAG
 ### 7. Multi-projet : 1 engine, N data
 ```bash
 sdlc --project TAL list            # Talenteo : AUTRE repo data, MÊME engine
-sdlc init-project DEMO --path /tmp/demo-sdlc-local --repos a,b
-sdlc projects                      # DEMO enregistré (dans le registre ~/.claude/sdlc/projects.json)
-rm -rf /tmp/demo-sdlc-local        # (+ retire "DEMO" du registre si tu veux)
+sdlc init-project DEMO --path /tmp/demo-sdlc-local --repos a,b   # crée le repo data + l'enregistre
+sdlc register OLD /tmp/demo-sdlc-local                          # (variante) enregistre un repo data EXISTANT sans le créer
+sdlc projects                      # DEMO + OLD enregistrés (dans le registre ~/.claude/sdlc/projects.json)
+rm -rf /tmp/demo-sdlc-local        # (+ retire "DEMO"/"OLD" du registre si tu veux)
 ```
 Ajouter un projet ne change **pas** l'engine : juste un **repo data** + une entrée dans le **registre**
 (ton état perso).
