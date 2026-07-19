@@ -1,0 +1,11 @@
+[project]
+name = "hia-sdlc-tooling"
+version = "0.1.0"
+description = "Cœur déterministe du SDLC local Harry (state-machine, DAG, workspace, board port)"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>hia-sdlc · cockpit</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f1115; --card:#1b1f27; --fg:#e6e6e6; --muted:#9aa4b2; --accent:#4c8bf5; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  header { padding:12px 18px; border-bottom:1px solid #2a2f3a; display:flex; gap:16px; align-items:center; }
+  h1 { font-size:15px; margin:0; } .muted { color:var(--muted); }
+  main { display:flex; gap:14px; padding:14px; align-items:flex-start; overflow-x:auto; }
+  .col { min-width:190px; background:#141821; border:1px solid #2a2f3a; border-radius:8px; padding:8px; }
+  .col h2 { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin:2px 4px 8px; }
+  .card { background:var(--card); border:1px solid #2a2f3a; border-radius:6px; padding:8px; margin:6px 0; }
+  .card b { font-size:12px; } .card .id { color:var(--accent); font-family:ui-monospace,monospace; font-size:11px; }
+  .card .repos { color:var(--muted); font-size:11px; margin-top:4px; }
+  .inbox { border-color:#7a5; } .badge { background:#2a2f3a; border-radius:10px; padding:0 7px; font-size:11px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>hia-sdlc · cockpit</h1>
+    <span class="muted">board + Inbox HITL — lit le read-model (façade Sdlc)</span>
+    <span class="muted" id="ts" style="margin-left:auto"></span>
+  </header>
+  <main id="board"><p class="muted" style="padding:20px">Chargement…</p></main>
+<script>
+const PIPE = ["draft","spec_func","spec_tech","implemented","reviewed","deployed","recette_ok","accepted","done"];
+async function load() {
+  let data; try { data = await (await fetch("/api/board")).json(); }
+  catch (e) { document.getElementById("board").innerHTML =
+    '<p class="muted" style="padding:20px">API non lancée — <code>python3 -m cockpit.server</code></p>'; return; }
+  const board = document.getElementById("board"); board.innerHTML = "";
+  const inbox = document.createElement("div"); inbox.className = "col inbox";
+  inbox.innerHTML = '<h2>📥 Inbox HITL — à valider <span class="badge">'+(data.inbox||[]).length+'</span></h2>';
+  (data.inbox||[]).forEach(c => inbox.appendChild(card(c))); board.appendChild(inbox);
+  PIPE.forEach(s => {
+    const col = document.createElement("div"); col.className = "col";
+    const items = (data.columns[s]||[]);
+    col.innerHTML = '<h2>'+s+' <span class="badge">'+items.length+'</span></h2>';
+    items.forEach(c => col.appendChild(card(c))); board.appendChild(col);
+  });
+  document.getElementById("ts").textContent = new Date().toLocaleTimeString();
+}
+function card(c){ const d=document.createElement("div"); d.className="card";
+  d.innerHTML='<span class="id">'+c.id+'</span><br><b>'+c.title+'</b>'+
+    (c.repos&&c.repos.length?'<div class="repos">'+c.repos.join(', ')+'</div>':''); return d; }
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>
