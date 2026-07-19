@@ -1,6 +1,6 @@
 """Cockpit REST+static (FastAPI, optionnel — `pip install fastapi uvicorn`).
 
-    HIA_SDLC_WORKSPACE=/…/hia-sdlc python3 -m cockpit.server   # http://localhost:8787
+    SDLC_WORKSPACE=/…/sample-proj-sdlc-local python3 -m cockpit.server   # http://localhost:8787
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def create_app():  # pragma: no cover - nécessite fastapi
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse
 
-    app = FastAPI(title="hia-sdlc cockpit")
+    app = FastAPI(title="sample-proj-sdlc-local cockpit")
     index = (Path(__file__).parent / "index.html").read_text()
 
     @app.get("/", response_class=HTMLResponse)

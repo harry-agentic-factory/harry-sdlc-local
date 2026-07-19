@@ -4,7 +4,7 @@ Prêt à brancher : nécessite le paquet `mcp` (`pip install mcp`). Tant qu'il n
 pas installé, l'import échoue proprement ; le CLI (`sdlc.cli`) reste utilisable.
 
 Lancement (une fois `mcp` installé) :
-    HIA_SDLC_WORKSPACE=/…/hia-sdlc python3 -m sdlc.mcp_server
+    SDLC_WORKSPACE=/…/sample-proj-sdlc-local python3 -m sdlc.mcp_server
 Puis déclarer le serveur dans la config MCP de Claude Code.
 """
 from __future__ import annotations

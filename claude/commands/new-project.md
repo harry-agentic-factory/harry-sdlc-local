@@ -3,7 +3,7 @@ Initialise un projet SDLC dans le harness : $ARGUMENTS
 Tu es Harry. Un « projet » = un repo **data** `<projet>-sdlc-local` (couche 2) opéré par l'engine.
 
 ## Déroulé
-1. **Clarifie** avec l'humain (si pas fourni) : le **PREFIX** (ex. `TAL`), le **chemin** du repo data
+1. **Clarifie** avec l'humain (si pas fourni) : le **PREFIX** (ex. `OTHER`), le **chemin** du repo data
    (`<parent>/<projet>-sdlc-local`), et la **liste des repos** de code du projet.
 2. **Crée + enregistre** en une commande (depuis `harry-sdlc-local/tooling`) :
    ```

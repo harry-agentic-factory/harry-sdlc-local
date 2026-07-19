@@ -1,4 +1,4 @@
-"""Workspace `hia-sdlc/` : les .md sont la source de vérité, `status.json` l'état.
+"""Workspace `sample-proj-sdlc-local/` : les .md sont la source de vérité, `status.json` l'état.
 
 Layout :
     <root>/<EPIC>/prd.md, refine.md, _index.md, stories/<STORY>/{spec-*.md, status.json, ...}

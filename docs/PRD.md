@@ -1,14 +1,14 @@
 # SDLC local « Harry » — outillage Claude Code, cap sur la factory
 
-> **Version** : 0.1 (cadrage) · **Date** : 2026-07-17 · **Owner** : Anis (a.bessa@harington.fr)
+> **Version** : 0.1 (cadrage) · **Date** : 2026-07-17 · **Owner** : <owner>
 > **Statut** : cadrage co-construit — spec de l'outillage local ET feuille de route de migration vers
-> `harington-common/harry-sdlc-ai-factory`.
-> **Fil rouge** : la feature réelle **HIA-PROV** (tenant provisioning / doctor) sert d'exemple bout-en-bout.
+> `harry-sdlc-ai-factory`.
+> **Fil rouge** : la feature réelle **SAMPLE-APPS** sert d'exemple bout-en-bout.
 
 ## But & principe
 
 Industrialiser le SDLC **d'abord en local sur Claude Code** (agents + slash-commands + un MCP local d'état),
-avant de brancher HIA sur la plateforme factory. La ligne de partage structurante :
+avant de brancher un projet sur la plateforme factory. La ligne de partage structurante :
 
 > **Interactif = Harry (session principale)** · **Autonome = agents (sous-agents / Workflow)**
 
@@ -53,8 +53,8 @@ Deux repos distincts :
 | **`harry-sdlc-local`** (engine) | `tooling/` (state-machine, DAG, CLI, MCP) · workflows · agents · commands · persona · docs/PRD · tests · `VERSION` · `migrations/` · `make install` | 1, 3, 4 | **réutilisable**, project-agnostic |
 | **`<projet>-sdlc-local`** (data) | `<PREFIX>-*/` (les `.md` + `status.json`) · `sdlc.config.json` (`prefix`, `repos`, `escalation`, `board`, `schemaVersion`) | 2 | **par projet** |
 
-L'engine **opère sur** la data. Un moteur, plusieurs jeux de données (`hia-sdlc-local`, demain
-`talenteo-sdlc-local`). **Install** : agents/commands/workflows/persona doivent être vus par Claude Code
+L'engine **opère sur** la data. Un moteur, plusieurs jeux de données (`sample-proj-sdlc-local`, demain
+`other-proj-sdlc-local`). **Install** : agents/commands/workflows/persona doivent être vus par Claude Code
 depuis `~/.claude/` → `harry-sdlc-local` est la **source versionnée** + un **`make install`** qui
 symlink/copie vers `~/.claude/{agents,commands,workflows,sdlc}`. C'est ce qui rend le harness **transférable**
 (factory-ready) à un autre poste/personne.
@@ -70,10 +70,10 @@ L'engine est **versionné** (`harry-sdlc-local/VERSION`, semver). La data porte 
   (idempotentes), bumpe `schemaVersion`. Data git-trackée → un mauvais upgrade se `revert`.
 - Règle : **jamais** de breaking change data sans migration ; la baseline actuelle = `schemaVersion 0.1.0`.
 
-## Extension multi-projets (Talenteo)
+## Extension multi-projets (other-proj)
 
-Cibler un nouveau projet = **créer un repo data** (`talenteo-sdlc-local` : `sdlc.config.json` avec
-`prefix: TAL`, ses repos, son escalation) + l'enregistrer dans `~/.claude/sdlc/projects.json`. **L'engine ne
+Cibler un nouveau projet = **créer un repo data** (`other-proj-sdlc-local` : `sdlc.config.json` avec
+`prefix: OTHER`, ses repos, son escalation) + l'enregistrer dans `~/.claude/sdlc/projects.json`. **L'engine ne
 change pas.** Les agents/workflows sont paramétrés par `--project`/args. Un upgrade d'engine migre **chaque**
 repo data via `sdlc migrate`.
 
@@ -81,13 +81,13 @@ repo data via `sdlc migrate`.
 
 ```
 idée ──/scope──▶ PRD (épic)
-        /refine ──▶ stories + tasks (1 task/story) ──▶ [board Planner]
+        /refine ──▶ stories + tasks (1 task/story) ──▶ [board optionnel]
    /spec-func ──▶ affinage fonctionnel + critères d'acceptation (skippable si trivial)
    /spec-tech ──▶ plan d'implémentation : guidelines dev + invariants (sans coder)
    /implement ──▶ codage
         │
         ▼  (Workflow run-ticket — débrayage humain configurable à chaque étape)
-   reviewer ─▶ deployer ─▶ recetteur(API|MCP) ─▶ [KO → fixer(local-dev) → boucle]
+   reviewer ─▶ deployer ─▶ recetteur(API|MCP) ─▶ [KO → fixer(l’env local) → boucle]
         │                                             │ OK "validé"
         ▼                                             ▼
    e2e-author ─▶ nonreg-runner ─▶ DEMO AGENT ─▶ [toi: accept] ─▶ done ✅
@@ -97,23 +97,23 @@ Hiérarchie : **idée = épic (PRD)** → **stories** → **task** (une par stor
 
 ## Identité & traçabilité — l'ID qui colle tout
 
-`HIA-<n>` (épic) / `HIA-<n>-<k>` (story). Le **même** identifiant sur : dossier workspace, branche git
-(`feat/HIA-42-1-…`), task Planner, MR, et en-tête de chaque `.md`. C'est le **fil de traçabilité** — l'équivalent
+`<PREFIX>-<n>` (épic) / `<PREFIX>-<n>-<k>` (story). Le **même** identifiant sur : dossier workspace, branche git
+(`feat/SAMPLE-42-1-…`), task Planner, MR, et en-tête de chaque `.md`. C'est le **fil de traçabilité** — l'équivalent
 local du *lineage* de la factory. Un agent réhydrate tout son contexte depuis l'ID.
 
-## Le workspace d'artefacts (`hia-sdlc/`)
+## Le workspace d'artefacts (`sample-proj-sdlc-local/`)
 
 Les `.md` ne vivent **ni dans le code produit, ni dans le Brain** : dans un **repo de missions dédié**
 (cross-repo, car un ticket touche souvent plusieurs modules). Git-tracké aujourd'hui, **bucket MinIO** demain.
 
 ```
-hia-sdlc/
-  HIA-42-<slug>/                 # épic
+sample-proj-sdlc-local/
+  SAMPLE-42-<slug>/                 # épic
     prd.md                       # /scope
     refine.md                    # index stories/tasks + DAG dépendances
     _index.md                    # dashboard live (stories × statut × MR × déploiement)
     stories/
-      HIA-42-1-<slug>/
+      SAMPLE-42-1-<slug>/
         spec-func.md             # /spec-func — critères d'acceptation Given/When/Then
         spec-tech.md             # /spec-tech — guidelines + INVARIANTS (= checklist reviewer)
         implement.md             # log /implement (fichiers, décisions)
@@ -125,14 +125,14 @@ hia-sdlc/
         status.json              # état-machine du ticket
 ```
 
-Chaque story déclare ses **repos touchés** (ex. HIA-PROV : `back-tenant + plugin_hia_secure + back-hia + hia-ops +
-front-tenant`).
+Chaque story déclare ses **repos touchés** (ex. SAMPLE-APPS : `app-repo + plugin-repo + api-repo + ops-repo +
+web-repo`).
 
 ### Persistance en 3 couches (et pourquoi elle migre seule)
 
 | Couche locale | Rôle | Devient dans la factory |
 |---|---|---|
-| **MD git-trackés** (`hia-sdlc/`) | source de vérité | ArtifactStore (bucket MinIO) |
+| **MD git-trackés** (`sample-proj-sdlc-local/`) | source de vérité | ArtifactStore (bucket MinIO) |
 | **Index SQLite** (rebuild depuis les MD) | requêtes, état-machine | projections Postgres |
 | **MCP `sdlc_*`** (local) | API que Harry **et les agents** appellent | mission-control REST |
 
@@ -170,7 +170,7 @@ Même modèle que les règles globales existantes (`worktree-paths`, `historize-
 
 ## Le board (gratuit, déjà là)
 
-Pas de Jira. Le MCP **`harington-mcp2`** (M365) expose **Microsoft Planner** :
+Pas de Jira. Le MCP **`company-mcp`** (M365) expose **Microsoft Planner** :
 - **Plan** = l'épic · **Buckets** = les stories · **Tasks** = les tasks.
 `/refine` pousse le miroir ; chaque `status.json` qui avance **coche** la task → suivi depuis le tel.
 Source de vérité = les `.md` ; Planner = miroir léger.
@@ -181,11 +181,11 @@ Source de vérité = les `.md` ; Planner = miroir léger.
 |---|---|---|---|
 | **Harry** | session (interactif) | Brain + code, profile-aware ; orchestre ; gates amont + accept démo | — |
 | reviewer | agent | diff **vs invariants du spec-tech** ; approuve la MR si conforme | `review.md` |
-| deployer | agent | Jenkins / hia-ops(prod) / kubectl / Replay ; sait **quoi** déployer ; **rollback** | `deploy.md` |
+| deployer | agent | Jenkins / ops-repo(prod) / kubectl / Replay ; sait **quoi** déployer ; **rollback** | `deploy.md` |
 | recetteur | agent | pilote **API** ou **Playwright via MCP** vs critères d'acceptation | `acceptance.md` (+`repro/` si KO) |
-| fixer | agent | monte **local-dev**, rejoue le repro, corrige, itère sans redéployer | commit + `implement.md` |
+| fixer | agent | monte **l’env local**, rejoue le repro, corrige, itère sans redéployer | commit + `implement.md` |
 | e2e-author | agent | fige le flow **validé** en `.spec.ts` programmatique (CI) | `.spec.ts` (non-reg) |
-| nonreg-runner | agent | lance la suite non-reg (`make scenario-*`) | `nonreg.md` |
+| nonreg-runner | agent | lance la suite non-reg (`la suite e2e du projet`) | `nonreg.md` |
 | demo | agent | rejoue le scénario validé en **narrant** vs stories (sprint review) | `demo.md` |
 
 ## Orchestrateur = Workflow `run-ticket` (pas un agent)
@@ -203,18 +203,18 @@ Chaque stage : lit via `sdlc_get_ticket`, écrit son `.md`, avance `sdlc_set_sta
 ## Fix-loop & bundle repro (le point qui casse les loops UI)
 
 Un agent qui échoue **ne renvoie jamais « KO »** : il renvoie un **bundle repro exécutable**. Le fix-loop tourne
-**en `local-dev`, pas sur le déployé** (boucle rapide : édite → rebuild → re-run, zéro redeploy).
+**en `l’env local`, pas sur le déployé** (boucle rapide : édite → rebuild → re-run, zéro redeploy).
 
 ```
 repro/
   scenario.spec.ts | steps.md   # scénario rejouable (script, ou log d'actions MCP si recette manuelle)
   trace.zip / snapshot.md       # DOM/screenshots/console/réseau par étape
   failure.md                    # étape KO, attendu vs observé
-  fixtures.md                   # tenant code, compte, challenge mode, seed  ← clé sur UI back-tenant
+  fixtures.md                   # id de test, compte, options, seed  ← clé sur UI app-repo
   env.md                        # URL, version déployée
 ```
 
-Boucle : `recette KO → bundle → fixer (local-dev, mêmes fixtures) → corrige → re-review → re-deploy → re-recette`.
+Boucle : `recette KO → bundle → fixer (l’env local, mêmes fixtures) → corrige → re-review → re-deploy → re-recette`.
 **Garde-fous** : détection *flaky* (rejoue 3× avant de crier KO → sinon ping humain, pas de loop) ; **bail-out
 humain borné** (N tentatives, ou repro nécessitant captcha/mail externe → STOP + livre le bundle).
 Le `.spec.ts` vert est **promu dans la non-reg** : la recette d'aujourd'hui = le test de non-reg de demain.
@@ -245,7 +245,7 @@ auto jusqu'à la démo ; `regulated` = plus de gates humaines. À la migration, 
 
 | Local (Harry) | Factory |
 |---|---|
-| `hia-sdlc/` (MD git) | ArtifactStore (MinIO) + `artifact_graph` |
+| `sample-proj-sdlc-local/` (MD git) | ArtifactStore (MinIO) + `artifact_graph` |
 | Index SQLite | projections Postgres |
 | MCP `sdlc_*` | mission-control REST |
 | Workflow `run-ticket` | `TicketWorkflow` (Temporal) |
@@ -261,38 +261,33 @@ auto jusqu'à la démo ; `regulated` = plus de gates humaines. À la migration, 
 3. **Schéma du MCP `sdlc`** + format `status.json` (état-machine).
 4. **`sdlc.config.json`** per-project (dont `escalation{}`).
 
-## Exemple fil-rouge — HIA-PROV (tenant provisioning / doctor)
+## Exemple fil-rouge (générique) — `SAMPLE-APPS`
 
-Feature réelle, cross-repo, avec **3 bugs trouvés « en testant »** → 3 fix-loops tracés.
+Une feature cross-repo type (afficher/gérer une entité côté back + front) pour illustrer le pipeline.
 
-- **Épic** : provisionner un tenant end-to-end depuis le produit (remplace `provision.py` manuel).
-- **`/refine`** : 7 stories — `1` API all+doctor, `2` master-admin+guard, `3` k8s secret merge-safe, `4` list/view
-  (+ migration 005), `5` doctor by-code, `6` account-creator listener, `7` UI wizard. DAG : `1←2,3`, `4←1`,
-  `5←1,4`, `6←1`, `7←4,5,6`.
-- **`/spec-tech` = les Invariants des docs** → **checklist du reviewer** : secret data-key jamais ré-encodé en
-  local ; admin via rôle+périmètre (pas `{code}-admin`) ; token invalidé après `createRealm` ; flow-alias à espaces
-  via `listFlowExecutions` (encodé 1×) ; listener **XOR** authenticator ; `provisioned_tenant.id` = String UUID.
-- **Fix-loops** (recette → repro → fixer → re-deploy) :
-  1. 403 `users/profile` (realm neuf) → token caché avant `createRealm` → `invalidate()` + retry → commit `4f9592a7`.
-  2. `gettoken` faux-négatif → alias `HIA Unified Web Flow` double-encodé `%20→%2520` → `listFlowExecutions` →
-     **nouvel invariant**.
-  3. Listener manquant → `ensureAccountCreatorListener` (attributs realm + `hia-user-sync`) + garde XOR → `ec806805`.
-  (+ `526fa8f8` perimeterId by-code BUG-04, `a43d812e` fallback secret unique / 409, `5c1d306` wizard.)
-- **Aval** : `e2e-author` fige *provisionner tenant jetable → login QR complet* (le `e2etest SUCCESS`) ;
-  `nonreg-runner` → `make scenario-*` ; `demo` rejoue l'écran front-tenant.
-- **Tier** : sensible (prod + manifests hia-ops RBAC/SA/Secret) → proche **regulated** (`deploy: human-confirm`).
+- **`/scope`** → PRD de l'épic `SAMPLE-APPS`.
+- **`/refine`** → stories + DAG, ex. `SAMPLE-APPS-1` (back : exposer les données) et `SAMPLE-APPS-2`
+  (front : liste + détail), avec `2 ← 1` (le front consomme le contrat du back).
+- **`/spec-func`** → critères d'acceptation (Given/When/Then). **`/spec-tech`** → plan + **invariants**
+  (assertions vérifiables sur un diff) qui deviennent la **checklist du reviewer**.
+- **`/implement`** → code + tests unitaires.
+- **Tronçon autonome** : `reviewer` (diff vs invariants) → `deployer` → `recetteur` → **fix-loop** si KO
+  (`recette KO → repro → fixer → re-deploy → re-recette`) → `e2e-author` fige le scénario validé →
+  `nonreg-runner` → `demo` → accept.
 
-**Gain** : ces 3 bugs sont aujourd'hui une phrase de doc (« *three gaps found while testing* ») ; avec le modèle,
-chacun a un `repro/` rejouable + un commit lié + un invariant né — **traçable, non-régressable**.
+**Gain démontré (run réel)** : le `reviewer` autonome a rattrapé une **fuite de secret** avant la PR, et le
+**fix-loop** a corrigé un critère manquant puis redéployé — entre **contextes d'agents isolés**, uniquement
+grâce à l'état partagé (`.md` + `status.json`) et au Workflow. Chaque écart → un `repro/` rejouable + un commit
+lié + un invariant né : **traçable, non-régressable**.
 
 ## Plan de construction (par étapes, sans sur-construire)
 
-1. **Sans MCP** : convention `hia-sdlc/` + `status.json` + skill `/ticket` (résout un ID en lisant les fichiers).
+1. **Sans MCP** : convention `sample-proj-sdlc-local/` + `status.json` + skill `/ticket` (résout un ID en lisant les fichiers).
    Prouve la valeur, zéro infra. Coder d'abord `/scope` + `/refine`.
 2. **Les deux vrais manques d'aujourd'hui** : agents `reviewer` + `deployer`.
 3. **Le MCP `sdlc`** (~200 lignes FastMCP Python) quand les agents autonomes en ont besoin (bus d'état partagé).
-4. **Recette + fix-loop** (`recetteur`, `fixer`, bundle repro, local-dev) puis `e2e-author` + `nonreg-runner`.
-5. **`demo` + escalation tiers** ; **SQLite + registre multi-projets** quand on étend au-delà de HIA (Talenteo).
+4. **Recette + fix-loop** (`recetteur`, `fixer`, bundle repro, l’env local) puis `e2e-author` + `nonreg-runner`.
+5. **`demo` + escalation tiers** ; **SQLite + registre multi-projets** quand on étend au-delà d’un projet (other-proj).
 
 ## Reste à décider
 
@@ -303,8 +298,8 @@ chacun a un `repro/` rejouable + un commit lié + un invariant né — **traçab
 Décisions/précisions actées après le cadrage initial (voir aussi le tracker
 [`sdlc-local-harry-progress.md`](./sdlc-local-harry-progress.md)) :
 
-- **`hia-sdlc/` = repo dédié** (tranché) : sibling des repos HIA, héberge les `.md` (vérité) + le
-  `tooling/` (cœur Python). Cf. `../../hia-sdlc/README.md`.
+- **`sample-proj-sdlc-local/` = repo dédié** (tranché) : sibling des repos le produit, héberge les `.md` (vérité) + le
+  `tooling/` (cœur Python). Cf. `../../sample-proj-sdlc-local/README.md`.
 - **Board = adaptateur enfichable** (port `Board`). La vérité reste `.md` + state-machine ; Trello /
   Planner / cockpit = **miroirs une-voie**. Testable offline via `FakeBoard`. `TrelloBoard` = stub prêt
   (MCP Trello à connecter via `claude mcp`). **Planner rétrogradé** : simple miroir optionnel, plus jamais
@@ -315,7 +310,7 @@ Décisions/précisions actées après le cadrage initial (voir aussi le tracker
   session Harry, en background, il **meurt** à la fin/gate. Rien ne boucle en permanence. Seuls le MCP et le
   cockpit peuvent être long-running. Le « toujours vivant sur signal » = Temporal, côté factory.
 - **Orchestrateur ≠ agents** : un run = **1 orchestrateur + N contextes d'agents isolés** (pas une session
-  partagée). Les agents communiquent via `hia-sdlc/` + MCP, jamais par conversation. Ils **retournent** un
+  partagée). Les agents communiquent via `sample-proj-sdlc-local/` + MCP, jamais par conversation. Ils **retournent** un
   verdict — ils ne « réveillent » pas l'orchestrateur (orchestration, pas choréographie).
 - **Cœur déterministe livré** (`tooling/sdlc/`) : `status` (state-machine), `graph` (DAG), `workspace`,
   `board` (port), `service` (façade `Sdlc` = future surface MCP). **Golden test pytest** vert.

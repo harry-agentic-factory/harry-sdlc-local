@@ -51,7 +51,7 @@ class TrelloBoard:
 
     TODO: implémenter via un MCP Trello (non connecté dans la session actuelle).
     Mapping prévu : chaque `Status` = une liste Trello ; `set_status` déplace la
-    carte ; la description de la carte pointe vers les .md de `hia-sdlc/`.
+    carte ; la description de la carte pointe vers les .md de `sample-proj-sdlc-local/`.
     """
 
     def __init__(self, *args, **kwargs) -> None:

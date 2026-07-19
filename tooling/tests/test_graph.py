@@ -2,7 +2,7 @@ import pytest
 
 from sdlc import topo_order, next_actionable, CycleError
 
-# DAG repris de HIA-PROV : 1<-2,3 ; 4<-1 ; 5<-1,4 ; 6<-1 ; 7<-4,5,6
+# DAG repris de SAMPLE-PROV : 1<-2,3 ; 4<-1 ; 5<-1,4 ; 6<-1 ; 7<-4,5,6
 DEPS = {
     "1": ["2", "3"], "2": [], "3": [],
     "4": ["1"], "5": ["1", "4"], "6": ["1"], "7": ["4", "5", "6"],

@@ -17,10 +17,10 @@ BASE = {
 AUTO = {"review": "auto", "deploy": "auto", "recette": "auto-then-human", "nonreg": "human-on-fail"}
 
 
-def at_implemented(tmp_path, story="HIA-T-1"):
+def at_implemented(tmp_path, story="SAMPLE-T-1"):
     s = Sdlc(Workspace(tmp_path), NullBoard())
-    s.create_epic("HIA-T", "demo")
-    s.create_ticket("HIA-T", story, "t")
+    s.create_epic("SAMPLE-T", "demo")
+    s.create_ticket("SAMPLE-T", story, "t")
     for st in ("spec_func", "spec_tech", "implemented"):
         s.set_status(story, st)
     return s
@@ -28,24 +28,24 @@ def at_implemented(tmp_path, story="HIA-T-1"):
 
 def test_happy_upstream_stops_for_validation(tmp_path):
     s = at_implemented(tmp_path)
-    o = run_ticket_upstream(s, "HIA-T-1", dict(BASE), escalation=AUTO)
+    o = run_ticket_upstream(s, "SAMPLE-T-1", dict(BASE), escalation=AUTO)
     assert o.reason == "await_validation" and o.stopped_at == "recette"
-    assert s.get_ticket("HIA-T-1")["status"] == "recette_ok"
+    assert s.get_ticket("SAMPLE-T-1")["status"] == "recette_ok"
 
 
 def test_review_non_conform_escalates(tmp_path):
     s = at_implemented(tmp_path)
     ag = dict(BASE, reviewer=lambda c: {"conform": False, "note": "invariant X violé"})
-    o = run_ticket_upstream(s, "HIA-T-1", ag)
+    o = run_ticket_upstream(s, "SAMPLE-T-1", ag)
     assert o.reason == "needs_human" and o.stopped_at == "review"
-    assert s.get_ticket("HIA-T-1")["status"] == "implemented"  # inchangé
+    assert s.get_ticket("SAMPLE-T-1")["status"] == "implemented"  # inchangé
 
 
 def test_deploy_human_confirm_gate(tmp_path):
     s = at_implemented(tmp_path)
-    o = run_ticket_upstream(s, "HIA-T-1", dict(BASE), escalation={"deploy": "human-confirm"})
+    o = run_ticket_upstream(s, "SAMPLE-T-1", dict(BASE), escalation={"deploy": "human-confirm"})
     assert o.reason == "needs_human" and o.stopped_at == "deploy"
-    assert s.get_ticket("HIA-T-1")["status"] == "reviewed"
+    assert s.get_ticket("SAMPLE-T-1")["status"] == "reviewed"
 
 
 def test_fix_loop_recovers(tmp_path):
@@ -58,40 +58,40 @@ def test_fix_loop_recovers(tmp_path):
         return {"fixed": True}
 
     ag = dict(BASE, recetteur=lambda c: next(seq), fixer=fixer)
-    o = run_ticket_upstream(s, "HIA-T-1", ag, escalation=AUTO)
+    o = run_ticket_upstream(s, "SAMPLE-T-1", ag, escalation=AUTO)
     assert o.reason == "await_validation" and calls["fix"] == 1
-    assert s.get_ticket("HIA-T-1")["status"] == "recette_ok"
+    assert s.get_ticket("SAMPLE-T-1")["status"] == "recette_ok"
 
 
 def test_fix_loop_exhausts(tmp_path):
     s = at_implemented(tmp_path)
     ag = dict(BASE, recetteur=lambda c: {"pass": False, "repro": "r"})
-    o = run_ticket_upstream(s, "HIA-T-1", ag, escalation=AUTO, max_fix=2)
+    o = run_ticket_upstream(s, "SAMPLE-T-1", ag, escalation=AUTO, max_fix=2)
     assert o.reason == "needs_human" and o.stopped_at == "recette"
 
 
 def test_flaky_bails_out(tmp_path):
     s = at_implemented(tmp_path)
     ag = dict(BASE, recetteur=lambda c: {"pass": False, "flaky": True})
-    o = run_ticket_upstream(s, "HIA-T-1", ag, escalation=AUTO)
+    o = run_ticket_upstream(s, "SAMPLE-T-1", ag, escalation=AUTO)
     assert o.reason == "needs_human"
 
 
 def test_downstream_then_accept_done(tmp_path):
     s = at_implemented(tmp_path)
-    run_ticket_upstream(s, "HIA-T-1", dict(BASE), escalation=AUTO)
+    run_ticket_upstream(s, "SAMPLE-T-1", dict(BASE), escalation=AUTO)
     ag = {"e2e_author": lambda c: {"spec": "x"}, "nonreg": lambda c: {"pass": True},
           "demo": lambda c: {"demo": "d"}}
-    o = run_ticket_downstream(s, "HIA-T-1", ag)
+    o = run_ticket_downstream(s, "SAMPLE-T-1", ag)
     assert o.reason == "await_validation" and o.stopped_at == "demo"
-    accept(s, "HIA-T-1")
-    assert s.get_ticket("HIA-T-1")["status"] == "done"
+    accept(s, "SAMPLE-T-1")
+    assert s.get_ticket("SAMPLE-T-1")["status"] == "done"
 
 
 def test_downstream_nonreg_regression(tmp_path):
     s = at_implemented(tmp_path)
-    run_ticket_upstream(s, "HIA-T-1", dict(BASE), escalation=AUTO)
+    run_ticket_upstream(s, "SAMPLE-T-1", dict(BASE), escalation=AUTO)
     ag = {"e2e_author": lambda c: {"spec": "x"}, "nonreg": lambda c: {"pass": False},
           "demo": lambda c: {"demo": "d"}}
-    o = run_ticket_downstream(s, "HIA-T-1", ag)
+    o = run_ticket_downstream(s, "SAMPLE-T-1", ag)
     assert o.reason == "needs_human" and o.stopped_at == "nonreg"

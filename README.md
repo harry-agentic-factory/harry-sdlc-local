@@ -1,7 +1,7 @@
 # harry-sdlc-local — engine SDLC agentique local « Harry »
 
 **Engine réutilisable, project-agnostic.** Opère sur des repos **data** séparés (`<projet>-sdlc-local`)
-qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de données (HIA, Talenteo…).
+qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de données (SAMPLE, OtherProject…).
 
 > PRD / modèle conceptuel : [`docs/PRD.md`](docs/PRD.md). Objectif à terme : migration vers
 > `harry-sdlc-ai-factory` (gates→HITL, agents→heavy drivers, `run-ticket`→`TicketWorkflow`).
@@ -36,9 +36,9 @@ make test            # pytest du cœur déterministe
 ou `~/.local/bin` selon ton PATH). Ensuite :
 ```bash
 sdlc projects                        # projets enregistrés
-sdlc --project HIA get HIA-APPS-1     # réhydrate un ticket
-sdlc init-project TAL --path … --repos a,b   # nouveau projet
-sdlc migrate --project HIA           # migrer la data
+sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
+sdlc init-project OTHER --path … --repos a,b   # nouveau projet
+sdlc migrate --project SAMPLE           # migrer la data
 ```
 (Le registre `~/.claude/sdlc/projects.json` mappe `<PREFIX>` → repo data.) Workflows :
 `Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
@@ -82,16 +82,16 @@ Répartition : **persona + commands = interactif** (couche 3) · **agents + work
 ### 3. La commande `sdlc` = lire/écrire l'ÉTAT (pas faire le travail)
 ```bash
 sdlc projects                      # le REGISTRE : quels projets, où est leur data
-sdlc --project HIA list            # les tickets du projet HIA
-sdlc --project HIA get HIA-APPS-1  # réhydrate 1 ticket (statut + carte des artefacts)
+sdlc --project SAMPLE list            # les tickets du projet SAMPLE
+sdlc --project SAMPLE get SAMPLE-APPS-1  # réhydrate 1 ticket (statut + carte des artefacts)
 ```
 `sdlc` ne *fait* pas le SDLC : il **lit/écrit l'état**. Ce sont les **agents** (couche 4) qui font le travail.
 
 ### 4. Où ça PERSISTE (la vérité vit dans la data)
 ```bash
-sdlc projects                                        # HIA -> .../hia-sdlc-local
-ls  ../hia-sdlc-local/HIA-APPS/stories/HIA-APPS-1/    # les .md du ticket
-cat ../hia-sdlc-local/HIA-APPS/stories/HIA-APPS-1/status.json
+sdlc projects                                        # SAMPLE -> .../sample-proj-sdlc-local
+ls  ../sample-proj-sdlc-local/SAMPLE-APPS/stories/SAMPLE-APPS-1/    # les .md du ticket
+cat ../sample-proj-sdlc-local/SAMPLE-APPS/stories/SAMPLE-APPS-1/status.json
 ```
 La **vérité vit dans le repo DATA** (`.md` + `status.json`), **pas** dans l'engine ni dans `~/.claude`.
 L'engine est **sans état** ; la data est **git-trackée** (persistante, versionnée, `git revert`-able).
@@ -99,29 +99,29 @@ L'engine est **sans état** ; la data est **git-trackée** (persistante, version
 
 ### 5. La state-machine (le garde-fou) — chaque écriture modifie un fichier
 ```bash
-sdlc --project HIA create-epic  HIA-TOUR "Découverte"
-sdlc --project HIA create-ticket HIA-TOUR HIA-TOUR-1 "socle"
-cat  ../hia-sdlc-local/HIA-TOUR/stories/HIA-TOUR-1/status.json   # le fichier vient d'être créé (persistance)
-sdlc --project HIA link HIA-TOUR-1 spec_tech HIA-TOUR/stories/HIA-TOUR-1/spec-tech.md  # attache un artefact (enregistré dans status.json)
-sdlc --project HIA set-status HIA-TOUR-1 spec_func              # OK — transition valide
-sdlc --project HIA set-status HIA-TOUR-1 done                   # ❌ REFUSÉ — saut interdit (le garde-fou)
-rm -rf ../hia-sdlc-local/HIA-TOUR                               # data jetable
+sdlc --project SAMPLE create-epic  SAMPLE-TOUR "Découverte"
+sdlc --project SAMPLE create-ticket SAMPLE-TOUR SAMPLE-TOUR-1 "socle"
+cat  ../sample-proj-sdlc-local/SAMPLE-TOUR/stories/SAMPLE-TOUR-1/status.json   # le fichier vient d'être créé (persistance)
+sdlc --project SAMPLE link SAMPLE-TOUR-1 spec_tech SAMPLE-TOUR/stories/SAMPLE-TOUR-1/spec-tech.md  # attache un artefact (enregistré dans status.json)
+sdlc --project SAMPLE set-status SAMPLE-TOUR-1 spec_func              # OK — transition valide
+sdlc --project SAMPLE set-status SAMPLE-TOUR-1 done                   # ❌ REFUSÉ — saut interdit (le garde-fou)
+rm -rf ../sample-proj-sdlc-local/SAMPLE-TOUR                               # data jetable
 ```
 Chaque commande **écrit sur disque** (persistance) **et** la state-machine **valide** (responsabilité :
 cohérence). L'erreur prouve que le statut n'est pas un champ libre.
 
 ### 6. Le DAG (dépendances entre tickets)
 ```bash
-sdlc --project HIA create-epic  HIA-DAG "Demo"
-sdlc --project HIA create-ticket HIA-DAG HIA-DAG-2 "socle"
-sdlc --project HIA create-ticket HIA-DAG HIA-DAG-1 "api" --deps HIA-DAG-2
-sdlc --project HIA next HIA-DAG     # -> [HIA-DAG-2]  (HIA-DAG-1 attend son socle)
-rm -rf ../hia-sdlc-local/HIA-DAG
+sdlc --project SAMPLE create-epic  SAMPLE-DAG "Demo"
+sdlc --project SAMPLE create-ticket SAMPLE-DAG SAMPLE-DAG-2 "socle"
+sdlc --project SAMPLE create-ticket SAMPLE-DAG SAMPLE-DAG-1 "api" --deps SAMPLE-DAG-2
+sdlc --project SAMPLE next SAMPLE-DAG     # -> [SAMPLE-DAG-2]  (SAMPLE-DAG-1 attend son socle)
+rm -rf ../sample-proj-sdlc-local/SAMPLE-DAG
 ```
 
 ### 7. Multi-projet : 1 engine, N data
 ```bash
-sdlc --project TAL list            # Talenteo : AUTRE repo data, MÊME engine
+sdlc --project OTHER list            # OtherProject : AUTRE repo data, MÊME engine
 sdlc init-project DEMO --path /tmp/demo-sdlc-local --repos a,b   # crée le repo data + l'enregistre
 sdlc register OLD /tmp/demo-sdlc-local                          # (variante) enregistre un repo data EXISTANT sans le créer
 sdlc projects                      # DEMO + OLD enregistrés (dans le registre ~/.claude/sdlc/projects.json)
@@ -134,7 +134,7 @@ Ajouter un projet ne change **pas** l'engine : juste un **repo data** + une entr
 Dans une session (tu me parles, pas le shell) :
 - `/harry techlead` → charge la **persona** (`~/.claude/sdlc/harry.md` → symlink engine).
 - `/scope <idée>` → la **commande** (symlink) guide Harry ; il écrit un `prd.md` **dans le repo DATA**.
-- « lance run-ticket sur HIA-APPS-1 » → le **Workflow** (symlink) orchestre les **agents** (symlinks).
+- « lance run-ticket sur SAMPLE-APPS-1 » → le **Workflow** (symlink) orchestre les **agents** (symlinks).
 
 La boucle : **Claude lit les symlinks → agit → persiste dans la data**. Pour changer un comportement, tu
 édites `claude/agents/*.md` (ou `commands/`, `workflows/`) **dans l'engine** — le symlink propage.
@@ -142,16 +142,16 @@ La boucle : **Claude lit les symlinks → agit → persiste dans la data**. Pour
 ### 9. Voir l'état visuellement (cockpit, optionnel)
 ```bash
 pip install fastapi uvicorn
-HIA_SDLC_WORKSPACE=$(cd ../hia-sdlc-local && pwd) python3 -m cockpit.server   # depuis tooling/ → http://localhost:8787
+SDLC_WORKSPACE=$(cd ../sample-proj-sdlc-local && pwd) python3 -m cockpit.server   # depuis tooling/ → http://localhost:8787
 ```
 
 ---
 
 ## Versioning & migration de la data
 L'engine est versionné (`VERSION`). Chaque repo data porte `schemaVersion` (dans `sdlc.config.json`).
-Un upgrade peut migrer la data : `make migrate PROJECT=HIA` (applique `tooling/sdlc/migrations/`, bumpe
+Un upgrade peut migrer la data : `make migrate PROJECT=SAMPLE` (applique `tooling/sdlc/migrations/`, bumpe
 `schemaVersion`). Data git-trackée → un mauvais upgrade se `git revert`. Baseline = `0.1.0` (0 migration).
 
-## Nouveau projet (ex. Talenteo)
-1. Créer `talenteo-sdlc-local/` (repo data) avec `sdlc.config.json` (`prefix: TAL`, ses repos, escalation).
+## Nouveau projet (ex. OtherProject)
+1. Créer `other-proj-sdlc-local/` (repo data) avec `sdlc.config.json` (`prefix: OTHER`, ses repos, escalation).
 2. L'enregistrer dans `~/.claude/sdlc/projects.json`. **L'engine ne change pas.**

@@ -3,16 +3,16 @@ name: demo
 description: Sprint review — rejoue le parcours validé en narrant story par story vs les critères, produit demo.md et prépare l'accept humain. Retourne {demo}.
 ---
 
-Tu es l'agent **demo** du SDLC HIA. Tu fais la **démo de la feature** comme en agilité (sprint review).
+Tu es l'agent **demo** du SDLC. Tu fais la **démo de la feature** comme en agilité (sprint review).
 
 ## Entrée
-`python3 -m sdlc.cli --project HIA get <STORY>` ; lis `prd.md`, `spec-func.md` (critères), `acceptance.md`.
+`python3 -m sdlc.cli --project SAMPLE get <STORY>` ; lis `prd.md`, `spec-func.md` (critères), `acceptance.md`.
 
 ## Étapes
 1. **Rejoue le scénario validé** en live (Playwright MCP pour l'UI, ou appels API pour le backend).
 2. **Narre** : « US <STORY> : tu voulais X → le voici qui marche », en **mappant chaque critère
    d'acceptation** à ce que tu montres.
-3. Produis `hia-sdlc/<EPIC>/stories/<STORY>/demo.md` (déroulé + captures/GIF + critère × montré).
+3. Produis `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/demo.md` (déroulé + captures/GIF + critère × montré).
 4. `sdlc.cli link <STORY> demo <chemin>`. **N'accepte pas toi-même** : c'est la gate humaine finale.
 
 ## Sortie (dernier message = JSON)

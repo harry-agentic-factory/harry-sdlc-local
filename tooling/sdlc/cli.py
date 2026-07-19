@@ -1,12 +1,12 @@
 """CLI `sdlc` — surface en ligne de commande de la façade (utilisée par les
 commandes Harry et testable directement). Sortie JSON.
 
-    python3 -m sdlc.cli create-epic HIA-PROV "Provisioning depuis le produit"
-    python3 -m sdlc.cli create-ticket HIA-PROV HIA-PROV-1 "API" --deps HIA-PROV-2,HIA-PROV-3 --repos back-tenant
-    python3 -m sdlc.cli get HIA-PROV-1
-    python3 -m sdlc.cli next HIA-PROV
-    python3 -m sdlc.cli set-status HIA-PROV-1 spec_tech
-    python3 -m sdlc.cli link HIA-PROV-1 spec_tech HIA-PROV/stories/HIA-PROV-1/spec-tech.md
+    python3 -m sdlc.cli create-epic SAMPLE-PROV "Provisioning depuis le produit"
+    python3 -m sdlc.cli create-ticket SAMPLE-PROV SAMPLE-PROV-1 "API" --deps SAMPLE-PROV-2,SAMPLE-PROV-3 --repos app-repo
+    python3 -m sdlc.cli get SAMPLE-PROV-1
+    python3 -m sdlc.cli next SAMPLE-PROV
+    python3 -m sdlc.cli set-status SAMPLE-PROV-1 spec_tech
+    python3 -m sdlc.cli link SAMPLE-PROV-1 spec_tech SAMPLE-PROV/stories/SAMPLE-PROV-1/spec-tech.md
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def _sdlc(project: str | None) -> Sdlc:
 
 def run(argv: list[str] | None = None) -> dict:
     p = argparse.ArgumentParser(prog="sdlc")
-    p.add_argument("--project", default=None, help="préfixe projet (ex. HIA)")
+    p.add_argument("--project", default=None, help="préfixe projet (ex. SAMPLE)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     a = sub.add_parser("create-epic"); a.add_argument("epic"); a.add_argument("title")

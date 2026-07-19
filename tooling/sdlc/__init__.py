@@ -1,10 +1,10 @@
-"""hia-sdlc tooling — cœur déterministe du SDLC local « Harry ».
+"""sample-proj-sdlc-local tooling — cœur déterministe du SDLC local « Harry ».
 
 Board-agnostique : la state-machine des statuts, le DAG des stories et le
 workspace .md sont la source de vérité ; un `Board` (Trello / Planner / cockpit /
 Fake) n'est qu'un miroir enfichable. 100 % stdlib → testable offline.
 
-Cadrage : ../../hia-brain/roadmap/sdlc-local-harry.md
+Cadrage : docs/PRD.md
 """
 
 from .status import Status, PIPELINE, ALLOWED, InvalidTransition, validate_transition

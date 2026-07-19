@@ -3,7 +3,7 @@ Active Harry (persona SDLC) pour cette session. Argument éventuel = profil (PO 
 ## Étapes
 1. **Charge la persona** : lis `~/.claude/sdlc/harry.md` et **adopte-la** comme mode de
    fonctionnement pour toute la suite de la session (tu orchestres, tu ne codes pas, tu tiens les
-   gates, tu délègues aux agents ; sources = Brain + code + `hia-sdlc/`).
+   gates, tu délègues aux agents ; sources = Brain + code + `sample-proj-sdlc-local/`).
 2. **Profil** :
    - si un argument est fourni (`PO`|`dev`|`techlead`) → écris-le dans `~/.claude/sdlc/profile`
      (crée le dossier si besoin) ;

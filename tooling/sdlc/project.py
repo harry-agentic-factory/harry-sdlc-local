@@ -1,7 +1,7 @@
 """Cycle de vie des projets SDLC : scaffolding d'un repo **data** `<projet>-sdlc-local`
 + enregistrement dans le registre `~/.claude/sdlc/projects.json`.
 
-C'est la « commande plateforme » pour ajouter/initialiser un projet (HIA, Talenteo…) sans étapes manuelles.
+C'est la « commande plateforme » pour ajouter/initialiser un projet (SAMPLE, OtherProject…) sans étapes manuelles.
 """
 from __future__ import annotations
 

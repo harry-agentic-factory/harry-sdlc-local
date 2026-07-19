@@ -4,7 +4,7 @@
 // ⚠️ À n'utiliser QUE sur un env d'intégration (ou une prod non ouverte utilisée comme tel).
 //    Pour une vraie prod live, utiliser run-ticket (gate deploy = human-confirm).
 // Lancer : Workflow({ name: 'run-ticket-full-auto',
-//   args: { ticket:'HIA-APPS-1', epic:'HIA-APPS', branch:'feat/HIA-APPS-1-applications-endrealm', mr:'76' } })
+//   args: { ticket:'SAMPLE-APPS-1', epic:'SAMPLE-APPS', branch:'feat/SAMPLE-APPS-1-applications-endrealm', mr:'76' } })
 export const meta = {
   name: 'run-ticket-full-auto',
   description: "Pipeline SDLC FULL AUTO (env d'intégration) : review -> deploy branche -> recette (+fix-loop) -> merge -> deploy main",
@@ -16,10 +16,10 @@ export const meta = {
   ],
 }
 
-const TICKET = (args && args.ticket) || 'HIA-APPS-1'
-const EPIC = (args && args.epic) || 'HIA-APPS'
-const REPO = (args && args.repo) || '/Users/anisbessa/dev/workspace/hia/back-tenant'
-const SDLC_ROOT = (args && args.sdlcRoot) || '/Users/anisbessa/dev/workspace/hia/hia-sdlc'
+const TICKET = (args && args.ticket) || 'SAMPLE-APPS-1'
+const EPIC = (args && args.epic) || 'SAMPLE-APPS'
+const REPO = (args && args.repo) || '<workspace>/app-repo'
+const SDLC_ROOT = (args && args.sdlcRoot) || '<workspace>/sample-proj-sdlc-local'
 const STORY = `${SDLC_ROOT}/${EPIC}/stories/${TICKET}`
 const BRANCH = (args && args.branch) || `feat/${TICKET}`
 const MR = (args && args.mr) || ''
@@ -40,13 +40,13 @@ const MERGE = { type: 'object', required: ['merged'], properties: {
 const reviewPrompt = () => `Story SDLC **${TICKET}** (${REPO}). Review le diff de ${BRANCH} vs ${TARGET} contre les INVARIANTS de ${STORY}/spec-tech.md (+ critères ${STORY}/spec-func.md). Diff: \`git -C ${REPO} diff ${TARGET}...${BRANCH}\`. Vérifie chaque invariant (preuve), cherche bugs/régressions/fuites. Écris ${STORY}/review.md. Ne modifie PAS le code. Dernier message = JSON {conform, note, violations}.`
 
 const deployBranchPrompt = () => `Story SDLC **${TICKET}**. Déploie la BRANCHE **${BRANCH}** de ${REPO} sur l'env d'INTÉGRATION.
-Jenkins job (casse EXACTE, minuscules) : \`/job/prod/job/hia-back-tenant/job/ci/\` (CI) et \`.../job/cd/\` (CD). Auth \`curl -s -n\`, jamais \`-L\`.
+Jenkins job (casse EXACTE, minuscules) : \`/job/prod/job/app-service/job/ci/\` (CI) et \`.../job/cd/\` (CD). Auth \`curl -s -n\`, jamais \`-L\`.
 **AVANT de déclencher** : vérifie s'il existe déjà un build CI **en cours ou récent pour le commit de ${BRANCH}** (ex. #115) → si oui, **SUIS-LE** (ne re-déclenche PAS). Sinon → Replay CODE_BRANCH=${BRANCH} depuis un build récent.
 Quand CI = SUCCESS → assure/suis le **CD**, puis vérifie la **santé** /actuator/health et récupère la version. Sur échec/ambiguïté -> {ok:false, note}. Écris ${STORY}/deploy.md. Dernier message = JSON {ok, version, note}.`
 
 const recettePrompt = () => `Story SDLC **${TICKET}**. Recette sur l'env déployé vs les critères d'acceptation de ${STORY}/spec-func.md. Backend -> pilote l'API ; UI -> Playwright MCP. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans ${STORY}/repro/. Écris ${STORY}/acceptance.md. Dernier message = JSON {pass, repro, flaky, failed}.`
 
-const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. Monte local-dev, rejoue le repro (${repro}), corrige sans casser les invariants (${STORY}/spec-tech.md), re-run local jusqu'au vert, commit + push sur ${BRANCH}. Dernier message = JSON {fixed, root_cause, commit}.`
+const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. Monte l’env local du projet, rejoue le repro (${repro}), corrige sans casser les invariants (${STORY}/spec-tech.md), re-run local jusqu'au vert, commit + push sur ${BRANCH}. Dernier message = JSON {fixed, root_cause, commit}.`
 
 const mergePrompt = () => `Story SDLC **${TICKET}**. Recette verte -> merge la MR **!${MR}** (${BRANCH} -> ${TARGET}) via \`env -u GITLAB_TOKEN glab mr merge ${MR}\` dans ${REPO}. Vérifie que le merge est effectif. Sur échec/conflit -> {merged:false, note}. Dernier message = JSON {merged, note}.`
 

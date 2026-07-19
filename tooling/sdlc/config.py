@@ -1,6 +1,6 @@
 """Résolution du workspace SDLC + lecture de `sdlc.config.json`.
 
-Ordre : env `HIA_SDLC_WORKSPACE` → registre `~/.claude/sdlc/projects.json` (par préfixe)
+Ordre : env `SDLC_WORKSPACE` → registre `~/.claude/sdlc/projects.json` (par préfixe)
 → remontée de l'arbo à la recherche d'un `sdlc.config.json`.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ def registry_path() -> Path:
 
 
 def resolve_workspace(project: str | None = None, start: str | Path | None = None) -> Path:
-    env = os.environ.get("HIA_SDLC_WORKSPACE")
+    env = os.environ.get("SDLC_WORKSPACE")
     if env:
         return Path(env)
 
@@ -36,10 +36,10 @@ def resolve_workspace(project: str | None = None, start: str | Path | None = Non
     for d in [cur, *cur.parents]:
         if (d / "sdlc.config.json").exists():
             return d
-        if (d / "hia-sdlc" / "sdlc.config.json").exists():
-            return d / "hia-sdlc"
+        if (d / "sample-proj-sdlc-local" / "sdlc.config.json").exists():
+            return d / "sample-proj-sdlc-local"
     raise FileNotFoundError(
-        "workspace SDLC introuvable (env HIA_SDLC_WORKSPACE, registre projects.json, "
+        "workspace SDLC introuvable (env SDLC_WORKSPACE, registre projects.json, "
         "ou un sdlc.config.json en remontant l'arbo)"
     )
 

@@ -1,6 +1,6 @@
 // run-ticket — pipeline autonome d'un ticket SDLC (Harry).
-// Calque hia-sdlc/tooling/sdlc/orchestrator.py (logique de référence testée en stub).
-// Lancer : Workflow({ name: 'run-ticket', args: { ticket: 'HIA-APPS-1', epic: 'HIA-APPS' } })
+// Calque sample-proj-sdlc-local/tooling/sdlc/orchestrator.py (logique de référence testée en stub).
+// Lancer : Workflow({ name: 'run-ticket', args: { ticket: 'SAMPLE-APPS-1', epic: 'SAMPLE-APPS' } })
 export const meta = {
   name: 'run-ticket',
   description: "Pipeline autonome d'un ticket SDLC : reviewer -> deployer -> recette (+ fix-loop), gates + escalation",
@@ -12,10 +12,10 @@ export const meta = {
 }
 
 // ── paramètres ──
-const TICKET = (args && args.ticket) || 'HIA-APPS-1'
-const EPIC = (args && args.epic) || 'HIA-APPS'
-const REPO = (args && args.repo) || '/Users/anisbessa/dev/workspace/hia/back-tenant'
-const SDLC_ROOT = (args && args.sdlcRoot) || '/Users/anisbessa/dev/workspace/hia/hia-sdlc'
+const TICKET = (args && args.ticket) || 'SAMPLE-APPS-1'
+const EPIC = (args && args.epic) || 'SAMPLE-APPS'
+const REPO = (args && args.repo) || '<workspace>/app-repo'
+const SDLC_ROOT = (args && args.sdlcRoot) || '<workspace>/sample-proj-sdlc-local'
 const STORY = `${SDLC_ROOT}/${EPIC}/stories/${TICKET}`
 const ESC = (args && args.escalation) || { review: 'auto', deploy: 'human-confirm', recette: 'auto-then-human' }
 const MAX_FIX = 2
@@ -36,11 +36,11 @@ Lis: ${STORY}/spec-tech.md (invariants = ta checklist) + ${STORY}/spec-func.md (
 Diff: \`git -C ${REPO} diff main...HEAD\`. Vérifie CHAQUE invariant (preuve dans le diff), cherche bugs/régressions/fuites. Écris ${STORY}/review.md. Ne modifie PAS le code.
 Dernier message = JSON {conform, note, violations}.`
 
-const deployPrompt = () => `Story SDLC **${TICKET}**. Déploie ${REPO} branche courante **en DEV UNIQUEMENT** (namespace dev hia-tenant, values dev helm ; JAMAIS prod). Connais Jenkins/kubectl/Replay/gitops. Vérifie la santé (/actuator/health). **Sécurité : si l'env dev n'est pas clairement prêt, ou si une action est ambiguë/risquée/irréversible, NE déploie PAS → retourne {ok:false, note:"raison"} pour escalade humaine.** Écris ${STORY}/deploy.md. Dernier message = JSON {ok, version, note}.`
+const deployPrompt = () => `Story SDLC **${TICKET}**. Déploie ${REPO} branche courante **en DEV UNIQUEMENT** (namespace dev app-ns, values dev helm ; JAMAIS prod). Connais Jenkins/kubectl/Replay/gitops. Vérifie la santé (/actuator/health). **Sécurité : si l'env dev n'est pas clairement prêt, ou si une action est ambiguë/risquée/irréversible, NE déploie PAS → retourne {ok:false, note:"raison"} pour escalade humaine.** Écris ${STORY}/deploy.md. Dernier message = JSON {ok, version, note}.`
 
 const recettePrompt = () => `Story SDLC **${TICKET}**. Recette sur l'env déployé vs les critères d'acceptation de ${STORY}/spec-func.md. Feature backend -> pilote l'API ; UI -> Playwright MCP. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans ${STORY}/repro/. Écris ${STORY}/acceptance.md. Dernier message = JSON {pass, repro, flaky, failed}.`
 
-const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. Monte local-dev, rejoue le bundle repro (${repro}), corrige le code sans casser les invariants (${STORY}/spec-tech.md), re-run en local jusqu'au vert, commit sur la branche. Dernier message = JSON {fixed, root_cause, commit}.`
+const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. Monte l’env local du projet, rejoue le bundle repro (${repro}), corrige le code sans casser les invariants (${STORY}/spec-tech.md), re-run en local jusqu'au vert, commit sur la branche. Dernier message = JSON {fixed, root_cause, commit}.`
 
 // ── TRONÇON 1 : review -> deploy -> recette (+ fix-loop) ──
 phase('Review')
