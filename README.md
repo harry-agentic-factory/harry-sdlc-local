@@ -29,11 +29,19 @@ docs/PRD.md
 
 ## Installer / tester
 ```bash
-make install         # symlink claude/* -> ~/.claude/{agents,commands,workflows,sdlc} (préserve profile/projects.json)
+make install         # symlink claude/* -> ~/.claude ; crée la commande globale `sdlc` (dans un dir du PATH)
 make test            # pytest du cœur déterministe
 ```
-Activer sur un projet : `python3 -m sdlc.cli --project <PREFIX> …` (le registre `~/.claude/sdlc/projects.json`
-mappe `<PREFIX>` → chemin du repo data). Workflows : `Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
+`make install` pose une commande **`sdlc`** appelable de partout (dans `/usr/local/bin`, `/opt/homebrew/bin`
+ou `~/.local/bin` selon ton PATH). Ensuite :
+```bash
+sdlc projects                        # projets enregistrés
+sdlc --project HIA get HIA-APPS-1     # réhydrate un ticket
+sdlc init-project TAL --path … --repos a,b   # nouveau projet
+sdlc migrate --project HIA           # migrer la data
+```
+(Le registre `~/.claude/sdlc/projects.json` mappe `<PREFIX>` → repo data.) Workflows :
+`Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
 
 ## Versioning & migration de la data
 L'engine est versionné (`VERSION`). Chaque repo data porte `schemaVersion` (dans `sdlc.config.json`).

@@ -17,4 +17,23 @@ link "$ENG/claude/sdlc/harry.md" "$CLA/sdlc/harry.md"
 # état par-utilisateur (jamais écrasé) : profil + registre projets
 [ -f "$CLA/sdlc/profile" ] || printf 'dev\n' > "$CLA/sdlc/profile"
 [ -f "$CLA/sdlc/projects.json" ] || printf '{\n  "projects": {}\n}\n' > "$CLA/sdlc/projects.json"
+
+# commande `sdlc` (CLI de l'engine) — dans un dir DÉJÀ dans le PATH (pas de modif shell si possible)
+chmod +x "$ENG/bin/sdlc"
+target=""
+for d in /usr/local/bin /opt/homebrew/bin "$HOME/.local/bin"; do
+  case ":${PATH:-}:" in *":$d:"*) [ -w "$d" ] && { target="$d"; break; } ;; esac
+done
+if [ -z "$target" ]; then          # aucun dir du PATH inscriptible -> fallback ~/.local/bin + hint
+  target="$HOME/.local/bin"; mkdir -p "$target"
+  case ":${PATH:-}:" in *":$target:"*) : ;; *)
+    RC="${ZDOTDIR:-$HOME}/.zshrc"
+    grep -qF "harry-sdlc-local (sdlc CLI)" "$RC" 2>/dev/null || \
+      printf '\n# harry-sdlc-local (sdlc CLI)\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$RC"
+    echo "  PATH ajouté à $RC — 'source $RC' ou nouveau terminal." ;;
+  esac
+fi
+ln -sfn "$ENG/bin/sdlc" "$target/sdlc"
+echo "  sdlc -> $target/sdlc"
+
 echo "OK. (profil + projects.json préservés)"

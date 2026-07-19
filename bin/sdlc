@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# sdlc — CLI de l'engine harry-sdlc-local, appelable de n'importe où.
+# Résout son propre chemin réel (suit les symlinks) → trouve l'engine → lance le module Python.
+set -euo pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -h "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ "$src" != /* ]] && src="$dir/$src"
+done
+BIN="$(cd -P "$(dirname "$src")" && pwd)"
+ENG="$(cd "$BIN/.." && pwd)"
+
+exec env PYTHONPATH="$ENG/tooling${PYTHONPATH:+:$PYTHONPATH}" python3 -m sdlc.cli "$@"
