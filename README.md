@@ -53,9 +53,19 @@ ou `~/.local/bin` selon ton PATH). Ensuite :
 sdlc projects                        # projets enregistrés
 sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
 sdlc --project SAMPLE config            # manifest RÉSOLU (repos→chemins abs, brain, deploy…)
+sdlc --project SAMPLE worktree SAMPLE-1 --branch feat/x   # worktree(s) isolé(s) du ticket (create-or-reuse)
+sdlc --project SAMPLE worktree-clean SAMPLE-1            # remove si la branche est mergée sur refBranch
 sdlc init-project OTHER --path … --repos a,b   # nouveau projet
 sdlc migrate --project SAMPLE           # migrer la data
 ```
+
+### Worktrees — code isolé par ticket (autonomie des agents)
+`1 ticket = 1 branche = 1 worktree`, réutilisé par **tous** les agents du ticket (fix-loop fluide,
+zéro collision avec la session ou un autre agent). Chemin **déterministe** `<parent>/_wt/<repo>/<branche>`.
+- `sdlc worktree <STORY> [--repo r] [--branch b] [--base b]` — **create-or-reuse** (git interdit un
+  2ᵉ checkout d'une branche → réutilise) pour chaque repo touché du ticket.
+- `sdlc worktree-clean <STORY> [--ref origin/main]` — **remove** worktree + `branch -d` **seulement si**
+  la branche est mergée sur `refBranch` (du manifest). `remove` ne détruit **pas** les commits.
 (Le registre `~/.claude/sdlc/projects.json` mappe `<PREFIX>` → repo data.) Workflows :
 `Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
 

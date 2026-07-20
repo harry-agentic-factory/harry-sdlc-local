@@ -49,6 +49,10 @@ def run(argv: list[str] | None = None) -> dict:
     a = sub.add_parser("register"); a.add_argument("prefix"); a.add_argument("path")
     sub.add_parser("projects")
     a = sub.add_parser("config"); a.add_argument("--raw", action="store_true")
+    a = sub.add_parser("worktree")
+    a.add_argument("story"); a.add_argument("--repo"); a.add_argument("--branch"); a.add_argument("--base")
+    a = sub.add_parser("worktree-clean")
+    a.add_argument("story"); a.add_argument("--branch"); a.add_argument("--ref")
 
     args = p.parse_args(argv)
 
@@ -88,6 +92,29 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.set_status(args.story, args.status))
     if args.cmd == "link":
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
+    if args.cmd in ("worktree", "worktree-clean"):
+        from .config import resolved_manifest
+        from . import worktree as wt
+        t = s.get_ticket(args.story)
+        branch = args.branch or t.get("branch")
+        if not branch:
+            raise ValueError(f"aucune branche pour {args.story} (ticket.branch vide, passe --branch)")
+        man = resolved_manifest(args.project)
+        repos_map = man["repos"]
+        names = ([args.repo] if getattr(args, "repo", None) else t.get("repos")) or []
+        out: dict[str, dict] = {}
+        if args.cmd == "worktree":
+            for name in names:
+                p = repos_map.get(name)
+                out[name] = ({"error": "repo non résolu dans le manifest (reposRoot/repos ?)"}
+                             if not p else wt.ensure_worktree(p, branch, base=args.base))
+            return {"story": args.story, "branch": branch, "worktrees": out}
+        ref = args.ref or man.get("refBranch") or "main"
+        for name in names:
+            p = repos_map.get(name)
+            out[name] = ({"error": "repo non résolu dans le manifest"}
+                         if not p else wt.cleanup_if_merged(p, branch, ref))
+        return {"story": args.story, "branch": branch, "ref": ref, "cleaned": out}
     raise SystemExit(2)
 
 
