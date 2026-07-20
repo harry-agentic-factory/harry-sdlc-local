@@ -26,9 +26,15 @@ Dans `.deploy["<repo>"]` (repo = celui de la story) :
 Complète avec `sdlc get <STORY>` : **branche** de la story, **MR**, et `refBranch` du manifest
 (branche de code de référence = build normal ; sinon Replay sur la branche de la story).
 
-## 2. Règles de sécurité (ABSOLUES)
-- Auth Jenkins : **`curl -s -n`** (lit `.netrc`). **Jamais** `-L` ni `%{redirect_url}` (la `Location`
-  Jenkins embarque le mot de passe en clair → fuite).
+## 2. Identité (d'où viennent les creds)
+`sdlc config` → `.credentials.source` :
+- **`host`** (défaut) : creds **ambiantes de l'opérateur** — `curl -s -n` lit `~/.netrc`, `kubectl`
+  lit `~/.kube/config`, git via keyring `gh`/`glab`. Tu les **utilises sans jamais les lire/afficher**.
+- `service` (futur) : creds de service scopées injectées dans la bulle de l'agent.
+
+## Règles de sécurité (ABSOLUES)
+- Auth Jenkins : **`curl -s -n`** (lit `.netrc` **lui-même** — ne lis/affiche **jamais** le contenu de
+  `~/.netrc`). **Jamais** `-L` ni `%{redirect_url}` (la `Location` Jenkins embarque le mot de passe → fuite).
 - **Jamais** afficher de secret/token/credential dans une sortie de commande.
 - Ajoute `/api/json` à toute URL Jenkins pour des données structurées.
 - Un chemin de job à folders se traduit en URL : `prod/app/ci` → `/job/prod/job/app/job/ci`.

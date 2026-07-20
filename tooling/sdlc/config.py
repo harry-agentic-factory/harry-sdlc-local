@@ -59,6 +59,10 @@ def load_config(workspace: str | Path) -> dict:
     cfg.setdefault("roles", {})
     cfg.setdefault("refBranch", "main")
     cfg.setdefault("deploy", {})
+    # identité : source des credentials utilisée par les agents.
+    #   "host" = creds ambiantes de l'opérateur (curl -s -n via ~/.netrc, ~/.kube/config, gh/glab
+    #   keyring) — jamais lues ni affichées. Futur : "service" = creds scopées injectées dans la bulle.
+    cfg.setdefault("credentials", {"source": "host"})
     return cfg
 
 
@@ -120,6 +124,7 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "brain": resolve_path(cfg.get("brain"), cfg, ws),
         "refBranch": cfg.get("refBranch", "main"),
         "deploy": cfg.get("deploy", {}),
+        "credentials": cfg.get("credentials", {"source": "host"}),
         "escalation": cfg["escalation"],
         "board": cfg["board"],
         "schemaVersion": cfg.get("schemaVersion", "0.1.0"),
