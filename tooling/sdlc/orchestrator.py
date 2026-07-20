@@ -36,12 +36,13 @@ def _esc(escalation: dict | None) -> dict:
     return {**DEFAULT_ESCALATION, **(escalation or {})}
 
 
-def run_ticket_upstream(sdlc, story, agents, escalation=None, max_fix=2) -> Outcome:
+def run_ticket_upstream(sdlc, story, agents, escalation=None, max_fix=2, bubble=None) -> Outcome:
     esc = _esc(escalation)
     log: list = []
 
     def ctx() -> dict:
-        return sdlc.get_ticket(story)
+        t = sdlc.get_ticket(story)
+        return {**t, "bubble": bubble} if bubble else t   # agents voient les worktrees scopés
 
     # ── REVIEW ──
     if esc["review"] == "human-confirm":
@@ -75,12 +76,13 @@ def run_ticket_upstream(sdlc, story, agents, escalation=None, max_fix=2) -> Outc
         sdlc.set_status(story, "deployed")                        # re-deploy
 
 
-def run_ticket_downstream(sdlc, story, agents, escalation=None) -> Outcome:
+def run_ticket_downstream(sdlc, story, agents, escalation=None, bubble=None) -> Outcome:
     esc = _esc(escalation)
     log: list = []
 
     def ctx() -> dict:
-        return sdlc.get_ticket(story)
+        t = sdlc.get_ticket(story)
+        return {**t, "bubble": bubble} if bubble else t
 
     ea = agents["e2e_author"](ctx()); log.append(("e2e_author", ea))
     nr = agents["nonreg"](ctx()); log.append(("nonreg", nr))
@@ -91,7 +93,14 @@ def run_ticket_downstream(sdlc, story, agents, escalation=None) -> Outcome:
     return Outcome(story, "demo", "await_validation", "démo prête — accept humain", log)
 
 
-def accept(sdlc, story) -> None:
-    """Gate humaine finale (sprint review) : recette_ok → accepted → done."""
+def accept(sdlc, story, finalize=None) -> None:
+    """Gate humaine finale (sprint review) : recette_ok → accepted → done.
+
+    `finalize` (optionnel) : callable appelé une fois `done` atteint — c'est le point où
+    l'orchestration nettoie la bulle du ticket (worktrees mergés + dossier), ex.
+    `lambda: clean_workspace(project, story)`.
+    """
     sdlc.set_status(story, "accepted")
     sdlc.set_status(story, "done")
+    if finalize:
+        finalize()
