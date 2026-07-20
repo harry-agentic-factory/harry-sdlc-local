@@ -5,6 +5,7 @@ export const meta = {
   name: 'run-ticket',
   description: "Pipeline autonome d'un ticket SDLC : reviewer -> deployer -> recette (+ fix-loop), gates + escalation",
   phases: [
+    { title: 'Prepare' },
     { title: 'Review' },
     { title: 'Deploy' },
     { title: 'Recette' },
@@ -14,11 +15,15 @@ export const meta = {
 // ── paramètres ──
 const TICKET = (args && args.ticket) || 'SAMPLE-APPS-1'
 const EPIC = (args && args.epic) || 'SAMPLE-APPS'
+const PREFIX = (args && args.prefix) || 'SAMPLE'
+const REPO_NAME = (args && args.repoName) || 'app-repo'
 const REPO = (args && args.repo) || '<workspace>/app-repo'
+const BRANCH = (args && args.branch) || `feat/${TICKET}`
 const SDLC_ROOT = (args && args.sdlcRoot) || '<workspace>/sample-proj-sdlc-local'
 const STORY = `${SDLC_ROOT}/${EPIC}/stories/${TICKET}`
 const ESC = (args && args.escalation) || { review: 'auto', deploy: 'human-confirm', recette: 'auto-then-human' }
 const MAX_FIX = 2
+let WORKREPO = REPO   // remplacé par le worktree isolé du ticket après la phase Prepare
 
 const REVIEW = { type: 'object', required: ['conform'], properties: {
   conform: { type: 'boolean' }, note: { type: 'string' },
@@ -31,16 +36,30 @@ const RECETTE = { type: 'object', required: ['pass'], properties: {
 const FIX = { type: 'object', required: ['fixed'], properties: {
   fixed: { type: 'boolean' }, root_cause: { type: 'string' }, commit: { type: 'string' } } }
 
-const reviewPrompt = () => `Story SDLC **${TICKET}** (${REPO}). Review le diff de la branche vs main contre les INVARIANTS du spec-tech.
+const WS = { type: 'object', required: ['worktree'], properties: {
+  worktree: { type: 'string' }, additionalDirectories: { type: 'array', items: { type: 'string' } },
+  projectSkills: { type: 'array', items: { type: 'string' } } } }
+
+const prepPrompt = () => `Prépare la **bulle scopée** du ticket **${TICKET}**. Exécute en Bash :
+\`sdlc --project ${PREFIX} workspace ${TICKET} --branch ${BRANCH}\`
+→ crée le worktree isolé + \`.claude/settings.json\` (additionalDirectories = worktrees+brain+data) + symlink des skills projet. Renvoie STRICTEMENT le JSON : worktree = \`.worktrees["${REPO_NAME}"]\`, additionalDirectories, projectSkills. Ne fais RIEN d'autre.`
+
+const reviewPrompt = () => `Story SDLC **${TICKET}** (${WORKREPO}). Review le diff de la branche vs main contre les INVARIANTS du spec-tech.
 Lis: ${STORY}/spec-tech.md (invariants = ta checklist) + ${STORY}/spec-func.md (critères).
-Diff: \`git -C ${REPO} diff main...HEAD\`. Vérifie CHAQUE invariant (preuve dans le diff), cherche bugs/régressions/fuites. Écris ${STORY}/review.md. Ne modifie PAS le code.
+Diff: \`git -C ${WORKREPO} diff main...HEAD\`. Vérifie CHAQUE invariant (preuve dans le diff), cherche bugs/régressions/fuites. Écris ${STORY}/review.md. Ne modifie PAS le code.
 Dernier message = JSON {conform, note, violations}.`
 
-const deployPrompt = () => `Story SDLC **${TICKET}**. Déploie ${REPO} branche courante **en DEV UNIQUEMENT** (namespace dev app-ns, values dev helm ; JAMAIS prod). Connais Jenkins/kubectl/Replay/gitops. Vérifie la santé (/actuator/health). **Sécurité : si l'env dev n'est pas clairement prêt, ou si une action est ambiguë/risquée/irréversible, NE déploie PAS → retourne {ok:false, note:"raison"} pour escalade humaine.** Écris ${STORY}/deploy.md. Dernier message = JSON {ok, version, note}.`
+const deployPrompt = () => `Story SDLC **${TICKET}**. Déploie ${WORKREPO} branche courante **en DEV UNIQUEMENT** (namespace dev app-ns, values dev helm ; JAMAIS prod). Connais Jenkins/kubectl/Replay/gitops. Vérifie la santé (/actuator/health). **Sécurité : si l'env dev n'est pas clairement prêt, ou si une action est ambiguë/risquée/irréversible, NE déploie PAS → retourne {ok:false, note:"raison"} pour escalade humaine.** Écris ${STORY}/deploy.md. Dernier message = JSON {ok, version, note}.`
 
 const recettePrompt = () => `Story SDLC **${TICKET}**. Recette sur l'env déployé vs les critères d'acceptation de ${STORY}/spec-func.md. Feature backend -> pilote l'API ; UI -> Playwright MCP. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans ${STORY}/repro/. Écris ${STORY}/acceptance.md. Dernier message = JSON {pass, repro, flaky, failed}.`
 
 const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. Monte l’env local du projet, rejoue le bundle repro (${repro}), corrige le code sans casser les invariants (${STORY}/spec-tech.md), re-run en local jusqu'au vert, commit sur la branche. Dernier message = JSON {fixed, root_cause, commit}.`
+
+// ── PREPARE : matérialise la bulle scopée (worktree isolé + settings + skills projet) ──
+phase('Prepare')
+const prep = await agent(prepPrompt(), { agentType: 'general-purpose', schema: WS, label: `prepare:${TICKET}`, phase: 'Prepare' })
+if (prep && prep.worktree) { WORKREPO = prep.worktree; log(`Bulle prête — worktree isolé: ${WORKREPO}${(prep.projectSkills||[]).length ? ' | skills projet: '+prep.projectSkills.join(',') : ''}`) }
+else log(`Prepare KO -> repli sur ${WORKREPO} (working tree partagé)`)
 
 // ── TRONÇON 1 : review -> deploy -> recette (+ fix-loop) ──
 phase('Review')

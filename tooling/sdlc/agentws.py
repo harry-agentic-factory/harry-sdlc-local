@@ -13,6 +13,7 @@ Le dossier est **déterministe et régénérable** (sibling des worktrees, hors 
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 from . import worktree as wt
@@ -92,3 +93,32 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
         "worktrees": worktrees, "additionalDirectories": add_dirs,
         "projectSkills": skills, "credentials": man.get("credentials", {"source": "host"}),
     }
+
+
+def clean_workspace(project: str | None = None, story: str | None = None,
+                    branch: str | None = None, ref: str | None = None,
+                    workspace: str | Path | None = None) -> dict:
+    """Fin de vie du ticket : retire worktrees + branche **si mergée** sur `ref` (défaut `refBranch`),
+    puis supprime la bulle régénérable. Partagé par la CLI (`worktree-clean`) et l'orchestrateur.
+    """
+    man = resolved_manifest(project, workspace)
+    sdlc = Sdlc(Workspace(man["workspace"]))
+    ticket = sdlc.get_ticket(story)
+    br = branch or ticket.get("branch")
+    if not br:
+        raise ValueError(f"aucune branche pour {story} (ticket.branch vide, passe branch=...)")
+    r = ref or man.get("refBranch") or "main"
+
+    cleaned: dict[str, dict] = {}
+    for name in ticket.get("repos") or []:
+        repo_path = man["repos"].get(name)
+        if repo_path:
+            cleaned[name] = wt.cleanup_if_merged(repo_path, br, r)
+
+    all_removed = all(c.get("removed") for c in cleaned.values()) if cleaned else True
+    bubble = agentws_path(man, story)
+    bubble_removed = False
+    if all_removed and bubble.exists():       # tout est mergé/parti → la bulle n'a plus lieu d'être
+        shutil.rmtree(bubble)
+        bubble_removed = True
+    return {"story": story, "branch": br, "ref": r, "cleaned": cleaned, "bubbleRemoved": bubble_removed}

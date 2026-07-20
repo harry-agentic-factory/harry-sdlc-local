@@ -96,7 +96,10 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
         return build_agent_workspace(args.project, args.story, branch=args.branch)
-    if args.cmd in ("worktree", "worktree-clean"):
+    if args.cmd == "worktree-clean":
+        from .agentws import clean_workspace
+        return clean_workspace(args.project, args.story, branch=args.branch, ref=args.ref)
+    if args.cmd == "worktree":
         from .config import resolved_manifest
         from . import worktree as wt
         t = s.get_ticket(args.story)
@@ -104,21 +107,13 @@ def run(argv: list[str] | None = None) -> dict:
         if not branch:
             raise ValueError(f"aucune branche pour {args.story} (ticket.branch vide, passe --branch)")
         man = resolved_manifest(args.project)
-        repos_map = man["repos"]
-        names = ([args.repo] if getattr(args, "repo", None) else t.get("repos")) or []
+        names = ([args.repo] if args.repo else t.get("repos")) or []
         out: dict[str, dict] = {}
-        if args.cmd == "worktree":
-            for name in names:
-                p = repos_map.get(name)
-                out[name] = ({"error": "repo non résolu dans le manifest (reposRoot/repos ?)"}
-                             if not p else wt.ensure_worktree(p, branch, base=args.base))
-            return {"story": args.story, "branch": branch, "worktrees": out}
-        ref = args.ref or man.get("refBranch") or "main"
         for name in names:
-            p = repos_map.get(name)
-            out[name] = ({"error": "repo non résolu dans le manifest"}
-                         if not p else wt.cleanup_if_merged(p, branch, ref))
-        return {"story": args.story, "branch": branch, "ref": ref, "cleaned": out}
+            p = man["repos"].get(name)
+            out[name] = ({"error": "repo non résolu dans le manifest (reposRoot/repos ?)"}
+                         if not p else wt.ensure_worktree(p, branch, base=args.base))
+        return {"story": args.story, "branch": branch, "worktrees": out}
     raise SystemExit(2)
 
 

@@ -79,6 +79,12 @@ zéro collision avec la session ou un autre agent). Chemin **déterministe** `<p
 
 Dossier **régénérable** sous `<reposRoot>/_agentws/<PREFIX>/<STORY>/`, prêt pour un lancement **headless**
 (préfigure le sandbox factory). C'est la brique **droits scopés** de la pile d'autonomie.
+
+**Intégré à l'orchestration** : `run-ticket*.js` ouvre par une phase **Prepare** (`sdlc workspace` →
+worktree isolé, passé comme repo à tous les agents) et le full-auto termine par **Cleanup**
+(`sdlc worktree-clean` → remove worktree + bulle **si mergé** sur `refBranch`). Côté logique de
+référence, `orchestrator.py` thread la bulle dans le `ctx` des agents et `accept(..., finalize=...)`
+déclenche le nettoyage post-`done`.
 (Le registre `~/.claude/sdlc/projects.json` mappe `<PREFIX>` → repo data.) Workflows :
 `Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
 
