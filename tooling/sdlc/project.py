@@ -63,7 +63,12 @@ def init_project(prefix: str, path: str | Path, repos: list[str] | None = None,
     _write_if_absent(ws / "README.md",
                      f"# {ws.name} — data SDLC ({prefix})\n\n"
                      f"Repo **DATA** opéré par l'engine `harry-sdlc-local`. Tickets `{prefix}-*/`.\n")
-    _write_if_absent(ws / ".gitignore", "*.db\n__pycache__/\n.pytest_cache/\n")
+    _write_if_absent(ws / "skills" / "README.md",
+                     "# Skills spécifiques au projet\n\n"
+                     "Skills **apportés par ce projet** (2-tiers : générique = engine, spécifique = ici).\n"
+                     "Un `<name>/SKILL.md` par skill ; référencé par le manifest (ex. `deploy.<repo>.skill`).\n"
+                     "La bulle agent (`sdlc workspace`) les symlinke dans son `.claude/skills`.\n")
+    _write_if_absent(ws / ".gitignore", "*.db\n__pycache__/\n.pytest_cache/\n_agentws/\n_wt/\n")
     if git and not (ws / ".git").exists():
         subprocess.run(["git", "init", "-q"], cwd=str(ws), check=False)
     register_project(prefix, ws)

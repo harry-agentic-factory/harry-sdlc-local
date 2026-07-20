@@ -53,6 +53,7 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("story"); a.add_argument("--repo"); a.add_argument("--branch"); a.add_argument("--base")
     a = sub.add_parser("worktree-clean")
     a.add_argument("story"); a.add_argument("--branch"); a.add_argument("--ref")
+    a = sub.add_parser("workspace"); a.add_argument("story"); a.add_argument("--branch")
 
     args = p.parse_args(argv)
 
@@ -92,6 +93,9 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.set_status(args.story, args.status))
     if args.cmd == "link":
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
+    if args.cmd == "workspace":
+        from .agentws import build_agent_workspace
+        return build_agent_workspace(args.project, args.story, branch=args.branch)
     if args.cmd in ("worktree", "worktree-clean"):
         from .config import resolved_manifest
         from . import worktree as wt

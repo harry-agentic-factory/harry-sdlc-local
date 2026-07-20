@@ -55,6 +55,7 @@ sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
 sdlc --project SAMPLE config            # manifest RÉSOLU (repos→chemins abs, brain, deploy…)
 sdlc --project SAMPLE worktree SAMPLE-1 --branch feat/x   # worktree(s) isolé(s) du ticket (create-or-reuse)
 sdlc --project SAMPLE worktree-clean SAMPLE-1            # remove si la branche est mergée sur refBranch
+sdlc --project SAMPLE workspace SAMPLE-1 --branch feat/x  # bulle scopée : worktrees + settings.json + skills projet
 sdlc init-project OTHER --path … --repos a,b   # nouveau projet
 sdlc migrate --project SAMPLE           # migrer la data
 ```
@@ -66,6 +67,18 @@ zéro collision avec la session ou un autre agent). Chemin **déterministe** `<p
   2ᵉ checkout d'une branche → réutilise) pour chaque repo touché du ticket.
 - `sdlc worktree-clean <STORY> [--ref origin/main]` — **remove** worktree + `branch -d` **seulement si**
   la branche est mergée sur `refBranch` (du manifest). `remove` ne détruit **pas** les commits.
+
+### Bulle scopée de l'agent (`sdlc workspace`) — droits + isolation + skills
+`sdlc workspace <STORY> --branch <b>` **assemble** la bulle d'un agent, session-indépendante :
+- **worktrees** (create-or-reuse) pour chaque repo touché ;
+- **`.claude/settings.json`** avec `additionalDirectories` = **worktrees + brain + data**, et *rien d'autre*
+  (fini le workspace VS Code hérité / le home-grant global) ;
+- **skills projet** : symlink de `<data>/skills/*` dans le `.claude/skills` de la bulle (2-tiers :
+  générique = engine, spécifique = projet) ;
+- **identité** : `credentials.source` héritée du manifest.
+
+Dossier **régénérable** sous `<reposRoot>/_agentws/<PREFIX>/<STORY>/`, prêt pour un lancement **headless**
+(préfigure le sandbox factory). C'est la brique **droits scopés** de la pile d'autonomie.
 (Le registre `~/.claude/sdlc/projects.json` mappe `<PREFIX>` → repo data.) Workflows :
 `Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
 
