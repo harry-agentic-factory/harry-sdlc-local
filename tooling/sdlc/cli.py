@@ -48,6 +48,7 @@ def run(argv: list[str] | None = None) -> dict:
     a = sub.add_parser("init-project"); a.add_argument("prefix"); a.add_argument("--path", required=True); a.add_argument("--repos")
     a = sub.add_parser("register"); a.add_argument("prefix"); a.add_argument("path")
     sub.add_parser("projects")
+    a = sub.add_parser("config"); a.add_argument("--raw", action="store_true")
 
     args = p.parse_args(argv)
 
@@ -64,6 +65,11 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "projects":
         from .project import list_projects
         return {"projects": list_projects()}
+    if args.cmd == "config":
+        from .config import load_config, resolved_manifest
+        if args.raw:
+            return load_config(resolve_workspace(args.project))
+        return resolved_manifest(args.project)
 
     s = _sdlc(args.project)
 

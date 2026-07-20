@@ -13,8 +13,29 @@ import json
 from pathlib import Path
 from typing import Callable
 
-# (from_version, to_version, fn) — chaînées. Ex. futur : ("0.1.0", "0.2.0", _m_add_field)
-MIGRATIONS: list[tuple[str, str, Callable[[Path], None]]] = []
+def _m_0_1_to_0_2(ws: Path) -> None:
+    """Manifest enrichi : `repos` liste→map name→path, + `reposRoot`/`roles`/`refBranch`/`deploy`.
+
+    Idempotente : convertit la liste seulement si c'en est une, `setdefault` pour le reste.
+    """
+    p = ws / "sdlc.config.json"
+    if not p.exists():
+        return
+    data = json.loads(p.read_text())
+    repos = data.get("repos", [])
+    if isinstance(repos, list):
+        data["repos"] = {name: None for name in repos}
+    data.setdefault("reposRoot", None)
+    data.setdefault("roles", {})
+    data.setdefault("refBranch", "main")
+    data.setdefault("deploy", {})
+    p.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+
+# (from_version, to_version, fn) — chaînées.
+MIGRATIONS: list[tuple[str, str, Callable[[Path], None]]] = [
+    ("0.1.0", "0.2.0", _m_0_1_to_0_2),
+]
 
 # Version de schéma DATA cible (découplée de la VERSION d'engine : n'avance QUE si migration data).
 LATEST_SCHEMA = MIGRATIONS[-1][1] if MIGRATIONS else "0.1.0"
