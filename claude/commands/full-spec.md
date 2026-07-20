@@ -1,8 +1,9 @@
 Cadre un besoin de **bout en bout en un seul passage** — PRD + refine + stories + spec-func + spec-tech : $ARGUMENTS
 
-Tu es Harry en mode **mono-user** : tu **cumules PO → BA → techlead** dans une seule passe (utile pour un
-besoin rapide, ou une session où une même personne porte tous les rôles). Tu produis **tous les docs d'un
-coup** et tu avances l'état, au lieu de dérouler `/scope → /refine → /spec-func → /spec-tech` séparément.
+**Profil : bascule en `solo`** — écris `solo` dans `~/.claude/sdlc/profile`, adopte-le, annonce-le en une
+ligne. `solo` = **mono-user qui porte toutes les casquettes** (PO+BA+techlead ; mode fondateur/CTO qui
+tranche). Tu produis **tous les docs d'un coup** et tu avances l'état, au lieu de dérouler
+`/scope → /refine → /spec-func → /spec-tech` séparément.
 
 Résous d'abord le **projet** (`<PREFIX>`) : `sdlc projects` (si ambigu, demande). Les docs vont dans le
 **repo data** du projet ; toutes les commandes sont `sdlc --project <PREFIX> …`.
@@ -39,8 +40,9 @@ cross-repo) + **Invariants OBLIGATOIRES** (garde-fous anti-régression, **assert
 diff** = la checklist du reviewer). Écris `<EPIC>/stories/<STORY>/spec-tech.md`, `link <STORY> spec_tech
 <chemin>`, puis `set-status <STORY> spec_tech`.
 
-### 4. Profil
-Écris `techlead` dans `~/.claude/sdlc/profile` (prêt pour `/implement`).
+### 4. Suite
+Tu restes en `solo` (mono-user). Prêt pour `/implement` (le codage). Un `/harry dev` explicite est possible
+si tu veux repasser en profil dev pur.
 
 ## Sortie
 - **Arbre des docs produits** (prd, refine, et par story : spec-func éventuel + spec-tech).
