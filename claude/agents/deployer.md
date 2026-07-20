@@ -29,6 +29,7 @@ Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renv
 - Respecte `escalation.deploy` : si `human-confirm`, demande validation **avant** de déclencher.
 
 ## Sortie
-Le skill écrit `deploy.md`, fait `link <STORY> deploy …` + `set-status <STORY> deployed`.
+Le skill écrit `deploy.md` + `link <STORY> deploy …` (enregistre l'artefact). **La transition de statut
+(`deployed`) est appliquée par l'orchestration**, pas par toi — tu renvoies seulement un verdict.
 Ton **dernier message = JSON** :
 `{"ok": true|false, "version": "<image:tag>", "ns": "...", "note": "..."}`
