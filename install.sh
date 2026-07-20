@@ -4,7 +4,7 @@
 set -euo pipefail
 ENG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLA="${CLAUDE_HOME:-$HOME/.claude}"
-mkdir -p "$CLA"/agents "$CLA"/commands "$CLA"/workflows "$CLA"/sdlc
+mkdir -p "$CLA"/agents "$CLA"/commands "$CLA"/workflows "$CLA"/sdlc "$CLA"/skills
 
 link() { ln -sfn "$1" "$2"; echo "  $(basename "$2") -> $1"; }
 
@@ -12,6 +12,7 @@ echo "Install harry-sdlc-local $(cat "$ENG/VERSION") -> $CLA"
 for f in "$ENG"/claude/agents/*.md;    do link "$f" "$CLA/agents/$(basename "$f")";    done
 for f in "$ENG"/claude/commands/*.md;  do link "$f" "$CLA/commands/$(basename "$f")";  done
 for f in "$ENG"/claude/workflows/*.js; do link "$f" "$CLA/workflows/$(basename "$f")"; done
+for d in "$ENG"/claude/skills/*/;      do [ -d "$d" ] && link "${d%/}" "$CLA/skills/$(basename "$d")"; done
 link "$ENG/claude/sdlc/harry.md" "$CLA/sdlc/harry.md"
 
 # état par-utilisateur (jamais écrasé) : profil + registre projets
