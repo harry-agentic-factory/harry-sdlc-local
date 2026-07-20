@@ -49,6 +49,14 @@ def test_resolved_manifest_defaults(tmp_path):
     assert m["escalation"]["deploy"]  # défaut posé
 
 
+def test_recette_block_exposed(tmp_path):
+    _write_cfg(tmp_path, {"prefix": "X", "recette": {"app": {"tool": "api", "auth": "admin"}}})
+    m = resolved_manifest(workspace=tmp_path)
+    assert m["recette"]["app"]["tool"] == "api"
+    _write_cfg(tmp_path, {"prefix": "X"})   # défaut = {}
+    assert resolved_manifest(workspace=tmp_path)["recette"] == {}
+
+
 def test_credentials_source_overridable(tmp_path):
     _write_cfg(tmp_path, {"prefix": "X", "credentials": {"source": "service", "ref": "vault/x"}})
     m = resolved_manifest(workspace=tmp_path)
