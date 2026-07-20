@@ -35,7 +35,7 @@ claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
   commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot upstream), ticket
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
-  skills/      deploy-jenkins (méthode déploiement, paramétrée par le manifest)
+  skills/      deploy-jenkins · recette (méthodes déploiement/recette, paramétrées par le manifest)
   sdlc/        harry.md (persona)
 tooling/
   sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/
