@@ -51,11 +51,26 @@ ou `~/.local/bin` selon ton PATH). Ensuite :
 ```bash
 sdlc projects                        # projets enregistrés
 sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
+sdlc --project SAMPLE config            # manifest RÉSOLU (repos→chemins abs, brain, deploy…)
 sdlc init-project OTHER --path … --repos a,b   # nouveau projet
 sdlc migrate --project SAMPLE           # migrer la data
 ```
 (Le registre `~/.claude/sdlc/projects.json` mappe `<PREFIX>` → repo data.) Workflows :
 `Workflow({scriptPath:'~/.claude/workflows/run-ticket*.js', args:{…}})`.
+
+### Le manifest (`sdlc.config.json`) = la carte du projet
+Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-engineerer l'infra) :
+```jsonc
+{ "prefix": "SAMPLE",
+  "reposRoot": "/abs/parent",              // base ; les repos ci-dessous se résolvent par <reposRoot>/<nom>
+  "repos": { "app-repo": null, "ops-repo": "/opt/ops" },  // name→path (null ⇒ via reposRoot)
+  "roles": { "app-repo": "code", "ops-repo": "gitops" },
+  "brain": "sample-brain",                 // pointeur connaissance (résolu abs)
+  "refBranch": "main",                     // cible de merge ⇒ cleanup worktree
+  "deploy": { "app-repo": { "skill": "deploy-jenkins", "ci": "prod/app/ci", "gitops": "ops@prod" } },
+  "escalation": { … }, "schemaVersion": "0.2.0" }
+```
+`sdlc config` renvoie la vue **résolue** (chemins absolus) ; `sdlc config --raw` renvoie le fichier brut.
 
 ## Découverte pas à pas
 
