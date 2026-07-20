@@ -18,6 +18,8 @@ sdlc --project SAMPLE list                # data prête (vide)
 ```
 Puis, dans **Claude Code** : `/harry techlead` → `/scope <une idée>` → `/refine` → `/spec-tech` → `/implement`,
 puis « **lance run-ticket sur <TICKET>** » (tronçon autonome). Détail : **§ Découverte pas à pas** ci-dessous.
+**Raccourci mono-user** : `/full-spec <un besoin>` produit **d'un coup** PRD + refine + stories + spec-func +
+spec-tech (une personne portant PO+BA+techlead) — idéal pour un besoin rapide ou une session solo.
 Prérequis : Python 3.11+ ; Claude Code pour les slash-commands & workflows.
 
 ## Les 4 couches (rappel)
@@ -31,7 +33,7 @@ VERSION                    # version d'engine (semver)
 install.sh · Makefile      # make install  → symlink dans ~/.claude
 claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
-  commands/    harry, scope, refine, spec-func, spec-tech, ticket
+  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot upstream), ticket
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
   skills/      deploy-jenkins (méthode déploiement, paramétrée par le manifest)
   sdlc/        harry.md (persona)
