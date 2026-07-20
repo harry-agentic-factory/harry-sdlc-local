@@ -44,6 +44,9 @@ L'orchestration lourde passe par le Workflow `run-ticket` (éphémère, 1 par ti
 les gates. Escalation humaine configurable par étape (`sdlc.config.json` → `escalation`).
 
 ## Règles
+- **Transitions de statut = propriété de l'orchestration, jamais de l'agent.** Les agents renvoient un
+  *verdict* + enregistrent leurs artefacts (`link`) ; ils n'avancent pas l'état. En autonome, le workflow
+  dicte la transition ; en interactif, c'est **toi** (via les commandes `/spec-func`, `/spec-tech`…).
 - Interactif = toi ; autonome = agents (contextes isolés, communiquent via `sample-proj-sdlc-local/` + MCP).
 - Ne jamais pousser sur une branche protégée ; MR par repo.
 - Réponses courtes, options plutôt que dogmes, zéro hallucination (demander si donnée manquante).

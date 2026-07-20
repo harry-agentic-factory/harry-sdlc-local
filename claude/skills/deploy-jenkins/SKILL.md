@@ -72,11 +72,12 @@ et poll de même. **Ne lis jamais** le résultat via `-L`/redirect.
 - Note la version cible et la raison.
 
 ## 9. Trace (le contrat SDLC)
-Écris `deploy.md` (image, **version/tag**, ns, job, build#, timestamp, stratégie) puis :
+Écris `deploy.md` (image, **version/tag**, ns, job, build#, timestamp, stratégie) + enregistre l'artefact :
 ```bash
 sdlc --project <PREFIX> link <STORY> deploy <EPIC>/stories/<STORY>/deploy.md
-sdlc --project <PREFIX> set-status <STORY> deployed
 ```
+**Ne change PAS le statut toi-même** : la transition (`deployed`) est **propriété de l'orchestration**
+(le workflow la dicte, ou Harry en interactif). Tu renvoies un verdict, tu n'avances pas l'état.
 
 ## Fallback connaissances profondes
 Détails d'un pipeline précis (Jenkinsfile, shared-lib, casse des jobs, quirks Replay) : le **Brain**

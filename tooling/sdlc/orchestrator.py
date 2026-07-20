@@ -4,6 +4,13 @@ Les agents sont injectés (callables `ctx -> verdict`) → on teste l'enchaînem
 gates, le fix-loop et l'escalation SANS LLM. La version « live » (Workflow Claude Code)
 appelle les mêmes étapes via de vrais sous-agents.
 
+**Propriété des transitions de statut = l'ORCHESTRATION, jamais l'agent.** Les agents renvoient un
+*verdict* (`{conform}`/`{ok}`/`{pass}`…) et enregistrent leurs artefacts (`link`) ; ils **ne décident pas**
+de la transition. Ici (Python) l'orchestrateur applique `sdlc.set_status(...)` en direct. Dans le tronçon
+JS (`run-ticket*.js`, qui ne peut pas shell-out), le **workflow dicte** la transition cible dans le prompt
+de chaque phase et l'agent l'exécute mécaniquement — la *décision* reste à l'orchestration. En interactif,
+c'est Harry/la commande (`/spec-func`…) qui possède la transition. Un seul propriétaire par contexte.
+
 Tronçon 1 (auto amont)  : reviewer → deployer → recette (+ fix-loop) → STOP validation.
 Tronçon 2 (auto aval)   : e2e-author → nonreg → demo → STOP accept.
 
