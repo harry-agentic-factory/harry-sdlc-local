@@ -83,6 +83,11 @@ Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-
 ```
 `sdlc config` renvoie la vue **résolue** (chemins absolus) ; `sdlc config --raw` renvoie le fichier brut.
 
+**Identité (`credentials.source`)** : `host` (défaut) = creds **ambiantes de l'opérateur** —
+`curl -s -n`/`~/.netrc`, `~/.kube/config`, keyring `gh`/`glab` — **utilisées sans jamais être lues ni
+affichées**. `service` (futur) = creds de service scopées injectées dans la bulle de l'agent (l'étape
+qui rendra les agents pleinement session-indépendants).
+
 ## Découverte pas à pas
 
 Tour guidé pour comprendre **3 choses** : (a) **qui fait quoi** (responsabilités), (b) **où ça persiste**,

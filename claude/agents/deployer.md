@@ -22,7 +22,9 @@ Selon `deploy.<repo>.skill` :
 Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renvoie vers le **Brain**
 (`.brain` du manifest) et le `CLAUDE.md` du repo — mais les **paramètres** restent ceux du manifest.
 
-## Garde-fous (rappelés par le skill, non négociables)
+## Identité & garde-fous (rappelés par le skill, non négociables)
+- **Creds** : `sdlc config` → `.credentials.source` (`host` = creds ambiantes opérateur : `.netrc`,
+  kubeconfig, keyring). Tu les **utilises sans jamais les lire/afficher**.
 - `curl -s -n` (.netrc) ; **jamais** `-L`/`%{redirect_url}` (fuite de creds) ; jamais de secret affiché.
 - Respecte `escalation.deploy` : si `human-confirm`, demande validation **avant** de déclencher.
 

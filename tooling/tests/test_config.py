@@ -45,7 +45,14 @@ def test_resolved_manifest_defaults(tmp_path):
     assert m["refBranch"] == "main"
     assert m["repos"] == {} and m["roles"] == {} and m["deploy"] == {}
     assert m["brain"] is None
+    assert m["credentials"] == {"source": "host"}   # identité par défaut
     assert m["escalation"]["deploy"]  # défaut posé
+
+
+def test_credentials_source_overridable(tmp_path):
+    _write_cfg(tmp_path, {"prefix": "X", "credentials": {"source": "service", "ref": "vault/x"}})
+    m = resolved_manifest(workspace=tmp_path)
+    assert m["credentials"]["source"] == "service" and m["credentials"]["ref"] == "vault/x"
 
 
 def test_resolved_manifest_brain_relative_to_reposroot(tmp_path):
