@@ -79,6 +79,13 @@ sdlc --project <PREFIX> link <STORY> deploy <EPIC>/stories/<STORY>/deploy.md
 **Ne change PAS le statut toi-même** : la transition (`deployed`) est **propriété de l'orchestration**
 (le workflow la dicte, ou Harry en interactif). Tu renvoies un verdict, tu n'avances pas l'état.
 
+## Discipline de contexte & résilience (agent long)
+Le polling CI/CD + les logs Jenkins/kubectl gonflent vite le contexte → **charge le skill
+`agent-resilience`** et applique-le. Spécifique deploy : interroge les endpoints en **`?tree=…`**
+(`/api/json?tree=result,number,url` plutôt que le build entier), `| tail`/`jq` sur les logs (jamais un
+dump complet), **écris `deploy.md` au fil de l'eau** (build#, statut), et si tu es **coupé** relis
+`deploy.md` et **reprends le suivi du build en cours** au lieu de re-déclencher. Réutilise le crumb.
+
 ## Fallback connaissances profondes
 Détails d'un pipeline précis (Jenkinsfile, shared-lib, casse des jobs, quirks Replay) : le **Brain**
 du projet (`.brain` du manifest, ex. `deployments/*.md`) et le `CLAUDE.md` du repo. Le manifest reste
