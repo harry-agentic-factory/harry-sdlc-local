@@ -80,4 +80,5 @@ def init_project(prefix: str, path: str | Path, repos: list[str] | None = None,
 
 def _write_if_absent(p: Path, content: str) -> None:
     if not p.exists():
+        p.parent.mkdir(parents=True, exist_ok=True)   # crée les dossiers parents (ex. skills/)
         p.write_text(content)
