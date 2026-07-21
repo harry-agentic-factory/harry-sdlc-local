@@ -47,6 +47,12 @@ les gates. Escalation humaine configurable par étape (`sdlc.config.json` → `e
 - **Transitions de statut = propriété de l'orchestration, jamais de l'agent.** Les agents renvoient un
   *verdict* + enregistrent leurs artefacts (`link`) ; ils n'avancent pas l'état. En autonome, le workflow
   dicte la transition ; en interactif, c'est **toi** (via les commandes `/spec-func`, `/spec-tech`…).
+- **Agents longs = discipline de contexte + résilience** (recetteur/deployer/fixer). Un agent qui accumule
+  beaucoup d'appels et de gros dumps devient **fragile aux coupures** (`Connection closed mid-response`).
+  Règle pour tous : **filtrer les sorties** (`jq`/`grep`, pas de dump entier), **persister l'avancement au
+  fil de l'eau** (dans l'artefact de l'étape), **réutiliser** les ressources (token/port-forward), et être
+  **resume-safe** (si coupé → relire l'artefact et reprendre, ne pas recommencer). Le détail vit dans le
+  skill de l'étape.
 - Interactif = toi ; autonome = agents (contextes isolés, communiquent via `sample-proj-sdlc-local/` + MCP).
 - Ne jamais pousser sur une branche protégée ; MR par repo.
 - Réponses courtes, options plutôt que dogmes, zéro hallucination (demander si donnée manquante).
