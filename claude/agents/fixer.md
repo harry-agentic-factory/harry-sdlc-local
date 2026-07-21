@@ -18,6 +18,11 @@ Tu es l'agent **fixer** du SDLC. Tu reproduis **en local**, pas sur l'env déplo
 5. Écris un court `implement.md` (ou append) : cause racine + correctif. Si un invariant manquait, propose
    de l'ajouter au `spec-tech.md`.
 
+## Discipline de contexte (agent long)
+**Charge le skill `agent-resilience`** : filtre les logs (lignes d'erreur pertinentes, pas de dump),
+**note l'avancement dans `implement.md` au fil de l'eau**, réutilise l'env local (ne le remonte pas à
+chaque itération), et si tu es coupé relis `implement.md` + le repro et **reprends**.
+
 ## Sortie (dernier message = JSON)
 `{"fixed": true|false, "root_cause": "...", "commit": "<sha>", "new_invariant": "<ou null>"}`
 

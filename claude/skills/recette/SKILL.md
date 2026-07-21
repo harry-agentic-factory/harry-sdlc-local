@@ -51,24 +51,12 @@ que le fixer rejouera en local.
   (le workflow, ou Harry) — applique-la seulement si on te l'indique explicitement.
 - Dernier message = JSON `{pass, repro, flaky, failed}`.
 
-## Discipline de contexte & résilience (agent long — IMPORTANT)
-Une recette enchaîne beaucoup d'appels (port-forward, token, API, kcadm…). Un agent **long et lourd en
-contexte** devient **fragile aux coupures de connexion** (`Connection closed mid-response`) — la cause
-n'est pas ta logique mais la **taille du contexte** ré-embarquée à chaque tour. Discipline obligatoire :
-
-1. **Contexte maigre — ne dumpe JAMAIS une réponse entière.** Filtre à la source avec `jq`/`grep` pour ne
-   garder que les champs que tu **assertes**. Ex. au lieu de coller 15 Ko de JSON :
-   `curl -s "$BASE/api/..." -H @<(...) | jq '[.[] | {clientId, enabled, authFlow, receptionMode, journeyOptions}]'`.
-   Vise des sorties **< ~2 Ko**.
-2. **Sauve au fil de l'eau.** Dès qu'un critère est tranché, **append** son verdict + preuve à
-   `acceptance.md`. Si tu es coupé, rien n'est perdu et un **resume** reprend proprement.
-3. **Sous-passes si ça s'allonge.** Au-delà de ~25-30 appels d'outils, écris un **point d'avancement**
-   (critères faits / restants) dans `acceptance.md` avant de continuer — un resume sait où reprendre.
-4. **Anti-flaky ciblé.** Rejoue **seulement l'assertion clé** (une requête filtrée), pas tout le parcours.
-5. **Réutilise les ressources.** Garde le **token** et le **port-forward** vivants ; ne les relance pas à
-   chaque critère. Nettoie le port-forward à la fin.
-6. **Si coupé et repris :** relis d'abord `acceptance.md` (tes résultats déjà sauvés) et **continue** au
-   critère suivant — ne recommence pas de zéro.
+## Discipline de contexte & résilience (agent long)
+Une recette enchaîne beaucoup d'appels (port-forward, token, API, kcadm…) → **charge le skill
+`agent-resilience`** et applique-le (contexte maigre via `jq`, `acceptance.md` sauvé au fil de l'eau,
+resume-safe, découpe si long). Spécifique recette : **filtre** chaque réponse aux seuls champs assertés
+(ex. `curl -s … | jq '[.[] | {clientId, enabled, authFlow, receptionMode, journeyOptions}]'`),
+**réutilise** token + port-forward (ne les relance pas par critère), et **nettoie** le port-forward à la fin.
 
 ## Fallback connaissances profondes
 Spécifiques d'auth/endpoint d'un projet : le **Brain** (`.brain` du manifest) + le `CLAUDE.md` du repo.

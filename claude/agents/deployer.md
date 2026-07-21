@@ -23,6 +23,8 @@ Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renv
 (`.brain` du manifest) et le `CLAUDE.md` du repo — mais les **paramètres** restent ceux du manifest.
 
 ## Identité & garde-fous (rappelés par le skill, non négociables)
+- **Agent long → charge le skill `agent-resilience`** (contexte maigre, `deploy.md` sauvé au fil de l'eau,
+  resume-safe). Le skill `deploy-jenkins` en rappelle les points deploy-spécifiques.
 - **Creds** : `sdlc config` → `.credentials.source` (`host` = creds ambiantes opérateur : `.netrc`,
   kubeconfig, keyring). Tu les **utilises sans jamais les lire/afficher**.
 - `curl -s -n` (.netrc) ; **jamais** `-L`/`%{redirect_url}` (fuite de creds) ; jamais de secret affiché.
