@@ -31,29 +31,61 @@ def _sdlc(project: str | None) -> Sdlc:
 
 
 def run(argv: list[str] | None = None) -> dict:
-    p = argparse.ArgumentParser(prog="sdlc")
-    p.add_argument("--project", default=None, help="préfixe projet (ex. SAMPLE)")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    p = argparse.ArgumentParser(
+        prog="sdlc",
+        description="Façade SDLC Harry — état des tickets/épics, DAG, artefacts, worktrees. Sortie JSON.",
+        epilog="Astuce : `sdlc <commande> -h` pour le détail d'une commande. "
+               "Pipeline : create-epic → create-ticket → set-status (spec_func→spec_tech→implemented→"
+               "reviewed→deployed→recette_ok→accepted→done).",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p.add_argument("--project", default=None, help="préfixe projet (ex. SAMPLE) ; sinon workspace résolu par défaut")
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="<commande>",
+                           title="commandes", help="(voir `sdlc <commande> -h`)")
 
-    a = sub.add_parser("create-epic"); a.add_argument("epic"); a.add_argument("title")
-    a = sub.add_parser("create-ticket")
-    a.add_argument("epic"); a.add_argument("story"); a.add_argument("title")
-    a.add_argument("--deps"); a.add_argument("--repos")
-    a = sub.add_parser("get"); a.add_argument("story")
-    a = sub.add_parser("list"); a.add_argument("--status")
-    a = sub.add_parser("next"); a.add_argument("epic")
-    a = sub.add_parser("set-status"); a.add_argument("story"); a.add_argument("status")
-    a = sub.add_parser("link"); a.add_argument("story"); a.add_argument("kind"); a.add_argument("path")
-    a = sub.add_parser("migrate"); a.add_argument("--workspace")
-    a = sub.add_parser("init-project"); a.add_argument("prefix"); a.add_argument("--path", required=True); a.add_argument("--repos")
-    a = sub.add_parser("register"); a.add_argument("prefix"); a.add_argument("path")
-    sub.add_parser("projects")
-    a = sub.add_parser("config"); a.add_argument("--raw", action="store_true")
-    a = sub.add_parser("worktree")
-    a.add_argument("story"); a.add_argument("--repo"); a.add_argument("--branch"); a.add_argument("--base")
-    a = sub.add_parser("worktree-clean")
-    a.add_argument("story"); a.add_argument("--branch"); a.add_argument("--ref")
-    a = sub.add_parser("workspace"); a.add_argument("story"); a.add_argument("--branch")
+    # --- backlog / stories ---
+    a = sub.add_parser("create-epic", help="crée un épic")
+    a.add_argument("epic", help="ID épic (ex. SAMPLE-PROV)"); a.add_argument("title", help="titre de l'épic")
+    a = sub.add_parser("create-ticket", help="crée une story dans un épic (avec deps + repos)")
+    a.add_argument("epic", help="ID épic parent"); a.add_argument("story", help="ID story (ex. SAMPLE-PROV-1)")
+    a.add_argument("title", help="titre de la story")
+    a.add_argument("--deps", help="stories dont elle dépend, séparées par des virgules")
+    a.add_argument("--repos", help="repos touchés, séparés par des virgules")
+    a = sub.add_parser("get", help="réhydrate un ticket (statut, repos, branche, artefacts)")
+    a.add_argument("story", help="ID story")
+    a = sub.add_parser("list", help="liste le backlog (option : filtrer par statut)")
+    a.add_argument("--status", help="filtre statut (spec_func|spec_tech|implemented|reviewed|deployed|…)")
+    a = sub.add_parser("next", help="prochain actionnable d'un épic (résolution du DAG)")
+    a.add_argument("epic", help="ID épic")
+    a = sub.add_parser("set-status", help="change le statut d'une story (transition d'orchestration)")
+    a.add_argument("story", help="ID story")
+    a.add_argument("status", help="spec_func|spec_tech|implemented|reviewed|deployed|recette_ok|accepted|done")
+    a = sub.add_parser("link", help="attache un artefact (doc) à une story")
+    a.add_argument("story", help="ID story")
+    a.add_argument("kind", help="type : prd|spec_func|spec_tech|implement|review|deploy|acceptance|demo")
+    a.add_argument("path", help="chemin du .md relatif au repo data du projet")
+
+    # --- projets / config / maintenance ---
+    a = sub.add_parser("migrate", help="applique les migrations de schéma du workspace")
+    a.add_argument("--workspace", help="chemin workspace (sinon résolu depuis --project)")
+    a = sub.add_parser("init-project", help="initialise un nouveau projet SDLC (repo data + config)")
+    a.add_argument("prefix", help="préfixe projet (ex. SAMPLE)")
+    a.add_argument("--path", required=True, help="chemin du repo data du projet")
+    a.add_argument("--repos", help="repos de code, séparés par des virgules")
+    a = sub.add_parser("register", help="enregistre un projet existant dans le registre")
+    a.add_argument("prefix", help="préfixe projet"); a.add_argument("path", help="chemin du repo data")
+    sub.add_parser("projects", help="liste les projets enregistrés")
+    a = sub.add_parser("config", help="manifest résolu du projet (deploy/recette/credentials…)")
+    a.add_argument("--raw", action="store_true", help="config brute non résolue")
+
+    # --- worktrees / workspace agent ---
+    a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
+    a.add_argument("story", help="ID story"); a.add_argument("--repo", help="limiter à un repo (sinon tous ceux du ticket)")
+    a.add_argument("--branch", help="branche (sinon ticket.branch)"); a.add_argument("--base", help="branche de base")
+    a = sub.add_parser("worktree-clean", help="nettoie le(s) worktree(s) d'une story")
+    a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche"); a.add_argument("--ref", help="ref à conserver")
+    a = sub.add_parser("workspace", help="construit le workspace isolé d'un agent pour une story")
+    a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche")
 
     args = p.parse_args(argv)
 
