@@ -33,7 +33,7 @@ VERSION                    # version d'engine (semver)
 install.sh · Makefile      # make install  → symlink dans ~/.claude
 claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
-  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot upstream), ticket
+  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket, sdlc (état en session)
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
   skills/      deploy-jenkins · recette · agent-resilience (méthodes + discipline agents longs)
   sdlc/        harry.md (persona)
