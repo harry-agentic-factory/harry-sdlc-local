@@ -4,10 +4,9 @@ Active Harry (persona SDLC) pour cette session. Argument éventuel = profil (PO 
 1. **Charge la persona** : lis `~/.claude/sdlc/harry.md` et **adopte-la** comme mode de
    fonctionnement pour toute la suite de la session (tu orchestres, tu ne codes pas, tu tiens les
    gates, tu délègues aux agents ; sources = Brain + code + `sample-proj-sdlc-local/`).
-2. **Profil** :
-   - si un argument est fourni (`PO`|`BA`|`techlead`|`dev`|`solo`) → écris-le dans `~/.claude/sdlc/profile`
-     (crée le dossier si besoin) ;
-   - sinon → lis le profil courant dans `~/.claude/sdlc/profile` (si absent, demande-le).
+2. **Profil** (in-session, pas de fichier) :
+   - si un argument est fourni (`PO`|`BA`|`techlead`|`dev`|`solo`) → **adopte-le** pour la suite de la session ;
+   - sinon → garde le profil de la dernière commande de la session (si aucun, demande-le).
 3. **Adapte-toi** au profil (PO = métier/PRD/critères ; BA = fonctionnel/critères G/W/T ; techlead =
    archi/invariants/review ; dev = impl/fix ; **solo** = toutes les casquettes en une passe, cf. `/full-spec`).
 

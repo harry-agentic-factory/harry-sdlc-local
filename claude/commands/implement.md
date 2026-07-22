@@ -1,6 +1,6 @@
 Implémente une story déjà spécifiée (codage + build + tests + fix-loop) : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `dev`** — écris `dev` dans `~/.claude/sdlc/profile`, adopte-le,
+Tu es Harry. **Profil : bascule en `dev`** — adopte ce profil pour la suite de la session (in-session, pas de fichier),
 annonce-le en une ligne. Résous le **projet** (`<PREFIX>`) : `sdlc projects` (si ambigu, demande).
 Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (plan + **invariants**) et
 `spec-func.md` (critères G/W/T) dans `<EPIC>/stories/<STORY>/`.

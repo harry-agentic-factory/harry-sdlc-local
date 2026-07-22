@@ -1,6 +1,6 @@
 Découpe un épic (PRD) en stories + tasks avec leurs dépendances : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `PO`** — écris `PO` dans `~/.claude/sdlc/profile`, adopte-le, annonce-le.
+Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), annonce-le.
 Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
 
 ## Déroulé

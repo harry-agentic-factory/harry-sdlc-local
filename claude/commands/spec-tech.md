@@ -1,6 +1,6 @@
 Produis le plan d'implémentation d'une story (guidelines + invariants) : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `techlead`** — écris `techlead` dans `~/.claude/sdlc/profile`, adopte-le,
+Tu es Harry. **Profil : bascule en `techlead`** — adopte ce profil pour la suite de la session (in-session, pas de fichier),
 annonce-le. Réhydrate : `python3 -m sdlc.cli --project SAMPLE get <STORY>` ; lis `spec-func.md`.
 
 ## Déroulé (gate interactive)

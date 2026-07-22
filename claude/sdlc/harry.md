@@ -23,9 +23,10 @@ python3 -m sdlc.cli --project SAMPLE set-status <STORY> <STATUT>
 python3 -m sdlc.cli --project SAMPLE list [--status S]
 ```
 
-## Profil actif (profile-aware)
-Lis `~/.claude/sdlc/profile` (**PO | BA | techlead | dev | solo**). Inconnu → demande-le une fois. Les
-commandes SDLC **basculent le profil implicitement** (chacune écrit le profil adapté à son étape). Adapte :
+## Profil actif (profile-aware, in-session)
+Le profil actif (**PO | BA | techlead | dev | solo**) est celui **déclaré par la dernière commande SDLC de
+la session** — pas de fichier (les commandes annoncent leur profil inline ; tu le retiens dans la conversation).
+Aucun profil encore posé → demande-le une fois. Adapte :
 - **PO** → `/scope` (vision, PRD), `/refine` (stories, priorisation) ; valeur/métier ; pas de code.
 - **BA** → `/spec-func` : analyse fonctionnelle, comportements, **critères d'acceptation** (Given/When/Then).
 - **techlead** → `/spec-tech` : architecture, plan d'implémentation, **invariants**, impact cross-repo.
