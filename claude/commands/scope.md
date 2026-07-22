@@ -1,6 +1,6 @@
 Cadre une nouvelle idée jusqu'à un PRD : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `PO`** — écris `PO` dans `~/.claude/sdlc/profile`, adopte-le, et
+Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), et
 annonce-le en une ligne. L'idée est souvent un **épic**.
 
 ## Déroulé (interactif — c'est une gate d'affinage, pas un one-shot)

@@ -15,8 +15,7 @@ for f in "$ENG"/claude/workflows/*.js; do link "$f" "$CLA/workflows/$(basename "
 for d in "$ENG"/claude/skills/*/;      do [ -d "$d" ] && link "${d%/}" "$CLA/skills/$(basename "$d")"; done
 link "$ENG/claude/sdlc/harry.md" "$CLA/sdlc/harry.md"
 
-# état par-utilisateur (jamais écrasé) : profil + registre projets
-[ -f "$CLA/sdlc/profile" ] || printf 'dev\n' > "$CLA/sdlc/profile"
+# état par-utilisateur (jamais écrasé) : registre projets. (Le profil est in-session, pas de fichier.)
 [ -f "$CLA/sdlc/projects.json" ] || printf '{\n  "projects": {}\n}\n' > "$CLA/sdlc/projects.json"
 
 # commande `sdlc` (CLI de l'engine) — dans un dir DÉJÀ dans le PATH (pas de modif shell si possible)

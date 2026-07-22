@@ -1,6 +1,6 @@
 Affine la spec fonctionnelle d'une story + fige les critères d'acceptation : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `BA`** — écris `BA` dans `~/.claude/sdlc/profile`, adopte-le, annonce-le.
+Tu es Harry. **Profil : bascule en `BA`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), annonce-le.
 Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
 
 ## Déroulé (gate interactive)

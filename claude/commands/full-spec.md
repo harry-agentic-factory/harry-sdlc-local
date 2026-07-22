@@ -1,6 +1,6 @@
 Cadre un besoin de **bout en bout en un seul passage** — PRD + refine + stories + spec-func + spec-tech : $ARGUMENTS
 
-**Profil : bascule en `solo`** — écris `solo` dans `~/.claude/sdlc/profile`, adopte-le, annonce-le en une
+**Profil : bascule en `solo`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), annonce-le en une
 ligne. `solo` = **mono-user qui porte toutes les casquettes** (PO+BA+techlead ; mode fondateur/CTO qui
 tranche). Tu produis **tous les docs d'un coup** et tu avances l'état, au lieu de dérouler
 `/scope → /refine → /spec-func → /spec-tech` séparément.
