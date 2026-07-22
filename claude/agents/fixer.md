@@ -15,7 +15,9 @@ Tu es l'agent **fixer** du SDLC. Tu reproduis **en local**, pas sur l'env déplo
 3. **Corrige** le code (minimal, sans casser les invariants). Rebuild → re-run le scénario **en local**
    jusqu'au vert. **Boucle rapide, zéro redeploy.**
 4. Commit sur la branche de la story (jamais push sur une branche protégée).
-5. Écris un court `implement.md` (ou append) : cause racine + correctif. Si un invariant manquait, propose
+5. Écris un court `implement.md` : **commence par un bloc `## Recap`** (fixed oui/non + cause racine en
+   1 ligne + `commit` + `agent: fixer` + horodatage), puis le détail. Le `## Recap` est lu par `sdlc status`.
+   Si un invariant manquait, propose
    de l'ajouter au `spec-tech.md`.
 
 ## Discipline de contexte (agent long)
