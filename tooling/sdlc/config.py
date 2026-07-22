@@ -105,6 +105,9 @@ def load_config(workspace: str | Path) -> dict:
     #   "host" = creds ambiantes de l'opérateur (curl -s -n via ~/.netrc, ~/.kube/config, gh/glab
     #   keyring) — jamais lues ni affichées. Futur : "service" = creds scopées injectées dans la bulle.
     cfg.setdefault("credentials", {"source": "host"})
+    # permissions par agent-rôle (allow/deny) injectées dans la bulle par `sdlc workspace --agent`.
+    #   { "deny": [...partagé...], "agents": { "deployer": {"allow": [...]}, "reviewer": {...} } }
+    cfg.setdefault("permissions", {})
     return cfg
 
 
@@ -168,6 +171,7 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "deploy": cfg.get("deploy", {}),
         "recette": cfg.get("recette", {}),
         "credentials": cfg.get("credentials", {"source": "host"}),
+        "permissions": cfg.get("permissions", {}),
         "escalation": cfg["escalation"],
         "board": cfg["board"],
         "schemaVersion": cfg.get("schemaVersion", "0.1.0"),

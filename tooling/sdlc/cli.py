@@ -153,6 +153,7 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche"); a.add_argument("--ref", help="ref à conserver")
     a = sub.add_parser("workspace", help="construit le workspace isolé d'un agent pour une story")
     a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche")
+    a.add_argument("--agent", help="rôle agent (deployer/reviewer/…) → injecte permissions.allow/deny du manifest")
 
     args = p.parse_args(_autocorrect(argv, list(sub.choices)))
 
@@ -199,7 +200,7 @@ def run(argv: list[str] | None = None) -> dict:
         return s.reject(args.story, args.to, args.note, actor=args.by)
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
-        return build_agent_workspace(args.project, args.story, branch=args.branch)
+        return build_agent_workspace(args.project, args.story, branch=args.branch, agent=args.agent)
     if args.cmd == "worktree-clean":
         from .agentws import clean_workspace
         return clean_workspace(args.project, args.story, branch=args.branch, ref=args.ref)
