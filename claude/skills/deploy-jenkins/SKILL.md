@@ -72,7 +72,7 @@ et poll de même. **Ne lis jamais** le résultat via `-L`/redirect.
 - Note la version cible et la raison.
 
 ## 9. Trace (le contrat SDLC)
-Écris `deploy.md` — **commence par un bloc `## Recap`** (ok/ko + `version/tag`, ns, `agent: deployer`,
+Écris `deploy.md` — **PREPEND en tête** (journal horodaté, récent en premier, n'écrase pas — cf. skill `agent-resilience`) un bloc `## Recap` (ok/ko + `version/tag`, ns, `agent: deployer`,
 horodatage), puis le détail (image, ns, job, build#, stratégie). Le `## Recap` est ce que lit `sdlc status`.
 Enregistre l'artefact :
 ```bash

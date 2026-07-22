@@ -78,6 +78,8 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
     bubble = agentws_path(man, story)
     claude = bubble / ".claude"
     claude.mkdir(parents=True, exist_ok=True)
+    scratch = bubble / "scratch"                 # scripts/fichiers temp de l'agent (jamais /tmp)
+    scratch.mkdir(parents=True, exist_ok=True)
     (claude / "settings.json").write_text(
         json.dumps({"permissions": {"additionalDirectories": add_dirs}},
                    indent=2, ensure_ascii=False) + "\n")
@@ -86,10 +88,11 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
         f"# Bulle agent — {story} ({man.get('prefix')})\n\n"
         f"Workspace scopé **régénérable** (`sdlc workspace {story}`). Branche `{br}`.\n"
         f"`additionalDirectories` = worktrees + brain + data. Skills projet : "
-        f"{', '.join(skills) or '(aucun)'}.\n")
+        f"{', '.join(skills) or '(aucun)'}.\n\n"
+        f"`scratch/` : scripts/fichiers temp de l'agent (JAMAIS /tmp).\n")
 
     return {
-        "story": story, "branch": br, "workspace": str(bubble),
+        "story": story, "branch": br, "workspace": str(bubble), "scratch": str(scratch),
         "worktrees": worktrees, "additionalDirectories": add_dirs,
         "projectSkills": skills, "credentials": man.get("credentials", {"source": "host"}),
     }
