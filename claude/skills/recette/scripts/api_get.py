@@ -17,7 +17,7 @@ import sys
 import tempfile
 import time
 
-from _common import build_url, die, emit, filter_obj
+from _recette_common import build_url, die, emit, filter_obj
 
 
 def _curl_get(url: str, token_file: str | None) -> str:

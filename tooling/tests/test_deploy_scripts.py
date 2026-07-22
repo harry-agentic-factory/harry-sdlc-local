@@ -10,7 +10,7 @@ import pytest
 SCRIPTS = Path(__file__).resolve().parents[2] / "claude" / "skills" / "deploy-jenkins" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from _common import job_url          # noqa: E402
+from _deploy_common import job_url          # noqa: E402
 import jk_replay                     # noqa: E402
 import k8s_version                   # noqa: E402
 

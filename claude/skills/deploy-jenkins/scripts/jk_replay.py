@@ -14,7 +14,7 @@ import re
 import sys
 import time
 
-from _common import curl_json, curl_text, die, emit, job_url, post
+from _deploy_common import curl_json, curl_text, die, emit, job_url, post
 
 
 def extract_main_script(form_html: str) -> str:

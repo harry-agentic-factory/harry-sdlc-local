@@ -7,7 +7,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[2] / "claude" / "skills" / "recette" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from _common import build_url, filter_obj   # noqa: E402
+from _recette_common import build_url, filter_obj   # noqa: E402
 
 
 def test_build_url():

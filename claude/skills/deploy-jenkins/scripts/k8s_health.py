@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from _common import emit
+from _deploy_common import emit
 
 
 def main(argv=None) -> None:
