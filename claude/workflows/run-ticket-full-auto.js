@@ -3,8 +3,8 @@
 //   -> [si recette OK] merge MR -> deploy main. Bail-out (needs_human) uniquement sur ÉCHEC.
 // ⚠️ À n'utiliser QUE sur un env d'intégration (ou une prod non ouverte utilisée comme tel).
 //    Pour une vraie prod live, utiliser run-ticket (gate deploy = human-confirm).
-// Lancer : Workflow({ name: 'run-ticket-full-auto',
-//   args: { ticket:'SAMPLE-APPS-1', epic:'SAMPLE-APPS', branch:'feat/SAMPLE-APPS-1-applications-endrealm', mr:'76' } })
+// Lancer : Workflow({ name: 'run-ticket-full-auto', args: 'SAMPLE-GATES-1' })   // ID seul (epic/repo/branch/mr auto-résolus)
+//     ou : Workflow({ name: 'run-ticket-full-auto', args: { ticket, epic, branch, mr, target } })
 export const meta = {
   name: 'run-ticket-full-auto',
   description: "Pipeline SDLC FULL AUTO (env d'intégration) : review -> deploy branche -> recette (+fix-loop) -> merge -> deploy main",
@@ -18,16 +18,25 @@ export const meta = {
   ],
 }
 
-const TICKET = (args && args.ticket) || 'SAMPLE-APPS-1'
-const EPIC = (args && args.epic) || 'SAMPLE-APPS'
-const PREFIX = (args && args.prefix) || 'SAMPLE'
-const REPO_NAME = (args && args.repoName) || 'app-repo'
-const REPO = (args && args.repo) || '<workspace>/app-repo'
-const SDLC_ROOT = (args && args.sdlcRoot) || '<workspace>/sample-proj-sdlc-local'
-const STORY = `${SDLC_ROOT}/${EPIC}/stories/${TICKET}`
-const BRANCH = (args && args.branch) || `feat/${TICKET}`
-const MR = (args && args.mr) || ''
-const TARGET = (args && args.target) || 'main'          // branche cible du merge
+// ── paramètres (args tolérant : objet | string "ID de ticket" | JSON-string) ──
+let A = args
+if (typeof A === 'string') {
+  const s = A.trim()
+  A = s.startsWith('{') ? (() => { try { return JSON.parse(s) } catch { return { ticket: s } } })()
+                        : { ticket: s }
+}
+A = A || {}
+const TICKET = A.ticket || 'SAMPLE-APPS-1'
+const PREFIX = A.prefix || (TICKET.includes('-') ? TICKET.split('-')[0] : 'SAMPLE')
+const TARGET = A.target || 'main'          // branche cible du merge
+// valeurs faibles — écrasées par la résolution de la phase Prepare (via `sdlc config`/`get`)
+let EPIC = A.epic
+let REPO_NAME = A.repoName
+let REPO = A.repo
+let SDLC_ROOT = A.sdlcRoot
+let BRANCH = A.branch || `feat/${TICKET}`
+let MR = A.mr || ''
+let STORY = ''            // calculé après résolution Prepare
 const MAX_FIX = 2
 let WORKREPO = REPO   // remplacé par le worktree isolé du ticket après la phase Prepare
 
@@ -41,14 +50,20 @@ const FIX = { type: 'object', required: ['fixed'], properties: {
   fixed: { type: 'boolean' }, root_cause: { type: 'string' }, commit: { type: 'string' } } }
 const MERGE = { type: 'object', required: ['merged'], properties: {
   merged: { type: 'boolean' }, note: { type: 'string' } } }
-const WS = { type: 'object', required: ['worktree'], properties: {
-  worktree: { type: 'string' }, additionalDirectories: { type: 'array', items: { type: 'string' } },
-  projectSkills: { type: 'array', items: { type: 'string' } } } }
+const WS = { type: 'object', required: ['resolved'], properties: {
+  resolved: { type: 'boolean' }, worktree: { type: 'string' },
+  epic: { type: 'string' }, repoName: { type: 'string' }, repo: { type: 'string' },
+  sdlcRoot: { type: 'string' }, branch: { type: 'string' }, mr: { type: 'string' },
+  additionalDirectories: { type: 'array', items: { type: 'string' } },
+  projectSkills: { type: 'array', items: { type: 'string' } }, note: { type: 'string' } } }
 const CLEAN = { type: 'object', properties: { cleaned: { type: 'boolean' }, note: { type: 'string' } } }
 
-const prepPrompt = () => `Prépare la **bulle scopée** du ticket **${TICKET}**. Exécute en Bash :
-\`sdlc --project ${PREFIX} workspace ${TICKET} --branch ${BRANCH}\`
-→ crée le worktree isolé + \`.claude/settings.json\` (additionalDirectories = worktrees+brain+data) + symlink des skills projet. Renvoie STRICTEMENT le JSON : worktree = \`.worktrees["${REPO_NAME}"]\`, additionalDirectories, projectSkills. Ne fais RIEN d'autre.`
+const prepPrompt = () => `Prépare la **bulle scopée** du ticket **${TICKET}** (préfixe projet **${PREFIX}**).
+1. **Résous la config** en Bash :
+   - \`sdlc --project ${PREFIX} get ${TICKET}\` → si le ticket est introuvable (erreur/"introuvable"), renvoie \`{"resolved":false,"note":"ticket ${TICKET} introuvable"}\` et NE crée RIEN. Sinon récupère \`epic\`, la 1re entrée de \`repos[]\` (= repoName), \`branch\` (sinon \`feat/${TICKET}\`) et \`mr\` (si présent).
+   - \`sdlc --project ${PREFIX} config\` → \`workspace\` (= sdlcRoot), le chemin du repo via \`repos[repoName]\` (= repo).
+2. **Crée la bulle** : \`sdlc --project ${PREFIX} workspace ${TICKET} --branch <branch résolue>\` → worktree isolé + \`.claude/settings.json\` (additionalDirectories) + symlink des skills projet.
+Renvoie STRICTEMENT le JSON : \`{resolved:true, worktree (= .worktrees[repoName]), epic, repoName, repo, sdlcRoot, branch, mr, additionalDirectories, projectSkills}\`. Ne fais RIEN d'autre.`
 
 const reviewPrompt = () => `Story SDLC **${TICKET}** (${WORKREPO}). Review le diff de ${BRANCH} vs ${TARGET} contre les INVARIANTS de ${STORY}/spec-tech.md (+ critères ${STORY}/spec-func.md). Diff: \`git -C ${WORKREPO} diff ${TARGET}...${BRANCH}\`. Vérifie chaque invariant (preuve), cherche bugs/régressions/fuites. Écris ${STORY}/review.md. Ne modifie PAS le code. **Transition dictée par l'orchestration — si conforme** : \`sdlc --project ${PREFIX} set-status ${TICKET} reviewed\`. Dernier message = JSON {conform, note, violations}.`
 
@@ -67,11 +82,28 @@ const cleanPrompt = () => `Story **${TICKET}** mergée sur ${TARGET}. (1) Exécu
 
 const deployMainPrompt = () => `Story SDLC **${TICKET}**. Déploie **${TARGET}** (mergé) sur l'env d'intégration via le pipeline prod normal (build depuis ${TARGET}). Vérifie /actuator/health. Sur erreur -> {ok:false, note}. Append ${STORY}/deploy.md. Dernier message = JSON {ok, version, note}.`
 
-// ── Prepare : bulle scopée (worktree isolé + settings + skills projet) ──
+// ── Prepare : résout la config projet (sdlc config/get) + matérialise la bulle scopée ──
 phase('Prepare')
 const prep = await agent(prepPrompt(), { agentType: 'general-purpose', schema: WS, label: `prepare:${TICKET}`, phase: 'Prepare' })
-if (prep && prep.worktree) { WORKREPO = prep.worktree; log(`Bulle prête — worktree isolé: ${WORKREPO}`) }
-else log(`Prepare KO -> repli sur ${WORKREPO} (working tree partagé)`)
+if (!prep || prep.resolved === false) {
+  log(`Prepare : ticket ${TICKET} non résolu -> STOP (humain). ${prep ? (prep.note || '') : 'agent KO'}`)
+  return { stopped_at: 'prepare', reason: 'needs_human', detail: `ticket ${TICKET} non résolu`, prepare: prep }
+}
+// applique la config résolue (args explicites prioritaires, sinon résolution Prepare)
+EPIC = EPIC || prep.epic
+REPO_NAME = REPO_NAME || prep.repoName
+REPO = REPO || prep.repo
+SDLC_ROOT = SDLC_ROOT || prep.sdlcRoot
+BRANCH = A.branch || prep.branch || BRANCH
+MR = MR || prep.mr || ''
+WORKREPO = prep.worktree || REPO
+STORY = `${SDLC_ROOT}/${EPIC}/stories/${TICKET}`
+// garde-fou anti-placeholder : ne jamais avancer sur des valeurs fictives
+if (!EPIC || !SDLC_ROOT || !REPO || `${EPIC}${SDLC_ROOT}${REPO}`.includes('<workspace>')) {
+  log('Prepare : config non résolue (placeholders restants) -> STOP (humain)')
+  return { stopped_at: 'prepare', reason: 'needs_human', detail: 'config non résolue (placeholders)', prepare: prep }
+}
+log(`Bulle prête — ${EPIC}/${TICKET} @ ${WORKREPO}`)
 
 // ── Review ──
 phase('Review')
