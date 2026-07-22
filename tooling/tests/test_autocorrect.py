@@ -39,3 +39,24 @@ def test_cli_runs_corrected(tmp_path, capsys, monkeypatch):
 def test_cli_ambiguous_errors(tmp_path, monkeypatch):
     monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path))
     assert cli.main(["s"]) == 1                             # ambigu → erreur propre (pas d'exécution)
+
+
+def test_bare_id_defaults_to_status(tmp_path, capsys, monkeypatch):
+    import json
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path))
+    cli.main(["create-epic", "E", "e"]); cli.main(["create-ticket", "E", "E-1", "t"])
+    capsys.readouterr()
+
+    assert cli.main(["E-1"]) == 0                           # ID de ticket nu → status
+    out = capsys.readouterr()
+    assert json.loads(out.out)["scope"] == "ticket"
+    assert "« E-1 » → « status E-1 »" in out.err
+
+    assert cli.main(["E"]) == 0                             # ID d'épic nu → status
+    assert json.loads(capsys.readouterr().out)["scope"] == "epic"
+
+
+def test_bare_unknown_still_errors(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path))
+    with pytest.raises(SystemExit):                         # ni commande, ni ID → argparse invalid choice
+        cli.main(["ZZZ-9"])

@@ -41,8 +41,27 @@ def _resolve_cmd(token: str, commands: list[str]) -> tuple[str | None, str | Non
     return None, None
 
 
+def _project_arg(argv: list[str]) -> str | None:
+    for j, a in enumerate(argv):
+        if a == "--project" and j + 1 < len(argv):
+            return argv[j + 1]
+        if a.startswith("--project="):
+            return a.split("=", 1)[1]
+    return None
+
+
+def _known_ids(argv: list[str]) -> set[str]:
+    """IDs de tickets + épics du workspace résolu (pour deviner un `sdlc <ID>` = `status <ID>`)."""
+    try:
+        tickets = Workspace(resolve_workspace(_project_arg(argv))).all_tickets()
+        return {t.id for t in tickets} | {t.epic for t in tickets}
+    except Exception:  # noqa: BLE001 — pas de workspace résoluble → pas de déduction
+        return set()
+
+
 def _autocorrect(argv: list[str] | None, commands: list[str]) -> list[str]:
-    """Corrige la 1re sous-commande de argv (approx → exacte). Ambigu → ValueError (message clair)."""
+    """Corrige la 1re sous-commande de argv. Non reconnue mais = ID de ticket/épic → défaut `status`.
+    Ambigu → ValueError (message clair)."""
     src = list(sys.argv[1:] if argv is None else argv)
     i = 0
     while i < len(src):
@@ -51,13 +70,17 @@ def _autocorrect(argv: list[str] | None, commands: list[str]) -> list[str]:
             i += 2; continue
         if tok.startswith("-"):
             i += 1; continue
-        if tok not in commands:               # 1er positionnel non reconnu → tenter de deviner
+        if tok not in commands:               # 1er positionnel non reconnu
             resolved, note = _resolve_cmd(tok, commands)
-            if resolved:
-                print(note, file=sys.stderr)   # info d'auto-correction (stdout reste du JSON pur)
+            if resolved:                       # faute de frappe sur une sous-commande
+                print(note, file=sys.stderr)   # stdout reste du JSON pur
                 src[i] = resolved
             elif note:
                 raise ValueError(note)          # ambigu → main() renvoie l'erreur proprement
+            elif tok in _known_ids(src):        # pas une commande, mais un ID connu → défaut `status`
+                print(f"sdlc: « {tok} » → « status {tok} »", file=sys.stderr)
+                src.insert(i, "status")
+            # sinon : laisse argparse produire l'erreur « invalid choice »
         break                                   # ne touche qu'à la sous-commande
     return src
 
