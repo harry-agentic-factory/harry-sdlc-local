@@ -56,12 +56,17 @@ sdlc projects                        # projets enregistrés
 sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
 sdlc --project SAMPLE config            # manifest RÉSOLU (repos→chemins abs, brain, deploy…)
 sdlc --project SAMPLE status [EPIC|STORY]  # statut EXACT : état + artefacts produits + recaps agents
+sdlc SAMPLE-APPS                        # sous-commande devinée (préfixe/fuzzy) ; ID nu → défaut `status`
+sdlc --project SAMPLE reject SAMPLE-1 --to spec_tech --note "…"  # gate : rejet routé + journal (newest-first)
 sdlc --project SAMPLE worktree SAMPLE-1 --branch feat/x   # worktree(s) isolé(s) du ticket (create-or-reuse)
 sdlc --project SAMPLE worktree-clean SAMPLE-1            # remove si la branche est mergée sur refBranch
 sdlc --project SAMPLE workspace SAMPLE-1 --branch feat/x  # bulle scopée : worktrees + settings.json + skills projet
 sdlc init-project OTHER --path … --repos a,b   # nouveau projet
 sdlc migrate --project SAMPLE           # migrer la data
 ```
+**Ergonomie** : `--project` est **optionnel** si tu es **dans un repo du projet** (le projet est déduit du
+**CWD** via `reposRoot`/repos du manifest, sans hypothèse de naming). La frappe est **tolérante** (préfixe +
+fuzzy). En session Claude, **`/sdlc <args>`** lance ces commandes et rend la sortie lisible.
 
 ### Worktrees — code isolé par ticket (autonomie des agents)
 `1 ticket = 1 branche = 1 worktree`, réutilisé par **tous** les agents du ticket (fix-loop fluide,
