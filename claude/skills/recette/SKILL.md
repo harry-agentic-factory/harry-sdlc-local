@@ -45,8 +45,9 @@ Dans `<data>/<EPIC>/stories/<STORY>/repro/` : `steps.md` (séquence rejouable), 
 que le fixer rejouera en local.
 
 ## 5. Trace + verdict
-- Écris/complète `acceptance.md` (par critère : PASS/FAIL + preuve **anonymisée**) + `link <STORY>
-  acceptance <chemin>`.
+- Écris/complète `acceptance.md` : **commence par un bloc `## Recap`** (pass/fail + `N/total`, faits
+  clés anonymisés, `agent: recetteur`, horodatage), puis le détail par critère (PASS/FAIL + preuve
+  **anonymisée**). Puis `link <STORY> acceptance <chemin>`. Le `## Recap` est ce que lit `sdlc status`.
 - **Ne change PAS le statut toi-même** : la transition (`recette_ok`) est **dictée par l'orchestration**
   (le workflow, ou Harry) — applique-la seulement si on te l'indique explicitement.
 - Dernier message = JSON `{pass, repro, flaky, failed}`.

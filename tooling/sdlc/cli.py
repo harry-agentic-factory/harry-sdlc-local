@@ -77,6 +77,8 @@ def run(argv: list[str] | None = None) -> dict:
     sub.add_parser("projects", help="liste les projets enregistrés")
     a = sub.add_parser("config", help="manifest résolu du projet (deploy/recette/credentials…)")
     a.add_argument("--raw", action="store_true", help="config brute non résolue")
+    a = sub.add_parser("status", help="statut exact d'un ticket/épic (état + artefacts + recaps agents)")
+    a.add_argument("target", nargs="?", help="ID ticket ou épic (sinon : projet entier)")
 
     # --- worktrees / workspace agent ---
     a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
@@ -107,6 +109,9 @@ def run(argv: list[str] | None = None) -> dict:
         if args.raw:
             return load_config(resolve_workspace(args.project))
         return resolved_manifest(args.project)
+    if args.cmd == "status":
+        from .status_report import build_status
+        return build_status(resolve_workspace(args.project), args.target)
 
     s = _sdlc(args.project)
 

@@ -55,6 +55,7 @@ ou `~/.local/bin` selon ton PATH). Ensuite :
 sdlc projects                        # projets enregistrés
 sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
 sdlc --project SAMPLE config            # manifest RÉSOLU (repos→chemins abs, brain, deploy…)
+sdlc --project SAMPLE status [EPIC|STORY]  # statut EXACT : état + artefacts produits + recaps agents
 sdlc --project SAMPLE worktree SAMPLE-1 --branch feat/x   # worktree(s) isolé(s) du ticket (create-or-reuse)
 sdlc --project SAMPLE worktree-clean SAMPLE-1            # remove si la branche est mergée sur refBranch
 sdlc --project SAMPLE workspace SAMPLE-1 --branch feat/x  # bulle scopée : worktrees + settings.json + skills projet
