@@ -24,6 +24,19 @@ taille.** Applique cette discipline **du début à la fin** :
    **point d'avancement** (fait / restant) dans ton artefact avant de continuer.
 6. **Cible tes re-vérifs.** Rejoue seulement l'**assertion clé** (une commande filtrée), pas tout le
    parcours.
+7. **Fichiers temporaires / scripts → dans TON workspace, jamais `/tmp`.** Écris tout script/fichier
+   jetable dans le **scratch de ta bulle** (`<workspace>/scratch/`, fourni par `sdlc workspace`) ou, à
+   défaut, le dossier du ticket. `/tmp` est **hors de ton périmètre** → **popup de permission** + fichier
+   non contenu/non nettoyé. Le scratch, lui, est dans ton périmètre et part avec la bulle.
+
+## Artefacts = journal horodaté, le plus RÉCENT en tête
+Ton artefact d'étape (`review.md` / `deploy.md` / `implement.md` / `acceptance.md`) est un **journal**,
+pas un fichier écrasable. À chaque run :
+- **PREPEND** une section datée en **tête** : `## <ISO 8601> — <résumé 1 ligne>` (newest-first), puis le
+  détail. **N'écrase JAMAIS** les entrées précédentes (v1/v2, itérations de fix-loop) — elles descendent.
+- Le bloc du **haut** = le run **le plus récent** → un `## Recap` en tête reflète toujours le dernier état,
+  et `sdlc status` lit cette tête.
+- Même sémantique que `journal.md` (décisions de gate) : historique préservé, lecture immédiate du récent.
 
 > Les skills d'étape (`recette`, `deploy-jenkins`, …) et les agents longs (recetteur, deployer, fixer)
 > **chargent ce skill** et n'en dupliquent pas le contenu.
