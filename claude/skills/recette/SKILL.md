@@ -8,6 +8,22 @@ description: Recette (test d'acceptation) autonome d'une story sur l'env déploy
 Tu ne devines pas comment joindre l'env : tu lis les paramètres, puis tu appliques la procédure.
 **QUOI tester** = les critères d'acceptation (`spec-func.md`). **COMMENT** = ce skill + le manifest.
 
+## 0. Outils NORMALISÉS — appelle ces scripts, n'improvise PAS de `curl`/token/`python -c`/`/tmp`
+**Générique** (ce skill, `scripts/`) :
+```bash
+D=<chemin du skill>/scripts        # dossier scripts/ à côté de ce SKILL.md
+# GET authentifié (token lu d'un FICHIER, jamais en argv ; direct --base ou via --pf) :
+python3 $D/api_get.py --pf <ns>/<kind>/<name>:<port> --path <p> --token-file <f> --fields <csv>
+```
+**Auth = skill PROJET** (2-tiers, dans le repo data `<projet>-sdlc-local/skills/`). Ex. HIA `hia-recette` :
+```bash
+# mint le token admin (creds du compte de test via ENV, jamais hardcodés) -> fichier 600, jamais affiché :
+python3 <data>/skills/hia-recette/scripts/hia_admin_token.py --keycloak <kc> --service-name <tenant> --out <scratch>/token
+```
+Le token **ne surface jamais** (fichier scratch `600`, lu en interne par `api_get.py`). **Scripts temp dans le
+scratch de la bulle, jamais `/tmp`.** Allowlist recetteur = `Bash(python3 …/scripts/*.py:*)`.
+> Ton rôle = **appeler ces scripts + asserter** vs les critères. Les sections ci-dessous = le *pourquoi* (fallback).
+
 ## 1. Récupère le QUOI et le COMMENT
 ```bash
 sdlc --project <PREFIX> get <STORY>          # repos touchés, branche, artefacts
