@@ -8,6 +8,25 @@ description: Déploie un module de code via un pipeline Jenkins (CI puis CD/gito
 Tu **ne devines pas** l'infra : tu lis les paramètres dans le manifest, puis tu appliques la procédure.
 C'est le **savoir-faire** (méthode) ; les **valeurs** (host, jobs, image, ns) viennent du projet.
 
+## 0. Outils NORMALISÉS — appelle ces scripts, n'improvise PAS de `curl`/`python -c`/`/tmp`
+Le skill embarque des scripts (`scripts/` à côté de ce SKILL.md). **Utilise-les** : surface fermée,
+allowlistable (`Bash(python3 …/deploy-jenkins/scripts/*.py:*)`), auth `curl -s -n` **interne** (jamais de
+secret), sorties JSON filtrées. **N'écris pas** de HTML/Groovy dans `/tmp` — les scripts le font en interne.
+```bash
+D=<chemin du skill>/scripts        # (résous-le : dossier scripts/ à côté de ce SKILL.md)
+# 1) déclencher un build en overridant CODE_BRANCH (Replay) :
+python3 $D/jk_replay.py --jenkins <host> --job <ci-path> --from <buildRécent> --code-branch <branche>
+# 2) suivre le build (poll) :
+python3 $D/jk_status.py --jenkins <host> --job <ci-path> --build <N>     # {building,result}
+# 3) version déployée (k8s) :
+python3 $D/k8s_version.py --ns <ns> --deploy <deployment>                 # {image,tag}
+# 4) santé (port-forward + health, refermé automatiquement) :
+python3 $D/k8s_health.py --ns <ns> --deploy <deployment> --path /actuator/health   # {http,status}
+```
+Ton rôle = **enchaîner ces 4 outils + décider** (build → suivre jusqu'à SUCCESS → CD → santé/version →
+escalade si ambigu, rollback si KO). Les sections ci-dessous expliquent le **pourquoi** (fallback), mais
+la **mécanique passe par les scripts**.
+
 ## 1. Récupère les paramètres (source unique = le manifest)
 ```bash
 sdlc --project <PREFIX> config          # JSON résolu

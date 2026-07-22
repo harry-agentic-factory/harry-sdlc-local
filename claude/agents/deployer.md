@@ -15,8 +15,10 @@ Pour **chaque** repo touché de la story, lis son bloc `deploy.<repo>` dans `sdl
 
 ## Méthode = un skill (pas de connaissance en dur)
 Selon `deploy.<repo>.skill` :
-- **`deploy-jenkins`** → invoque le skill **`deploy-jenkins`** (crumb, trigger/Replay `CODE_BRANCH`,
-  polling, santé, rollback — tout paramétré par le manifest). N'improvise pas la procédure : suis le skill.
+- **`deploy-jenkins`** → invoque le skill **`deploy-jenkins`** : il fournit des **scripts normalisés**
+  (`scripts/jk_replay.py`, `jk_status.py`, `k8s_version.py`, `k8s_health.py`). Ton rôle = **les appeler**
+  (build/Replay `CODE_BRANCH` → suivre → santé/version) **+ décider** (escalade/rollback). **N'improvise
+  PAS** de `curl`/`python -c`/fichiers `/tmp` — surface de permissions fermée, tout passe par les scripts.
 - (autres `skill:` → invoque le skill correspondant quand il existera.)
 
 Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renvoie vers le **Brain**
