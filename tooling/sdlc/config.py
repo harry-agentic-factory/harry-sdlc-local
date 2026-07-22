@@ -37,15 +37,56 @@ def resolve_workspace(project: str | None = None, start: str | Path | None = Non
                 return Path(p)
 
     cur = Path(start or Path.cwd()).resolve()
+    # remontée de l'arbo (cas : on est DANS le repo data)
     for d in [cur, *cur.parents]:
         if (d / "sdlc.config.json").exists():
             return d
         if (d / "sample-proj-sdlc-local" / "sdlc.config.json").exists():
             return d / "sample-proj-sdlc-local"
+    # déduction par le CWD (cas : on est dans un repo de CODE) — matche le CWD contre le
+    # reposRoot / les repos de chaque projet enregistré. Aucune hypothèse sur le naming.
+    inferred = infer_project_workspace(cur)
+    if inferred:
+        return Path(inferred)
     raise FileNotFoundError(
-        "workspace SDLC introuvable (env SDLC_WORKSPACE, registre projects.json, "
-        "ou un sdlc.config.json en remontant l'arbo)"
+        "workspace SDLC introuvable (env SDLC_WORKSPACE, --project, sdlc.config.json en remontant "
+        "l'arbo, ou CWD sous le reposRoot/les repos d'un projet enregistré)"
     )
+
+
+def _registered_projects() -> dict:
+    reg = registry_path()
+    return json.loads(reg.read_text()).get("projects", {}) if reg.exists() else {}
+
+
+def infer_project_workspace(start: str | Path) -> str | None:
+    """Déduit le workspace data à partir du CWD : le projet dont le `reposRoot`, un repo, ou le repo
+    data **contient** le CWD. Match le plus **spécifique** (chemin le plus long) en cas de chevauchement.
+    """
+    try:
+        start = Path(start).resolve()
+    except OSError:
+        return None
+    best: tuple[int, str] | None = None
+    for _prefix, meta in _registered_projects().items():
+        ws = meta.get("workspace")
+        if not ws:
+            continue
+        cfg = load_config(ws)
+        candidates = [str(Path(ws).resolve())]                 # le repo data lui-même
+        if cfg.get("reposRoot"):
+            candidates.append(_expand(cfg["reposRoot"]))       # la racine des repos de code
+        candidates += [p for p in resolve_repos(cfg).values() if p]  # chaque repo résolu
+        for cand in candidates:
+            try:
+                cp = Path(cand).resolve()
+            except OSError:
+                continue
+            if start == cp or start.is_relative_to(cp):
+                score = len(str(cp))
+                if best is None or score > best[0]:
+                    best = (score, str(ws))
+    return best[1] if best else None
 
 
 def load_config(workspace: str | Path) -> dict:

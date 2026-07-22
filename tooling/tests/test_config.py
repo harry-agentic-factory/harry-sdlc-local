@@ -112,3 +112,24 @@ def test_migration_idempotent(tmp_path):
 
 def test_latest_schema_is_0_2_0():
     assert LATEST_SCHEMA == "0.2.0"
+
+
+# --- déduction du projet par le CWD (sans hypothèse de naming) ---
+
+def test_infer_project_from_cwd(tmp_path, monkeypatch):
+    from sdlc.config import infer_project_workspace, resolve_workspace
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("SDLC_WORKSPACE", raising=False)
+    repos = tmp_path / "repos"; (repos / "app").mkdir(parents=True)
+    data = tmp_path / "data"; data.mkdir()
+    _write_cfg(data, {"prefix": "DEMO", "reposRoot": str(repos), "repos": {"app": None}})
+    reg = tmp_path / "home" / ".claude" / "sdlc" / "projects.json"
+    reg.parent.mkdir(parents=True)
+    reg.write_text(json.dumps({"projects": {"DEMO": {"workspace": str(data)}}}))
+
+    assert infer_project_workspace(repos / "app") == str(data)          # dans un repo de code
+    assert infer_project_workspace(repos / "app" / "src") == str(data)  # sous-dossier
+    assert infer_project_workspace(data) == str(data)                   # dans le repo data
+    assert infer_project_workspace(tmp_path / "ailleurs") is None       # hors périmètre
+    # resolve_workspace sans --project ni env : déduit par le CWD
+    assert str(resolve_workspace(start=repos / "app")) == str(data)
