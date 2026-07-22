@@ -139,6 +139,11 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("--raw", action="store_true", help="config brute non résolue")
     a = sub.add_parser("status", help="statut exact d'un ticket/épic (état + artefacts + recaps agents)")
     a.add_argument("target", nargs="?", help="ID ticket ou épic (sinon : projet entier)")
+    a = sub.add_parser("reject", help="rejette une story (gate) → route vers spec_func|spec_tech|implemented + note (journal)")
+    a.add_argument("story", help="ID story")
+    a.add_argument("--to", required=True, help="étape de retour : spec_func | spec_tech | implemented")
+    a.add_argument("--note", required=True, help="raison du rejet (consignée dans journal.md)")
+    a.add_argument("--by", default="humain", help="auteur de la décision (défaut: humain)")
 
     # --- worktrees / workspace agent ---
     a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
@@ -190,6 +195,8 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.set_status(args.story, args.status))
     if args.cmd == "link":
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
+    if args.cmd == "reject":
+        return s.reject(args.story, args.to, args.note, actor=args.by)
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
         return build_agent_workspace(args.project, args.story, branch=args.branch)

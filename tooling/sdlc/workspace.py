@@ -91,6 +91,27 @@ class Workspace:
             return p
         return None
 
+    # --- journal des décisions (rejets routés, etc.) — le plus RÉCENT en premier ---
+    def journal_add(self, story: str, entry: str) -> Path:
+        """Ajoute une entrée en **tête** du journal (newest-first), sous l'en-tête. N'écrase rien
+        d'autre (les entrées plus anciennes restent, décalées vers le bas)."""
+        sp = self._find_status(story)
+        if sp is None:
+            raise KeyError(f"ticket introuvable: {story}")
+        p = sp.parent / "journal.md"
+        header = f"# {story} — journal (le plus récent en premier)"
+        older = ""
+        if p.exists():
+            rest = p.read_text(encoding="utf-8").split("\n", 1)   # retire la ligne d'en-tête
+            older = rest[1].strip() if len(rest) > 1 else ""
+        parts = [header, "", entry.strip()] + (["", older] if older else [])
+        p.write_text("\n".join(parts).rstrip() + "\n", encoding="utf-8")
+        return p
+
+    def journal_path(self, story: str) -> Path | None:
+        sp = self._find_status(story)
+        return (sp.parent / "journal.md") if sp else None
+
     def all_tickets(self) -> list[Ticket]:
         out: list[Ticket] = []
         for p in sorted(self.root.glob("*/stories/*/status.json")):
