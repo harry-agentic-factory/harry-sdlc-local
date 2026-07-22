@@ -13,11 +13,13 @@ sdlc --project <PREFIX> config            # .recette.<repo>, .credentials, .depl
 ```
 Critères d'acceptation (le QUOI) = `spec-func.md` (Given/When/Then) → ta checklist.
 
-## Méthode = le skill `recette`
-Invoque le skill **`recette`** : il encode le COMMENT (joindre l'env déployé via `recette.<repo>` du
-manifest — `baseUrl`/`portForward`, `auth`, `tool` api|ui —, s'authentifier sans jamais exposer de secret,
-piloter l'**API** ou **Playwright MCP**, anti-flaky 3×, écrire `acceptance.md` au fur et à mesure, bundle
-repro sur KO). N'improvise pas la procédure : suis le skill.
+## Méthode = le skill `recette` + ses **scripts normalisés**
+Invoque le skill **`recette`**. Il fournit des **scripts** (`scripts/api_get.py` — GET authentifié,
+token-file, jamais de secret) : **appelle-les, n'improvise PAS** de `curl`/token/`python -c`/`/tmp`.
+L'**auth** vient d'un **skill PROJET** (2-tiers, ex. HIA `hia-recette` → `hia_admin_token.py`) qui mint le
+token dans un **fichier `600`** (jamais affiché). API → `api_get.py` ; UI → **Playwright MCP** via le skill
+`recette-ui` (une fois connecté, navigation libre). Anti-flaky 3×, `acceptance.md` au fil de l'eau, bundle
+repro sur KO. Scripts temp dans le **scratch de la bulle**, jamais `/tmp`.
 
 ## Garde-fous (rappelés par le skill)
 - **Agent long → charge le skill `agent-resilience`** (contexte maigre, `acceptance.md` sauvé au fil de

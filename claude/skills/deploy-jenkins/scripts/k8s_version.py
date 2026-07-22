@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from _common import die, emit, kubectl
+from _deploy_common import die, emit, kubectl
 
 
 def parse_image_tag(image_ref: str) -> tuple[str, str | None]:

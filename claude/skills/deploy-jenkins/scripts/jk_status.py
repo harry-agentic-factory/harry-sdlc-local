@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from _common import curl_json, emit, job_url
+from _deploy_common import curl_json, emit, job_url
 
 
 def main(argv=None) -> None:
