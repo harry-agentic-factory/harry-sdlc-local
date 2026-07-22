@@ -44,6 +44,19 @@ def _recap(md_path: Path) -> str | None:
     return txt[:_RECAP_MAX] + ("…" if len(txt) > _RECAP_MAX else "")
 
 
+def _last_decision(story_dir: Path) -> str | None:
+    """Dernière décision = 1re entrée du journal (newest-first), tronquée."""
+    p = story_dir / "journal.md"
+    if not p.exists():
+        return None
+    segs = p.read_text(errors="ignore").split("## ")
+    entries = [s.strip() for s in segs[1:] if s.strip()]   # segs[0] = en-tête `# …`, on la saute
+    if not entries:
+        return None
+    last = "## " + entries[0]    # newest-first → la 1re entrée est la plus récente
+    return last[:_RECAP_MAX] + ("…" if len(last) > _RECAP_MAX else "")
+
+
 def _artifacts(story_dir: Path) -> list[dict]:
     """Un artefact est **produit** (feedback d'agent réel) s'il dépasse le stub scaffoldé
     (`# <id> — <kind>`, une seule ligne). Un stub vide ≠ feedback."""
@@ -80,11 +93,13 @@ def build_status(workspace: str | Path, target: str | None = None) -> dict:
     out_tickets = []
     for t in sel:
         blocked = [d for d in t.deps if status_by.get(d) not in done]
+        sd = ws.story_dir(t.epic, t.id)
         out_tickets.append({
             "id": t.id, "epic": t.epic, "title": t.title, "status": t.status,
             "next": t.next_step, "deps": t.deps, "blockedBy": blocked,
             "awaiting": _AWAITING.get(t.status),
-            "artifacts": _artifacts(ws.story_dir(t.epic, t.id)),
+            "lastDecision": _last_decision(sd),
+            "artifacts": _artifacts(sd),
         })
 
     total = len(out_tickets)

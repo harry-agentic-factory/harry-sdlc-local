@@ -62,3 +62,27 @@ class Sdlc:
         t.artifacts[kind] = path
         self.ws.save(t)
         return t
+
+    # --- rejet routé (gate humaine : review/recette KO → spec_func|spec_tech|implemented) ---
+    def reject(self, story: str, to: str, note: str, actor: str = "humain",
+               now: str | None = None) -> dict:
+        """Consigne une décision de rejet dans le journal (append-only) PUIS route le ticket.
+        `to` doit être une transition autorisée depuis le statut courant (garde-fou state-machine).
+        N'écrase JAMAIS `acceptance.md` (preuve de recette) — la décision vit dans `journal.md`.
+        """
+        t = self.ws.load(story)
+        validate_transition(t.status, to)              # garde-fou : rejet routé autorisé ?
+        ts = now or _now_iso()
+        frm = t.status
+        self.ws.journal_add(
+            story, f"## {ts} — REJECT  {frm} → {to}  (par: {actor})\n{note.strip()}")
+        t.status = to
+        self.ws.save(t)
+        self.board.set_status(story, to)               # miroir
+        return {"story": story, "from": frm, "to": to, "actor": actor, "note": note,
+                "journal": str(self.ws.journal_path(story))}
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ")

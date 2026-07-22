@@ -34,9 +34,10 @@ def _build_allowed() -> dict[Status, set[Status]]:
     allowed[Status.DONE] = set()
     # spec-func skippable (feature triviale) : DRAFT peut aller direct en SPEC_TECH
     allowed[Status.DRAFT].add(Status.SPEC_TECH)
-    # fix-loop : une recette/review KO renvoie le ticket au dev
+    # rejet routé : une review/recette KO peut repartir vers le dev (implemented), la conception
+    # (spec_tech, ré-analyse) ou le fonctionnel (spec_func) — c'est la gate humaine qui choisit.
     for s in (Status.REVIEWED, Status.DEPLOYED, Status.RECETTE_OK):
-        allowed[s].add(Status.IMPLEMENTED)
+        allowed[s].update({Status.IMPLEMENTED, Status.SPEC_TECH, Status.SPEC_FUNC})
     return allowed
 
 
