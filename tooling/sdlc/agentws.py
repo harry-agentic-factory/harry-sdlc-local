@@ -50,9 +50,10 @@ def _link_project_skills(data_workspace: str | Path, skills_dir: Path) -> list[s
 
 
 def build_agent_workspace(project: str | None = None, story: str | None = None,
-                          branch: str | None = None,
+                          branch: str | None = None, agent: str | None = None,
                           workspace: str | Path | None = None) -> dict:
-    """Crée/rafraîchit la bulle scopée du ticket. Idempotent (worktrees réutilisés, settings réécrit)."""
+    """Crée/rafraîchit la bulle scopée du ticket. Idempotent (worktrees réutilisés, settings réécrit).
+    `agent` : rôle (deployer/reviewer/…) → injecte `permissions.allow/deny` du manifest dans la bulle."""
     man = resolved_manifest(project, workspace)
     ws_root = man["workspace"]
     sdlc = Sdlc(Workspace(ws_root))
@@ -80,9 +81,16 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
     claude.mkdir(parents=True, exist_ok=True)
     scratch = bubble / "scratch"                 # scripts/fichiers temp de l'agent (jamais /tmp)
     scratch.mkdir(parents=True, exist_ok=True)
+    perms: dict = {"additionalDirectories": add_dirs}   # droits scopés
+    mperm = man.get("permissions", {})
+    if agent:                                    # allow/deny par agent-rôle (from manifest)
+        allow = ((mperm.get("agents", {}) or {}).get(agent, {}) or {}).get("allow", [])
+        if allow:
+            perms["allow"] = allow
+        if mperm.get("deny"):
+            perms["deny"] = mperm["deny"]
     (claude / "settings.json").write_text(
-        json.dumps({"permissions": {"additionalDirectories": add_dirs}},
-                   indent=2, ensure_ascii=False) + "\n")
+        json.dumps({"permissions": perms}, indent=2, ensure_ascii=False) + "\n")
     skills = _link_project_skills(ws_root, claude / "skills")
     (bubble / "README.md").write_text(
         f"# Bulle agent — {story} ({man.get('prefix')})\n\n"
@@ -92,8 +100,8 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
         f"`scratch/` : scripts/fichiers temp de l'agent (JAMAIS /tmp).\n")
 
     return {
-        "story": story, "branch": br, "workspace": str(bubble), "scratch": str(scratch),
-        "worktrees": worktrees, "additionalDirectories": add_dirs,
+        "story": story, "branch": br, "agent": agent, "workspace": str(bubble), "scratch": str(scratch),
+        "worktrees": worktrees, "additionalDirectories": add_dirs, "permissions": perms,
         "projectSkills": skills, "credentials": man.get("credentials", {"source": "host"}),
     }
 

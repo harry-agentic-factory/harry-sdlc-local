@@ -71,3 +71,28 @@ def test_cli_workspace(tmp_path, capsys, monkeypatch):
     rc = cli.main(["workspace", "X-1", "--branch", "feat/X-1"])
     out = json.loads(capsys.readouterr().out)
     assert rc == 0 and Path(out["workspace"], ".claude", "settings.json").exists()
+
+
+def test_agent_permissions_injected(tmp_path, monkeypatch):
+    """--agent injecte permissions.allow (rôle) + deny (partagé) du manifest dans la bulle."""
+    import json as _json
+    repo, brain, ws = _setup(tmp_path, with_skill=False)
+    # ajoute un bloc permissions au manifest du projet de test
+    cfgp = ws / "sdlc.config.json"
+    cfg = _json.loads(cfgp.read_text())
+    cfg["permissions"] = {"deny": ["Bash(rm -rf:*)"],
+                          "agents": {"deployer": {"allow": ["Bash(python3:*)", "Bash(kubectl:*)"]}}}
+    cfgp.write_text(_json.dumps(cfg))
+    monkeypatch.setenv("SDLC_WORKSPACE", str(ws))
+    cli.main(["create-epic", "X-E", "e"]); cli.main(["create-ticket", "X-E", "X-1", "t", "--repos", "app"])
+
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1", agent="deployer")
+    settings = _json.loads((Path(res["workspace"]) / ".claude" / "settings.json").read_text())
+    perms = settings["permissions"]
+    assert "Bash(python3:*)" in perms["allow"] and "Bash(kubectl:*)" in perms["allow"]
+    assert perms["deny"] == ["Bash(rm -rf:*)"]
+    assert perms["additionalDirectories"]                 # toujours présent
+    # sans --agent : pas d'allow (juste additionalDirectories)
+    res2 = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    s2 = _json.loads((Path(res2["workspace"]) / ".claude" / "settings.json").read_text())
+    assert "allow" not in s2["permissions"]
