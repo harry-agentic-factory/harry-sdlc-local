@@ -31,29 +31,42 @@ def _sdlc(project: str | None) -> Sdlc:
 
 
 def run(argv: list[str] | None = None) -> dict:
-    p = argparse.ArgumentParser(prog="sdlc")
+    p = argparse.ArgumentParser(
+        prog="sdlc",
+        description="CLI de l'engine SDLC (Harry) — pilote épics, stories, statuts, "
+                    "artefacts et worktrees d'un projet. Sortie JSON.",
+        epilog=(
+            "exemples :\n"
+            "  sdlc --project SAMPLE list --status implemented\n"
+            "  sdlc --project SAMPLE get SAMPLE-GATES-1\n"
+            "  sdlc --project SAMPLE next SAMPLE-GATES\n"
+            "  sdlc --project SAMPLE set-status SAMPLE-GATES-1 reviewed\n"
+            "  sdlc --project SAMPLE workspace SAMPLE-GATES-1 --branch feat/SAMPLE-GATES-1"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     p.add_argument("--project", default=None, help="préfixe projet (ex. SAMPLE)")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="<commande>", title="commandes")
 
-    a = sub.add_parser("create-epic"); a.add_argument("epic"); a.add_argument("title")
-    a = sub.add_parser("create-ticket")
+    a = sub.add_parser("create-epic", help="crée un épic"); a.add_argument("epic"); a.add_argument("title")
+    a = sub.add_parser("create-ticket", help="crée une story dans un épic")
     a.add_argument("epic"); a.add_argument("story"); a.add_argument("title")
     a.add_argument("--deps"); a.add_argument("--repos")
-    a = sub.add_parser("get"); a.add_argument("story")
-    a = sub.add_parser("list"); a.add_argument("--status")
-    a = sub.add_parser("next"); a.add_argument("epic")
-    a = sub.add_parser("set-status"); a.add_argument("story"); a.add_argument("status")
-    a = sub.add_parser("link"); a.add_argument("story"); a.add_argument("kind"); a.add_argument("path")
-    a = sub.add_parser("migrate"); a.add_argument("--workspace")
-    a = sub.add_parser("init-project"); a.add_argument("prefix"); a.add_argument("--path", required=True); a.add_argument("--repos")
-    a = sub.add_parser("register"); a.add_argument("prefix"); a.add_argument("path")
-    sub.add_parser("projects")
-    a = sub.add_parser("config"); a.add_argument("--raw", action="store_true")
-    a = sub.add_parser("worktree")
+    a = sub.add_parser("get", help="affiche une story (JSON)"); a.add_argument("story")
+    a = sub.add_parser("list", help="liste les stories (option --status)"); a.add_argument("--status")
+    a = sub.add_parser("next", help="prochaine story prête d'un épic"); a.add_argument("epic")
+    a = sub.add_parser("set-status", help="change le statut d'une story"); a.add_argument("story"); a.add_argument("status")
+    a = sub.add_parser("link", help="rattache un artefact à une story"); a.add_argument("story"); a.add_argument("kind"); a.add_argument("path")
+    a = sub.add_parser("migrate", help="applique les migrations du workspace"); a.add_argument("--workspace")
+    a = sub.add_parser("init-project", help="initialise un nouveau projet SDLC"); a.add_argument("prefix"); a.add_argument("--path", required=True); a.add_argument("--repos")
+    a = sub.add_parser("register", help="enregistre un projet existant"); a.add_argument("prefix"); a.add_argument("path")
+    sub.add_parser("projects", help="liste les projets enregistrés")
+    a = sub.add_parser("config", help="affiche le manifest résolu (--raw = brut)"); a.add_argument("--raw", action="store_true")
+    a = sub.add_parser("worktree", help="crée un worktree git isolé pour une story")
     a.add_argument("story"); a.add_argument("--repo"); a.add_argument("--branch"); a.add_argument("--base")
-    a = sub.add_parser("worktree-clean")
+    a = sub.add_parser("worktree-clean", help="retire le worktree/branche d'une story mergée")
     a.add_argument("story"); a.add_argument("--branch"); a.add_argument("--ref")
-    a = sub.add_parser("workspace"); a.add_argument("story"); a.add_argument("--branch")
+    a = sub.add_parser("workspace", help="matérialise la bulle scopée (worktree+settings+skills)"); a.add_argument("story"); a.add_argument("--branch")
 
     args = p.parse_args(argv)
 
