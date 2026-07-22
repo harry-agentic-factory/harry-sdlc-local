@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import difflib
 import json
 import sys
 
@@ -23,6 +24,42 @@ from .workspace import Workspace
 
 def _csv(v: str | None) -> list[str]:
     return [x for x in (v or "").split(",") if x]
+
+
+def _resolve_cmd(token: str, commands: list[str]) -> tuple[str | None, str | None]:
+    """Devine la sous-commande si la frappe n'est pas exacte : préfixe unique > fuzzy proche.
+    Retourne (commande_résolue|None, message|None). Ambigu → (None, suggestion)."""
+    pref = [c for c in commands if c.startswith(token)]
+    if len(pref) == 1:
+        return pref[0], f"sdlc: « {token} » → « {pref[0]} »"
+    close = difflib.get_close_matches(token, commands, n=3, cutoff=0.6)
+    if not pref and len(close) == 1:
+        return close[0], f"sdlc: « {token} » → « {close[0]} »"
+    cands = pref or close
+    if cands:
+        return None, f"commande « {token} » inconnue — voulais-tu : {', '.join(cands)} ?"
+    return None, None
+
+
+def _autocorrect(argv: list[str] | None, commands: list[str]) -> list[str]:
+    """Corrige la 1re sous-commande de argv (approx → exacte). Ambigu → ValueError (message clair)."""
+    src = list(sys.argv[1:] if argv is None else argv)
+    i = 0
+    while i < len(src):
+        tok = src[i]
+        if tok == "--project":
+            i += 2; continue
+        if tok.startswith("-"):
+            i += 1; continue
+        if tok not in commands:               # 1er positionnel non reconnu → tenter de deviner
+            resolved, note = _resolve_cmd(tok, commands)
+            if resolved:
+                print(note, file=sys.stderr)   # info d'auto-correction (stdout reste du JSON pur)
+                src[i] = resolved
+            elif note:
+                raise ValueError(note)          # ambigu → main() renvoie l'erreur proprement
+        break                                   # ne touche qu'à la sous-commande
+    return src
 
 
 def _sdlc(project: str | None) -> Sdlc:
@@ -89,7 +126,7 @@ def run(argv: list[str] | None = None) -> dict:
     a = sub.add_parser("workspace", help="construit le workspace isolé d'un agent pour une story")
     a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche")
 
-    args = p.parse_args(argv)
+    args = p.parse_args(_autocorrect(argv, list(sub.choices)))
 
     if args.cmd == "migrate":
         from .migrations import apply_migrations
