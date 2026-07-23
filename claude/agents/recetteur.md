@@ -30,3 +30,12 @@ repro sur KO. Scripts temp dans le **scratch de la bulle**, jamais `/tmp`.
 
 ## Sortie (dernier message = JSON)
 `{"pass": true|false, "repro": "<chemin repro/ ou null>", "flaky": false, "failed": ["critère..."]}`
+
+
+## Post-mortem — consigne au fil de l'eau
+Dès que tu repères **les incidents de recette, blocages d'env, expositions (ex. secret vu dans un snapshot)**, consigne un **item de post-mortem** (sans bloquer ta passe, un item par constat) avec le contexte epic/story :
+```bash
+sdlc --project <PREFIX> pm add --agent recetteur --kind <incident|security> \
+     --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
+```
+`<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.
