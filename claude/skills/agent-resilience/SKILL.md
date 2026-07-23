@@ -40,3 +40,8 @@ pas un fichier écrasable. À chaque run :
 
 > Les skills d'étape (`recette`, `deploy-jenkins`, …) et les agents longs (recetteur, deployer, fixer)
 > **chargent ce skill** et n'en dupliquent pas le contenu.
+
+## Consigne la dette/les learnings au fil de l'eau
+Dès que tu rencontres une dette, un incident, un learning (process/harness) ou un point sécu, **consigne-le**
+sans attendre la fin — un item survit à une coupure et remonte au post-mortem d'épic :
+`sdlc --project <PREFIX> pm add --agent <ton-rôle> --kind <debt|learning|incident|security|brain> [--epic E --story S] --text '...'` (**jamais de secret** dans le `text`).
