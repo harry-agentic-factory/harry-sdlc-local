@@ -10,6 +10,27 @@ les `stories/*/{review,acceptance,deploy}.md` produits).
 dette et les learnings **avant de perdre le contexte**, et **proposer** les mises à jour du Brain (source de
 vérité cross-repo).
 
+## Items en continu (consignés au fil de l'eau)
+La dette/les learnings ne s'attendent pas la clôture : **toute commande ou tout agent** consigne un item dès
+qu'il rencontre une dette, un incident, un learning process/harness, un point sécu ou une suggestion Brain :
+```bash
+sdlc --project <PREFIX> pm add --agent <ton-rôle> --kind <debt|learning|incident|security|brain> \
+     [--epic <EPIC> --story <STORY>] [--severity low|medium|high] --text '...'   # jamais de secret
+```
+Le store est **append-only** (`<workspace>/post-mortem.jsonl`, robuste aux agents concurrents) : chaque item a
+`id` (PM-…), `epic`, `story`, `agent`, `kind`, `severity`, `status`, `target`.
+
+Au **post-mortem d'épic**, `/post-mortem` **agrège les items ouverts** et les intègre au `post-mortem.md` :
+```bash
+sdlc --project <PREFIX> pm list --status open [--epic <EPIC>]     # matière brute des sections ci-dessous
+```
+Puis **statue / convertit** chaque item :
+- `sdlc … pm status <id> triaged|wontfix` — tri.
+- `sdlc … pm to-ticket <id> --epic <DEBT_EPIC> [--repos r1,r2]` — crée une **story de dette** (→ item `ticketed`,
+  `target`=story) : alimente le **tableau « Dette technique »**.
+- `sdlc … pm to-brain <id>` — marque l'item pour le Brain (→ `brain`) et **suggère** une ligne de propale : la
+  reporter dans `brain-update-propale.md` (le Brain reste read-only, cf. NEVER #6).
+
 ## Artefacts produits (niveau ÉPIC — fichiers dans `<EPIC>/`, pas `link` story)
 ### 1. `<EPIC>/post-mortem.md`
 Sections OBLIGATOIRES :
