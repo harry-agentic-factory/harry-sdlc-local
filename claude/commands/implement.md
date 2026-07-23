@@ -38,3 +38,7 @@ Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (pla
 - Transitions de statut = propriété de l'orchestration, pas de l'implémenteur ad hoc : n'avance qu'à
   `implemented` une fois build+tests+invariants OK.
 - Zéro secret en clair (placeholder `CHANGEME`), pas de push sur branche protégée, une MR par repo.
+
+## Post-mortem — consigne au fil de l'eau
+Toute **dette/déviation/TODO/learning** rencontrée pendant le codage : consigne un item (pas de blocage) —
+`sdlc --project <PREFIX> pm add --agent dev --kind <debt|learning> --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat, jamais de secret>'`. Trié plus tard (`pm status`/`to-ticket`/`to-brain`).
