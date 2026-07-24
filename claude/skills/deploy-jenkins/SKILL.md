@@ -107,6 +107,32 @@ Le polling CI/CD + les logs Jenkins/kubectl gonflent vite le contexte → **char
 dump complet), **écris `deploy.md` au fil de l'eau** (build#, statut), et si tu es **coupé** relis
 `deploy.md` et **reprends le suivi du build en cours** au lieu de re-déclencher. Réutilise le crumb.
 
+## Pièges & astuces (durcis en prod)
+- **`curl -g` (globoff) OBLIGATOIRE** dès qu'une URL Jenkins contient `[...]` ou `{...}` — typiquement
+  `?tree=builds[number,result,timestamp]{0,10}`. Sans `-g`, curl interprète `[]`/`{}` comme des **globs** →
+  `bad range in URL` ou **réponse vide** (piège **silencieux**). Les scripts `jk_*` le gèrent ; à la main, ajoute `-g`.
+- **Version réellement déployée = l'IMAGE du conteneur** (le script `k8s_version.py` lit ça), **pas** un timestamp :
+  `kubectl -n <ns> get deploy <d> -o jsonpath='{.spec.template.spec.containers[0].image}'` (+ `rollout status`).
+  ⚠️ **N'utilise JAMAIS** `.status.conditions[].lastUpdateTime` pour dater un déploiement — c'est la date d'une
+  *condition* (souvent bien plus ancienne que le dernier rollout) → conclusion fausse (« déployé il y a 2 mois »
+  alors que c'était hier). En cas de doute, **recoupe avec le dernier build CD Jenkins** (date + n°) = la vérité.
+- **Déclenchement de build → 403** : un `POST …/job/…/build` **nu** peut renvoyer **403** si le job est
+  **paramétré** → utilise **`…/buildWithParameters`** (avec les params) ou le script `jk_replay.py`. Toujours
+  **crumb** (`crumbRequestField:crumb`) + `-X POST`.
+  - **Replay durci (vécu, PM-020)** : sur certaines instances, le Replay exige, **en plus du crumb**, le **cookie
+    de session** — récupère le crumb **et le cookie** dans une même requête (`curl -s -n -c cookiejar …/crumbIssuer/api/json`)
+    puis rejoue avec `-b cookiejar -H "<crumbField>:<crumb>"` en POST sur `…/<buildN>/replay/run` avec le corps
+    `--data-urlencode 'json={"mainScript":"…","parameters":[{"name":"CODE_BRANCH","value":"<branche>"}]}'`. Un
+    `/build` ou un replay sans cookie → **403**. (Si `jk_replay.py` ne le fait pas encore, adapte-le : cookie jar partagé.)
+- **Casse & folders des jobs** : respecte la **casse exacte** (`ci` ≠ `CI`) et la structure de folders
+  (`prod/<app>/ci` → `/job/prod/job/<app>/job/ci`). Mauvais casing/folder = **404**. Valeurs par projet → Brain.
+- **Réseau sandboxé** : si l'environnement de l'agent **bloque le réseau** vers Jenkins (curl renvoie vide /
+  exit≠0 **sans message**), relance la commande réseau via l'échappatoire sandbox de l'hôte
+  (`dangerouslyDisableSandbox`) — c'est du **read-only** authentifié `.netrc`.
+- **Front ≠ back** : un module **front** a son propre couple CI/CD Jenkins + deployment k8s (bloc `deploy.<front>`
+  distinct dans le manifest). Ne suppose pas qu'un merge sur `main` est déployé : **vérifie l'image déployée vs la
+  date des merges** (un front peut être mergé mais pas redéployé).
+
 ## Fallback connaissances profondes
 Détails d'un pipeline précis (Jenkinsfile, shared-lib, casse des jobs, quirks Replay) : le **Brain**
 du projet (`.brain` du manifest, ex. `deployments/*.md`) et le `CLAUDE.md` du repo. Le manifest reste
