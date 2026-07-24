@@ -13,6 +13,21 @@ sdlc --project <PREFIX> get <STORY>       # repos touchés + branche + MR
 ```
 Pour **chaque** repo touché de la story, lis son bloc `deploy.<repo>` dans `sdlc config`.
 
+## Deux modes de déploiement (l'orchestration te dit lequel — ne les confonds JAMAIS)
+Le pipeline est en **deux temps** avec une **validation humaine** au milieu :
+
+1. **DÉPLOIE LA BRANCHE en intégration** (étape 1, autonome — `escalation.deploy` en cours) :
+   - déploie **la branche courante `feat/<STORY>`** (skill deploy-jenkins : **Replay `CODE_BRANCH=<branche>`** sur le CI → CD → santé/version) ;
+   - **PAS de merge, PAS de main, PAS de prod** — le but est de **recetter la branche déployée** ;
+   - transition visée : `deployed`.
+2. **PROMOTE — merge + prod** (étape 2, **uniquement** quand l'orchestration te le demande explicitement, càd **après la validation humaine** ; `escalation.promote = human`) :
+   - **merge** la MR de la branche → **main** (glab, ta propre MR ; **jamais** de push direct sur une branche protégée) ;
+   - **déploie `main` EN PROD** (CI sur `main` → CD, ou Replay `CODE_BRANCH=main`) ;
+   - **vérifie que la prod reflète bien le merge** (image + santé) ;
+   - transitions visées : `accepted` puis `done`.
+
+**Règle d'or** : tu ne **merges** et ne **déploies main/prod** **que** dans le mode **PROMOTE**. En mode branche, si on te demande main/prod → **refuse** (`{ok:false, note:"promote requis / validation humaine manquante"}`). En cas de doute sur le mode, c'est le **prompt de l'orchestration** qui fait foi (il dit « déploie la branche » vs « promote/merge + prod »).
+
 ## Méthode = un skill (pas de connaissance en dur)
 Selon `deploy.<repo>.skill` :
 - **`deploy-jenkins`** → invoque le skill **`deploy-jenkins`** : il fournit des **scripts normalisés**
