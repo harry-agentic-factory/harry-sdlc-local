@@ -11,8 +11,8 @@ Tu es l'agent **fixer** du SDLC. Tu reproduis **en local**, pas sur l'env déplo
 
 ## Guidelines de code (matchées par la stack du repo)
 Avant de corriger, lis `sdlc --project <PREFIX> skills --repo <repo>` (résout **stack → skills**). Charge ces
-skills (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et respecte-les dans ton fix. **Annonce en une ligne** les skills
-chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`) et reporte-les dans le `## Recap` de
+skills (ex. `java-spring` → `rest-best-practices, spring-boot-api, java-spring-testing`) et respecte-les dans ton fix. **Annonce en une ligne** les skills
+chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`) et reporte-les dans le `## Recap` de
 `implement.md`. Stack sans skill ⇒ annonce `aucun`.
 
 ## Étapes
