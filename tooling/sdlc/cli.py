@@ -137,6 +137,8 @@ def run(argv: list[str] | None = None) -> dict:
     sub.add_parser("projects", help="liste les projets enregistrés")
     a = sub.add_parser("config", help="manifest résolu du projet (deploy/recette/credentials…)")
     a.add_argument("--raw", action="store_true", help="config brute non résolue")
+    a = sub.add_parser("skills", help="skills matchés par la stack de chaque repo (repo → stack → skills)")
+    a.add_argument("--repo", help="limiter à un repo (sinon tous)")
     a = sub.add_parser("status", help="statut exact d'un ticket/épic (état + artefacts + recaps agents)")
     a.add_argument("target", nargs="?", help="ID ticket ou épic (sinon : projet entier)")
     a = sub.add_parser("reject", help="rejette une story (gate) → route vers spec_func|spec_tech|implemented + note (journal)")
@@ -175,6 +177,13 @@ def run(argv: list[str] | None = None) -> dict:
         if args.raw:
             return load_config(resolve_workspace(args.project))
         return resolved_manifest(args.project)
+    if args.cmd == "skills":
+        from .config import resolved_manifest
+        man = resolved_manifest(args.project)
+        stacks = man.get("stacks", {})
+        sbr = man.get("skillsByRepo", {})
+        names = [args.repo] if args.repo else list(stacks.keys())
+        return {"skills": {n: {"stack": stacks.get(n), "skills": sbr.get(n, [])} for n in names}}
     if args.cmd == "status":
         from .status_report import build_status
         return build_status(resolve_workspace(args.project), args.target)

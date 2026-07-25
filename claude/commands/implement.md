@@ -13,6 +13,11 @@ Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (pla
   repo est occupé, utilise un **worktree isolé** (règle `worktree-paths` : `<parent>/_wt/<repo>/<branche>`).
 - Jamais de code au-delà du plan ; pas de refacto hors-scope ; réutilise les patterns du repo (CLAUDE.md).
 
+## Guidelines de code (matchées par la stack du repo)
+Avant de coder, lis `sdlc --project <PREFIX> skills` (résout **stack → skills** par repo ; `--repo <repo>` pour
+un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et applique-les.
+**Annonce en une ligne** au démarrage les skills chargés par repo, ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`. Repo dont la stack n'a pas de skill (front, python, …) ⇒ liste vide, annonce `aucun`.
+
 ## Déroulé
 1. **Branche par repo** : `feat/<STORY>-<slug>` (jamais sur une branche protégée).
 2. **Code pas à pas** dans l'ordre des fichiers du plan.

@@ -101,6 +101,14 @@ def load_config(workspace: str | Path) -> dict:
     cfg.setdefault("refBranch", "main")
     cfg.setdefault("deploy", {})
     cfg.setdefault("recette", {})
+    # type/stack technique par repo : { "<repo>": "java-spring" | "java" | "node" | "python" | ... }.
+    #   Explicite côté projet ; à défaut, le CLI l'auto-détecte (pom+spring-boot -> java-spring, package.json
+    #   -> node, pyproject/requirements -> python, …). C'est LE critère de matching des skills.
+    cfg.setdefault("stacks", {})
+    # guidelines de code par STACK (la politique, générique) : { "java-spring": ["rest-api-design", ...] }.
+    #   Le CLI résout repo -> stack -> skills et surface `skillsByRepo`. Un repo dont la stack n'a aucune
+    #   entrée (ex. python) n'hérite d'aucun skill.
+    cfg.setdefault("guidelines", {})
     # identité : source des credentials utilisée par les agents.
     #   "host" = creds ambiantes de l'opérateur (curl -s -n via ~/.netrc, ~/.kube/config, gh/glab
     #   keyring) — jamais lues ni affichées. Futur : "service" = creds scopées injectées dans la bulle.
@@ -156,20 +164,70 @@ def resolve_path(value: str | None, cfg: dict, workspace: str | Path) -> str | N
     return _expand(Path(workspace) / value)
 
 
+def detect_stack(repo_path: str | Path | None) -> str | None:
+    """Devine le type/stack d'un repo à partir de ses fichiers-marqueurs. Critère de matching des skills.
+    pom.xml + spring-boot -> "java-spring" ; pom/gradle Java sinon -> "java" ; package.json -> "node" ;
+    pyproject/requirements/setup.py -> "python". Renvoie None si indéterminé (aucun skill hérité)."""
+    if not repo_path:
+        return None
+    p = Path(repo_path)
+    if not p.exists():
+        return None
+    pom = p / "pom.xml"
+    if pom.exists():
+        try:
+            txt = pom.read_text(errors="ignore")
+        except OSError:
+            txt = ""
+        return "java-spring" if "spring-boot" in txt else "java"
+    if (p / "build.gradle").exists() or (p / "build.gradle.kts").exists():
+        gr = ""
+        for g in ("build.gradle", "build.gradle.kts"):
+            try:
+                gr += (p / g).read_text(errors="ignore") if (p / g).exists() else ""
+            except OSError:
+                pass
+        return "java-spring" if "spring-boot" in gr else "java"
+    if (p / "package.json").exists():
+        return "node"
+    if (p / "pyproject.toml").exists() or (p / "requirements.txt").exists() or (p / "setup.py").exists():
+        return "python"
+    return None
+
+
+def resolve_stacks(cfg: dict, repos: dict) -> dict:
+    """repo -> stack : override explicite `stacks` du manifest, sinon auto-détection."""
+    explicit = cfg.get("stacks", {})
+    out: dict = {}
+    for name, path in repos.items():
+        out[name] = explicit.get(name) or detect_stack(path)
+    return out
+
+
 def resolved_manifest(project: str | None = None, workspace: str | Path | None = None) -> dict:
     """Vue **résolue** du manifest (chemins absolus) — la sortie de `sdlc config`, lue par les agents."""
     ws = Path(workspace) if workspace else resolve_workspace(project)
     cfg = load_config(ws)
+    repos = resolve_repos(cfg)
+    # matching des skills : repo -> stack (explicite ou détecté) -> skills (politique par stack).
+    stacks = resolve_stacks(cfg, repos)
+    guidelines = cfg.get("guidelines", {})  # stack -> [skills]
+    skills_by_repo = {
+        name: list(guidelines.get(st, [])) for name, st in stacks.items() if st and guidelines.get(st)
+    }
     return {
         "prefix": cfg.get("prefix"),
         "workspace": str(ws),
         "reposRoot": _expand(cfg["reposRoot"]) if cfg.get("reposRoot") else None,
-        "repos": resolve_repos(cfg),
+        "repos": repos,
         "roles": cfg.get("roles", {}),
+        "stacks": stacks,
         "brain": resolve_path(cfg.get("brain"), cfg, ws),
         "refBranch": cfg.get("refBranch", "main"),
         "deploy": cfg.get("deploy", {}),
         "recette": cfg.get("recette", {}),
+        "guidelines": guidelines,
+        "skillsByRepo": skills_by_repo,
         "credentials": cfg.get("credentials", {"source": "host"}),
         "permissions": cfg.get("permissions", {}),
         "escalation": cfg["escalation"],

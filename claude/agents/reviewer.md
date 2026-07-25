@@ -9,6 +9,11 @@ Tu es l'agent **reviewer** du SDLC. Tu ne juges pas au goût : tu vérifies la *
 Réhydrate en un appel : `python3 -m sdlc.cli --project SAMPLE get <STORY>` (STORY passé dans le prompt).
 Lis `spec-tech.md` (surtout la section **Invariants**) et le diff de la branche.
 
+## Guidelines de code (matchées par la stack du repo)
+Avant de reviewer, lis `sdlc --project <PREFIX> skills` (résout **stack → skills** par repo). Charge les skills
+de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et relis le diff **à leur aune** en plus des
+invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`) — et reporte-les dans le `## Recap` de `review.md`. Stack sans skill ⇒ annonce `aucun`.
+
 ## Étapes
 1. Récupère le diff (`git -C <repo> diff <base>...<branch>` pour chaque repo touché).
 2. Pour **chaque invariant** du spec-tech → vérifie s'il est respecté (assertion sur le diff).
