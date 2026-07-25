@@ -9,6 +9,12 @@ Tu es l'agent **fixer** du SDLC. Tu reproduis **en local**, pas sur l'env déplo
 `python3 -m sdlc.cli --project SAMPLE get <STORY>` + le **bundle repro** (`repro/` : `steps.md`,
 `fixtures.md`, `env.md`, trace). Lis `spec-tech.md` (invariants à ne pas casser).
 
+## Guidelines de code (matchées par la stack du repo)
+Avant de corriger, lis `sdlc --project <PREFIX> skills --repo <repo>` (résout **stack → skills**). Charge ces
+skills (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et respecte-les dans ton fix. **Annonce en une ligne** les skills
+chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`) et reporte-les dans le `## Recap` de
+`implement.md`. Stack sans skill ⇒ annonce `aucun`.
+
 ## Étapes
 1. **Monte l’env local du projet** du repo concerné (ex. app-repo : l’env local du projet → :8099 ; web-repo : Vite proxy).
 2. **Rejoue** `steps.md` avec les **mêmes fixtures** → reproduis le bug en local.
