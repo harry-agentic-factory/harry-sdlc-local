@@ -14,18 +14,20 @@ export const meta = {
 }
 
 // ── paramètres ──
-const TICKET = (args && args.ticket) || 'SAMPLE-APPS-1'
-const EPIC = (args && args.epic) || 'SAMPLE-APPS'
-const PREFIX = (args && args.prefix) || 'SAMPLE'
-const REPO_NAME = (args && args.repoName) || 'app-repo'
-const REPO = (args && args.repo) || '<workspace>/app-repo'
-const BRANCH = (args && args.branch) || `feat/${TICKET}`
-const SDLC_ROOT = (args && args.sdlcRoot) || '<workspace>/sample-proj-sdlc-local'
+// Le runtime peut passer `args` en OBJET ou en CHAÎNE JSON — normaliser en objet (sinon args.X = undefined -> défauts SAMPLE).
+const A = (typeof args === 'string' ? (() => { try { return JSON.parse(args) } catch { return {} } })() : (args || {}))
+const TICKET = A.ticket || 'SAMPLE-APPS-1'
+const EPIC = A.epic || 'SAMPLE-APPS'
+const PREFIX = A.prefix || 'SAMPLE'
+const REPO_NAME = A.repoName || 'app-repo'
+const REPO = A.repo || '<workspace>/app-repo'
+const BRANCH = A.branch || `feat/${TICKET}`
+const SDLC_ROOT = A.sdlcRoot || '<workspace>/sample-proj-sdlc-local'
 const STORY = `${SDLC_ROOT}/${EPIC}/stories/${TICKET}`
-const ESC = (args && args.escalation) || { review: 'auto', deploy: 'auto', recette: 'auto', promote: 'human' }
-const PROMOTE = !!(args && args.promote)   // true = phase C (après validation humaine de la recette) : merge main + deploy prod
-const REVIEW_HUMAN = ((((args && args.review) || ESC.review) || 'human') === 'human')  // option : gate review humaine (défaut) vs review auto
-const REVIEW_OK = !!(args && args.reviewOk) // review humaine déjà approuvée -> on reprend directement au deploy branche
+const ESC = A.escalation || { review: 'auto', deploy: 'auto', recette: 'auto', promote: 'human' }
+const PROMOTE = !!A.promote   // true = phase C (après validation humaine de la recette) : merge main + deploy prod
+const REVIEW_HUMAN = (((A.review || ESC.review) || 'human') === 'human')  // option : gate review humaine (défaut) vs review auto
+const REVIEW_OK = !!A.reviewOk // review humaine déjà approuvée -> on reprend directement au deploy branche
 const MAX_FIX = 2
 let WORKREPO = REPO   // remplacé par le worktree isolé du ticket après la phase Prepare
 

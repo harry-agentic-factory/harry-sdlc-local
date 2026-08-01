@@ -59,6 +59,25 @@ def _registered_projects() -> dict:
     return json.loads(reg.read_text()).get("projects", {}) if reg.exists() else {}
 
 
+def current_project(start: str | Path | None = None) -> str | None:
+    """Préfixe du projet **courant** déduit du CWD (ou `start`) : le projet enregistré dont le
+    workspace data / reposRoot / un repo contient le CWD. `None` si aucun ne matche (CWD hors projet).
+    C'est ce qui lève l'ambiguïté de `sdlc projects` quand plusieurs projets sont enregistrés.
+    """
+    try:
+        ws = infer_project_workspace(start or Path.cwd())
+    except OSError:
+        return None
+    if not ws:
+        return None
+    ws_res = str(Path(ws).resolve())
+    for prefix, meta in _registered_projects().items():
+        w = meta.get("workspace")
+        if w and str(Path(w).resolve()) == ws_res:
+            return prefix
+    return None
+
+
 def infer_project_workspace(start: str | Path) -> str | None:
     """Déduit le workspace data à partir du CWD : le projet dont le `reposRoot`, un repo, ou le repo
     data **contient** le CWD. Match le plus **spécifique** (chemin le plus long) en cas de chevauchement.

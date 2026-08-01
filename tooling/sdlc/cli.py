@@ -146,6 +146,11 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("--to", required=True, help="étape de retour : spec_func | spec_tech | implemented")
     a.add_argument("--note", required=True, help="raison du rejet (consignée dans journal.md)")
     a.add_argument("--by", default="humain", help="auteur de la décision (défaut: humain)")
+    a = sub.add_parser("validate-spec",
+                       help="GATE specs : spec_tech→spec_validated (story OU épic entier). La review harry-archi "
+                            "+ l'escalade humaine se font en AMONT (orchestration) ; cette commande CONSIGNE la validation.")
+    a.add_argument("target", help="ID story OU épic (épic = batch toutes ses stories en spec_tech)")
+    a.add_argument("--review", help="chemin du spec-review.md (artefact de gate) à consigner sur l'épic/la story")
 
     # --- worktrees / workspace agent ---
     a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
@@ -197,7 +202,12 @@ def run(argv: list[str] | None = None) -> dict:
         return {"prefix": args.prefix, "registered": register_project(args.prefix, args.path)}
     if args.cmd == "projects":
         from .project import list_projects
-        return {"projects": list_projects()}
+        from .config import current_project
+        # `current` = projet déduit du CWD (lève l'ambiguïté quand plusieurs sont enregistrés).
+        # `--project` explicite l'emporte s'il est fourni et connu.
+        projects = list_projects()
+        cur = args.project if args.project in projects else current_project()
+        return {"projects": projects, "current": cur}
     if args.cmd == "config":
         from .config import load_config, resolved_manifest
         if args.raw:
@@ -253,6 +263,20 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
     if args.cmd == "reject":
         return s.reject(args.story, args.to, args.note, actor=args.by)
+    if args.cmd == "validate-spec":
+        # GATE specs (harry-archi + escalade humaine faites en amont) → spec_tech → spec_validated.
+        # target = une story, OU un épic (batch de toutes ses stories encore en spec_tech = gate au niveau PRD).
+        all_t = s.list_backlog(None)
+        ids = {t.id for t in all_t}
+        if args.target in ids:
+            targets = [args.target]
+        else:
+            targets = [t.id for t in all_t if t.epic == args.target and t.status == "spec_tech"]
+            if not targets:
+                raise ValueError(
+                    f"validate-spec: « {args.target} » n'est ni une story ni un épic avec des stories en spec_tech")
+        validated = [s.set_status(tid, "spec_validated").id for tid in targets]
+        return {"gate": "spec_validated", "target": args.target, "validated": validated, "review": args.review}
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
         return build_agent_workspace(args.project, args.story, branch=args.branch, agent=args.agent)

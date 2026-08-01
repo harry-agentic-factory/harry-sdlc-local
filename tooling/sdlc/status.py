@@ -13,6 +13,7 @@ class Status(str, Enum):
     DRAFT = "draft"            # créé par /refine
     SPEC_FUNC = "spec_func"    # /spec-func (skippable)
     SPEC_TECH = "spec_tech"    # /spec-tech
+    SPEC_VALIDATED = "spec_validated"  # gate: specs validées par harry-archi (+ escalade humaine) AVANT implem
     IMPLEMENTED = "implemented"  # /implement
     REVIEWED = "reviewed"      # agent reviewer (MR approuvée)
     DEPLOYED = "deployed"      # agent deployer
@@ -22,7 +23,7 @@ class Status(str, Enum):
 
 
 PIPELINE: list[Status] = [
-    Status.DRAFT, Status.SPEC_FUNC, Status.SPEC_TECH, Status.IMPLEMENTED,
+    Status.DRAFT, Status.SPEC_FUNC, Status.SPEC_TECH, Status.SPEC_VALIDATED, Status.IMPLEMENTED,
     Status.REVIEWED, Status.DEPLOYED, Status.RECETTE_OK, Status.ACCEPTED, Status.DONE,
 ]
 
@@ -34,6 +35,10 @@ def _build_allowed() -> dict[Status, set[Status]]:
     allowed[Status.DONE] = set()
     # spec-func skippable (feature triviale) : DRAFT peut aller direct en SPEC_TECH
     allowed[Status.DRAFT].add(Status.SPEC_TECH)
+    # gate spec_validated SKIPPABLE (backward-compat + features triviales) : SPEC_TECH -> IMPLEMENTED direct.
+    # La gate "dure" (review harry-archi + escalade) est portée par l'ORCHESTRATION (`validate-spec` passe par
+    # SPEC_VALIDATED) ; la state-machine tolère le skip pour ne pas casser les flux existants.
+    allowed[Status.SPEC_TECH].add(Status.IMPLEMENTED)
     # rejet routé : une review/recette KO peut repartir vers le dev (implemented), la conception
     # (spec_tech, ré-analyse) ou le fonctionnel (spec_func) — c'est la gate humaine qui choisit.
     for s in (Status.REVIEWED, Status.DEPLOYED, Status.RECETTE_OK):

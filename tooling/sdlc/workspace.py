@@ -5,6 +5,7 @@ Layout :
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +25,7 @@ class Ticket:
     branch: str | None = None
     mr: str | None = None
     artifacts: dict[str, str] = field(default_factory=dict)
+    recette: dict | None = None
 
     @property
     def next_step(self) -> str | None:
@@ -74,6 +76,8 @@ class Workspace:
             "deps": t.deps, "repos": t.repos, "branch": t.branch, "mr": t.mr,
             "artifacts": t.artifacts,
         }
+        if t.recette is not None:
+            payload["recette"] = t.recette
         self._status_path(t.epic, t.id).write_text(json.dumps(payload, indent=2, ensure_ascii=False))
 
     def load(self, story: str) -> Ticket:
@@ -81,7 +85,8 @@ class Workspace:
         if p is None:
             raise KeyError(f"ticket introuvable: {story}")
         data = json.loads(p.read_text())
-        return Ticket(**data)
+        known = {f.name for f in dataclasses.fields(Ticket)}
+        return Ticket(**{k: v for k, v in data.items() if k in known})
 
     def save(self, t: Ticket) -> None:
         self._save(t)

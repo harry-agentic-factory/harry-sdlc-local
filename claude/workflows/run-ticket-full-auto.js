@@ -16,4 +16,6 @@ export const meta = {
 const RUN_TICKET = '/Users/anisbessa/.claude/workflows/run-ticket.js'
 
 // Délégation : même pipeline, review forcée en AUTO. Le résultat (await_validation / promote / done) remonte tel quel.
-return await workflow({ scriptPath: RUN_TICKET }, { ...(args || {}), review: 'auto' })
+// `args` peut arriver en OBJET ou en CHAÎNE JSON — normaliser avant le spread (sinon {...string} éclate en caractères).
+const A = (typeof args === 'string' ? (() => { try { return JSON.parse(args) } catch { return {} } })() : (args || {}))
+return await workflow({ scriptPath: RUN_TICKET }, { ...A, review: 'auto' })
