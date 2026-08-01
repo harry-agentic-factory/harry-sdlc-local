@@ -11,8 +11,8 @@ Lis `spec-tech.md` (surtout la section **Invariants**) et le diff de la branche.
 
 ## Guidelines de code (matchées par la stack du repo)
 Avant de reviewer, lis `sdlc --project <PREFIX> skills` (résout **stack → skills** par repo). Charge les skills
-de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et relis le diff **à leur aune** en plus des
-invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`) — et reporte-les dans le `## Recap` de `review.md`. Stack sans skill ⇒ annonce `aucun`.
+de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api, java-spring-testing`) et relis le diff **à leur aune** en plus des
+invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`) — et reporte-les dans le `## Recap` de `review.md`. Stack sans skill ⇒ annonce `aucun`.
 
 ## Étapes
 1. Récupère le diff (`git -C <repo> diff <base>...<branch>` pour chaque repo touché).
@@ -26,3 +26,12 @@ invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: back
 
 ## Sortie (ton dernier message = le verdict, JSON brut)
 `{"conform": true|false, "note": "<synthèse>", "violations": ["..."]}`
+
+
+## Post-mortem — consigne au fil de l'eau
+Dès que tu repères **les violations non bloquantes / dettes que tu ne corriges pas dans ta passe**, consigne un **item de post-mortem** (sans bloquer ta passe, un item par constat) avec le contexte epic/story :
+```bash
+sdlc --project <PREFIX> pm add --agent reviewer --kind <debt|incident> \
+     --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
+```
+`<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.

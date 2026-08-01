@@ -146,6 +146,11 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("--to", required=True, help="étape de retour : spec_func | spec_tech | implemented")
     a.add_argument("--note", required=True, help="raison du rejet (consignée dans journal.md)")
     a.add_argument("--by", default="humain", help="auteur de la décision (défaut: humain)")
+    a = sub.add_parser("validate-spec",
+                       help="GATE specs : spec_tech→spec_validated (story OU épic entier). La review harry-archi "
+                            "+ l'escalade humaine se font en AMONT (orchestration) ; cette commande CONSIGNE la validation.")
+    a.add_argument("target", help="ID story OU épic (épic = batch toutes ses stories en spec_tech)")
+    a.add_argument("--review", help="chemin du spec-review.md (artefact de gate) à consigner sur l'épic/la story")
 
     # --- worktrees / workspace agent ---
     a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
@@ -156,6 +161,32 @@ def run(argv: list[str] | None = None) -> dict:
     a = sub.add_parser("workspace", help="construit le workspace isolé d'un agent pour une story")
     a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche")
     a.add_argument("--agent", help="rôle agent (deployer/reviewer/…) → injecte permissions.allow/deny du manifest")
+
+    # --- post-mortem : items consignés au fil de l'eau (dette/learning/incident/sécu/brain) ---
+    pm = sub.add_parser("post-mortem", aliases=["pm"],
+                        help="items de post-mortem : consigne / statue / convertit (dette ou Brain)")
+    pmsub = pm.add_subparsers(dest="pmcmd", required=True, metavar="<pm-cmd>")
+    a = pmsub.add_parser("add", help="consigne un item (qui/epic/story + kind/sévérité/texte)")
+    a.add_argument("--agent", required=True, help="qui consigne (reviewer|recetteur|deployer|fixer|dev|demo|human|<commande>)")
+    a.add_argument("--kind", required=True, help="debt|learning|incident|security|brain")
+    a.add_argument("--text", required=True, help="description (jamais de secret)")
+    a.add_argument("--epic", help="ID épic concerné")
+    a.add_argument("--story", help="ID story concernée")
+    a.add_argument("--severity", default="medium", help="low|medium|high (défaut medium)")
+    a = pmsub.add_parser("list", help="liste les items courants (filtrable)")
+    a.add_argument("--epic"); a.add_argument("--story"); a.add_argument("--agent")
+    a.add_argument("--kind"); a.add_argument("--status")
+    a = pmsub.add_parser("show", help="affiche un item"); a.add_argument("id", help="ID item (PM-…)")
+    a = pmsub.add_parser("status", help="statue sur un item (append d'un snapshot)")
+    a.add_argument("id", help="ID item (PM-…)")
+    a.add_argument("status", choices=["open", "triaged", "wontfix"], help="open|triaged|wontfix")
+    a.add_argument("--target", help="id ticket / URL PR Brain (optionnel)")
+    a = pmsub.add_parser("to-ticket", help="convertit l'item en story de dette dans un épic")
+    a.add_argument("id", help="ID item (PM-…)")
+    a.add_argument("--epic", required=True, help="épic dette cible (DEBT_EPIC)")
+    a.add_argument("--repos", help="repos touchés, séparés par des virgules")
+    a = pmsub.add_parser("to-brain", help="marque l'item pour le Brain + suggère l'entrée de propale")
+    a.add_argument("id", help="ID item (PM-…)")
 
     args = p.parse_args(_autocorrect(argv, list(sub.choices)))
 
@@ -171,7 +202,12 @@ def run(argv: list[str] | None = None) -> dict:
         return {"prefix": args.prefix, "registered": register_project(args.prefix, args.path)}
     if args.cmd == "projects":
         from .project import list_projects
-        return {"projects": list_projects()}
+        from .config import current_project
+        # `current` = projet déduit du CWD (lève l'ambiguïté quand plusieurs sont enregistrés).
+        # `--project` explicite l'emporte s'il est fourni et connu.
+        projects = list_projects()
+        cur = args.project if args.project in projects else current_project()
+        return {"projects": projects, "current": cur}
     if args.cmd == "config":
         from .config import load_config, resolved_manifest
         if args.raw:
@@ -187,6 +223,26 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "status":
         from .status_report import build_status
         return build_status(resolve_workspace(args.project), args.target)
+    if args.cmd in ("post-mortem", "pm"):
+        from .post_mortem import PostMortemStore
+        store = PostMortemStore(resolve_workspace(args.project))
+        if args.pmcmd == "add":
+            item = store.add(agent=args.agent, kind=args.kind, text=args.text,
+                             epic=args.epic, story=args.story, severity=args.severity)
+            return {"id": item.id}
+        if args.pmcmd == "list":
+            return {"items": [dataclasses.asdict(i) for i in store.list(
+                epic=args.epic, story=args.story, agent=args.agent,
+                kind=args.kind, status=args.status)]}
+        if args.pmcmd == "show":
+            return dataclasses.asdict(store.get(args.id))
+        if args.pmcmd == "status":
+            return dataclasses.asdict(store.set_status(args.id, args.status, target=args.target))
+        if args.pmcmd == "to-ticket":
+            return store.to_ticket(args.id, _sdlc(args.project),
+                                   debt_epic=args.epic, repos=_csv(args.repos))
+        if args.pmcmd == "to-brain":
+            return store.to_brain(args.id)
 
     s = _sdlc(args.project)
 
@@ -207,6 +263,20 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
     if args.cmd == "reject":
         return s.reject(args.story, args.to, args.note, actor=args.by)
+    if args.cmd == "validate-spec":
+        # GATE specs (harry-archi + escalade humaine faites en amont) → spec_tech → spec_validated.
+        # target = une story, OU un épic (batch de toutes ses stories encore en spec_tech = gate au niveau PRD).
+        all_t = s.list_backlog(None)
+        ids = {t.id for t in all_t}
+        if args.target in ids:
+            targets = [args.target]
+        else:
+            targets = [t.id for t in all_t if t.epic == args.target and t.status == "spec_tech"]
+            if not targets:
+                raise ValueError(
+                    f"validate-spec: « {args.target} » n'est ni une story ni un épic avec des stories en spec_tech")
+        validated = [s.set_status(tid, "spec_validated").id for tid in targets]
+        return {"gate": "spec_validated", "target": args.target, "validated": validated, "review": args.review}
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
         return build_agent_workspace(args.project, args.story, branch=args.branch, agent=args.agent)

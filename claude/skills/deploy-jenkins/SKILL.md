@@ -27,6 +27,20 @@ Ton rôle = **enchaîner ces 4 outils + décider** (build → suivre jusqu'à SU
 escalade si ambigu, rollback si KO). Les sections ci-dessous expliquent le **pourquoi** (fallback), mais
 la **mécanique passe par les scripts**.
 
+### ⛔ RÈGLE ANTI-HANG (obligatoire — un agent s'est figé 9h sinon)
+**Toute op potentiellement bloquante DOIT être bornée.** N'exécute JAMAIS en direct : `kubectl port-forward`
+(bloquant par nature), un `while … curl … done` de polling, un `mvn`/`npm` long — sans borne. Utilise les
+wrappers :
+```bash
+# borne N'IMPORTE QUELLE commande (jamais de hang ; rc=124 si dépassé) :
+bash $D/safe_run.sh <timeout_sec> -- <commande...>
+# port-forward + curl + kill, entièrement borné (health/API sur un deploy) :
+bash $D/pf_curl.sh <ns> <deploy> <containerPort> <path> [curl_opts...]   # sortie: corps + `__HTTP__<code>`
+```
+Et **si tu polls un build**, poll avec un **max d'itérations** (ex. 40×20s=13min) puis **bail** `{ok:false,
+note:"timeout poll"}` — ne boucle jamais sans sortie. (L'orchestration doit aussi surveiller le mtime de ta
+sortie : au-delà de ~15 min sans écriture = agent figé à tuer.)
+
 ## 1. Récupère les paramètres (source unique = le manifest)
 ```bash
 sdlc --project <PREFIX> config          # JSON résolu
@@ -124,6 +138,12 @@ dump complet), **écris `deploy.md` au fil de l'eau** (build#, statut), et si tu
     puis rejoue avec `-b cookiejar -H "<crumbField>:<crumb>"` en POST sur `…/<buildN>/replay/run` avec le corps
     `--data-urlencode 'json={"mainScript":"…","parameters":[{"name":"CODE_BRANCH","value":"<branche>"}]}'`. Un
     `/build` ou un replay sans cookie → **403**. (Si `jk_replay.py` ne le fait pas encore, adapte-le : cookie jar partagé.)
+  - **`CODE_BRANCH` en `envVar` du podTemplate (vécu, PM-023)** : quand le job **n'est pas paramétré** et fixe la
+    branche via `envVar(key:'CODE_BRANCH', value:'main')` dans le podTemplate, `jk_replay.py` (qui cherche `name:`)
+    **ne swappe pas** la branche. Le `"Checking out (main)"` du log est le checkout de la **définition pipeline**,
+    pas du code (`checkoutCode` lit l'envVar). → passe par le **replay durci** (`json=`+crumb+cookie) qui réinjecte
+    `CODE_BRANCH` dans les 3 conteneurs du podTemplate. **Piège classique : le CI SUCCESS mais l'agent reste coincé à
+    la transition CI→CD** — enchaîne bien le trigger CD (crumb+cookie) après le SUCCESS, ne boucle pas.
 - **Casse & folders des jobs** : respecte la **casse exacte** (`ci` ≠ `CI`) et la structure de folders
   (`prod/<app>/ci` → `/job/prod/job/<app>/job/ci`). Mauvais casing/folder = **404**. Valeurs par projet → Brain.
 - **Réseau sandboxé** : si l'environnement de l'agent **bloque le réseau** vers Jenkins (curl renvoie vide /

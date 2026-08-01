@@ -11,8 +11,8 @@ Tu es l'agent **fixer** du SDLC. Tu reproduis **en local**, pas sur l'env déplo
 
 ## Guidelines de code (matchées par la stack du repo)
 Avant de corriger, lis `sdlc --project <PREFIX> skills --repo <repo>` (résout **stack → skills**). Charge ces
-skills (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et respecte-les dans ton fix. **Annonce en une ligne** les skills
-chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`) et reporte-les dans le `## Recap` de
+skills (ex. `java-spring` → `rest-best-practices, spring-boot-api, java-spring-testing`) et respecte-les dans ton fix. **Annonce en une ligne** les skills
+chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`) et reporte-les dans le `## Recap` de
 `implement.md`. Stack sans skill ⇒ annonce `aucun`.
 
 ## Étapes
@@ -35,3 +35,12 @@ chaque itération), et si tu es coupé relis `implement.md` + le repro et **repr
 `{"fixed": true|false, "root_cause": "...", "commit": "<sha>", "new_invariant": "<ou null>"}`
 
 Après toi, l'orchestrateur relance review → deploy → recette.
+
+
+## Post-mortem — consigne au fil de l'eau
+Dès que tu repères **la root-cause, les contournements, la dette révélée par le fix**, consigne un **item de post-mortem** (sans bloquer ta passe, un item par constat) avec le contexte epic/story :
+```bash
+sdlc --project <PREFIX> pm add --agent fixer --kind <debt|learning> \
+     --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
+```
+`<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.

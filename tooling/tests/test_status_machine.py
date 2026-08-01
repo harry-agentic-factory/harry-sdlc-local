@@ -31,3 +31,19 @@ def test_skip_more_than_one_rejected():
 def test_done_is_terminal():
     with pytest.raises(InvalidTransition):
         validate_transition(Status.DONE, Status.ACCEPTED)
+
+
+def test_spec_validated_gate():
+    # gate: spec_tech -> spec_validated -> implemented
+    assert validate_transition(Status.SPEC_TECH, Status.SPEC_VALIDATED) == Status.SPEC_VALIDATED
+    assert validate_transition(Status.SPEC_VALIDATED, Status.IMPLEMENTED) == Status.IMPLEMENTED
+
+
+def test_spec_validated_gate_is_skippable():
+    # backward-compat : spec_tech -> implemented direct reste toléré (gate portée par l'orchestration)
+    assert validate_transition(Status.SPEC_TECH, Status.IMPLEMENTED) == Status.IMPLEMENTED
+
+
+def test_spec_validated_cannot_skip_from_spec_func():
+    with pytest.raises(InvalidTransition):
+        validate_transition(Status.SPEC_FUNC, Status.SPEC_VALIDATED)

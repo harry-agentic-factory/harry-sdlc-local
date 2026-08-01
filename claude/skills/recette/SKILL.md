@@ -24,6 +24,16 @@ Le token **ne surface jamais** (fichier scratch `600`, lu en interne par `api_ge
 scratch de la bulle, jamais `/tmp`.** Allowlist recetteur = `Bash(python3 …/scripts/*.py:*)`.
 > Ton rôle = **appeler ces scripts + asserter** vs les critères. Les sections ci-dessous = le *pourquoi* (fallback).
 
+### ⛔ RÈGLE ANTI-HANG (obligatoire — un recetteur s'est figé 9h sur un port-forward)
+`kubectl port-forward` est **bloquant par nature** : lancé en direct, il ne rend **jamais** la main → l'agent se fige.
+**N'exécute JAMAIS un port-forward brut.** Borne **toute** op longue (port-forward, mvn, npm, curl) avec les wrappers
+partagés (dans le skill `deploy-jenkins/scripts/`) :
+```bash
+D=<…>/deploy-jenkins/scripts
+bash $D/pf_curl.sh <ns> <deploy> <containerPort> <path> [curl_opts…]   # port-forward + curl + kill, borné
+bash $D/safe_run.sh <timeout_sec> -- <commande…>                        # borne n'importe quoi (rc=124 si dépassé)
+```
+
 ## 1. Récupère le QUOI et le COMMENT
 ```bash
 sdlc --project <PREFIX> get <STORY>          # repos touchés, branche, artefacts
@@ -74,6 +84,26 @@ Une recette enchaîne beaucoup d'appels (port-forward, token, API, kcadm…) →
 resume-safe, découpe si long). Spécifique recette : **filtre** chaque réponse aux seuls champs assertés
 (ex. `curl -s … | jq '[.[] | {clientId, enabled, authFlow, receptionMode, journeyOptions}]'`),
 **réutilise** token + port-forward (ne les relance pas par critère), et **nettoie** le port-forward à la fin.
+
+## Pièges & astuces (vécus en prod)
+- **Accès backend sans port-forward** : si le repo a un **ingress public**, curl-le **directement** (plus fiable que
+  le port-forward). Ex. HIA : `https://prod.client.hiasecure.com/back-tenant/api/…` (le front proxie `/back-tenant`).
+  → évite le piège port-forward.
+- **Présence d'un endpoint sans token** : un `GET` sans auth qui renvoie **302/401** = endpoint **présent + sécurisé** ;
+  **404** = endpoint **absent** (pas déployé). Check rapide avant de sortir l'artillerie d'auth.
+- **Auth Keycloak 26** : le token vit sous le **chemin relatif** `KC_HTTP_RELATIVE_PATH` — souvent **`/admin`** (vécu :
+  `https://<host>/admin/realms/<realm>/protocol/openid-connect/token`). **Sans `/admin` → 405/404** (piège classique).
+  Mint = `client_credentials` (SA de recette) **ou** ROPC (user de recette), **secret lu d'un fichier**, jamais en argv.
+- **Erreur générique `{"field":null,"key":"unknown.error"}`** (HTTP 400) = **échec en aval mappé** par le
+  gestionnaire d'exception (pas une validation de champ). → **LIS le code de la méthode aval** (relais), n'ASSUME
+  jamais la cause. *(Vécu, leçon à la dure : j'ai d'abord assumé « back-hia rejette un code absent de son `SettingEnum`,
+  il faut releaser le domaine » — **FAUX**. En lisant enfin la méthode aval `updateSettingClient`, la vraie cause était
+  que back-hia ne fait qu'un **update des lignes EXISTANTES matchées par ID** (`findAllByClientId` + `stg.getId().equals`),
+  **sans upsert-by-code** → un relais qui envoie des settings **neufs sans id** ne matche rien / NPE. Aucun rapport avec
+  le domaine. J'ai perdu une release + un build à chasser la mauvaise piste.)* **Règle : `curl` la cause hypothétique
+  puis `grep`/`Read` la méthode aval AVANT d'ouvrir un chantier release/infra.**
+- **Un test unitaire vert ne prouve pas l'intégration** : le relais cross-repo (back-tenant→back-hia) était **mocké**
+  → le PUT passait en test. La **recette live attrape** le mismatch de contrat (upsert attendu vs update-by-id réel).
 
 ## Fallback connaissances profondes
 Spécifiques d'auth/endpoint d'un projet : le **Brain** (`.brain` du manifest) + le `CLAUDE.md` du repo.

@@ -15,8 +15,8 @@ Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (pla
 
 ## Guidelines de code (matchées par la stack du repo)
 Avant de coder, lis `sdlc --project <PREFIX> skills` (résout **stack → skills** par repo ; `--repo <repo>` pour
-un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api`) et applique-les.
-**Annonce en une ligne** au démarrage les skills chargés par repo, ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api`. Repo dont la stack n'a pas de skill (front, python, …) ⇒ liste vide, annonce `aucun`.
+un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api, java-spring-testing`) et applique-les.
+**Annonce en une ligne** au démarrage les skills chargés par repo, ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`. Repo dont la stack n'a pas de skill (front, python, …) ⇒ liste vide, annonce `aucun`.
 
 ## Déroulé
 1. **Branche par repo** : `feat/<STORY>-<slug>` (jamais sur une branche protégée).
@@ -43,3 +43,7 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
 - Transitions de statut = propriété de l'orchestration, pas de l'implémenteur ad hoc : n'avance qu'à
   `implemented` une fois build+tests+invariants OK.
 - Zéro secret en clair (placeholder `CHANGEME`), pas de push sur branche protégée, une MR par repo.
+
+## Post-mortem — consigne au fil de l'eau
+Toute **dette/déviation/TODO/learning** rencontrée pendant le codage : consigne un item (pas de blocage) —
+`sdlc --project <PREFIX> pm add --agent dev --kind <debt|learning> --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat, jamais de secret>'`. Trié plus tard (`pm status`/`to-ticket`/`to-brain`).

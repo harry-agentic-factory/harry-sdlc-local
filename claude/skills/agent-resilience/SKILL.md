@@ -28,6 +28,17 @@ taille.** Applique cette discipline **du début à la fin** :
    jetable dans le **scratch de ta bulle** (`<workspace>/scratch/`, fourni par `sdlc workspace`) ou, à
    défaut, le dossier du ticket. `/tmp` est **hors de ton périmètre** → **popup de permission** + fichier
    non contenu/non nettoyé. Le scratch, lui, est dans ton périmètre et part avec la bulle.
+8. **⛔ BORNE TOUTE OP BLOQUANTE — JAMAIS DE HANG.** *(règle apprise à la dure : un agent s'est figé **9h** sur
+   un `kubectl port-forward` lancé en direct.)* Certaines commandes **ne rendent jamais la main** :
+   `kubectl port-forward` (bloquant par nature), un `while … done` de **polling sans max d'itérations**, un
+   `mvn`/`npm`/`curl` qui pend sur le réseau. **N'en lance AUCUNE en direct.** Deux réflexes :
+   - **Wrappers bornés** (dans `deploy-jenkins/scripts/`) :
+     `bash <…>/safe_run.sh <timeout_sec> -- <cmd…>` (borne n'importe quoi ; rc=124 si dépassé) ·
+     `bash <…>/pf_curl.sh <ns> <deploy> <port> <path> [curl…]` (port-forward + curl + kill, borné).
+   - **Tout poll a un plafond** : `for i in $(seq 1 40); do … ; sleep 20; done` (≤ ~13 min) **puis bail**
+     (`{ok:false, note:"timeout"}`), jamais de boucle infinie. Sur `sleep` en foreground bloqué par le harness,
+     mets le `sleep` **dans** une commande composée.
+   L'orchestration surveille aussi le **mtime** de ta sortie : >~15 min sans écriture = agent figé → tué.
 
 ## Artefacts = journal horodaté, le plus RÉCENT en tête
 Ton artefact d'étape (`review.md` / `deploy.md` / `implement.md` / `acceptance.md`) est un **journal**,
@@ -40,3 +51,8 @@ pas un fichier écrasable. À chaque run :
 
 > Les skills d'étape (`recette`, `deploy-jenkins`, …) et les agents longs (recetteur, deployer, fixer)
 > **chargent ce skill** et n'en dupliquent pas le contenu.
+
+## Consigne la dette/les learnings au fil de l'eau
+Dès que tu rencontres une dette, un incident, un learning (process/harness) ou un point sécu, **consigne-le**
+sans attendre la fin — un item survit à une coupure et remonte au post-mortem d'épic :
+`sdlc --project <PREFIX> pm add --agent <ton-rôle> --kind <debt|learning|incident|security|brain> [--epic E --story S] --text '...'` (**jamais de secret** dans le `text`).
