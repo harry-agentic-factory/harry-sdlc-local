@@ -10,6 +10,11 @@ venv/
 *.db
 _toDelete/
 
+# Post-mortem = DATA locale/sensible (dette/incident/sécu) — jamais en open-source.
+# (on n'ignore QUE les données ; le code/commande PM restent trackés : post_mortem.py, claude/commands/post-mortem.md)
+post-mortem.jsonl
+**/post-mortem.jsonl
+
 # OS / éditeurs
 .DS_Store
 *.swp
