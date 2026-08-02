@@ -65,9 +65,12 @@ def find_worktree_for_branch(repo: str | Path, branch: str) -> str | None:
 
 
 def ensure_worktree(repo: str | Path, branch: str, base: str | None = None) -> dict:
-    """Create-or-reuse le worktree du ticket. Retourne {path, reused, created_branch}.
+    """Create-or-reuse le worktree du ticket. **Idempotent** — un 2ᵉ appel réutilise, ne recrée pas.
+    Retourne {path, reused, created_branch}.
 
     - branche déjà checkoutée dans un worktree → **réutilise** ce chemin (git interdirait un 2ᵉ).
+    - chemin déterministe déjà présent (worktree résiduel / registre élagué) → `prune` + re-scan :
+      si rattachable à `branch` → réutilise ; sinon **erreur explicite** (pas d'écrasement silencieux).
     - branche existe mais pas sortie → `worktree add <path> <branch>`.
     - branche absente → `worktree add -b <branch> <path> <base>` (base requise, défaut HEAD).
     """
@@ -77,6 +80,17 @@ def ensure_worktree(repo: str | Path, branch: str, base: str | None = None) -> d
         return {"path": existing, "reused": True, "created_branch": False}
 
     path = worktree_path(repo, branch)
+    if path.exists():
+        # chemin occupé mais pas (encore) listé pour cette branche : élague les métadonnées mortes
+        # (worktree supprimé à la main, registre périmé) puis retente de le rattacher.
+        _git(repo, "worktree", "prune")
+        existing = find_worktree_for_branch(repo, branch)
+        if existing:
+            return {"path": existing, "reused": True, "created_branch": False}
+        raise RuntimeError(
+            f"chemin worktree déjà présent mais non rattaché à '{branch}' ({path}); "
+            f"nettoie-le (git worktree remove/prune ou supprime le dossier) avant de relancer")
+
     path.parent.mkdir(parents=True, exist_ok=True)
     created_branch = False
     if branch_exists(repo, branch):
