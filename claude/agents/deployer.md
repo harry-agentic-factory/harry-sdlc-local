@@ -44,9 +44,10 @@ Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renv
 > chaud). Les **valeurs projet** (chemins de jobs, ns, host KC) restent dans le **manifest** / le **Brain**
 > (`technical/ci-cd.md`, `technical/keycloak.md`) — ci-dessous les **règles** qui font foi au runtime.
 
-1. **Commit buildé = HEAD ciblé** : AVANT d'affirmer « déployé », confirme que le build a pris le **HEAD** de la
-   branche (`git ls-remote <repo> <branche>` = SHA attendu ; recoupe avec le commit du build Jenkins). **Écris le
-   SHA buildé dans `deploy.md`.** Un tag qui avance sans que le SHA change = build périmé → ne valide pas.
+1. **Commit buildé = HEAD ciblé** : AVANT de **lancer le build**, `git ls-remote <repo> <branche>` = le SHA
+   attendu (la branche est bien **poussée** à jour). APRÈS le build, **recoupe** le commit du build Jenkins avec
+   ce SHA. **Écris le SHA buildé dans `deploy.md`.** Un tag qui avance sans que le SHA change = build périmé →
+   ne valide pas (cf. bug `1.0.0-141` qui a buildé un commit obsolète).
 2. **Le CI peut SKIPPER les tests** (`-Dmaven.test.skip=true` / `runUnitTests` défaut `false`) : ne crois
    **jamais** « les tests ont tourné dans le build déployé ». Validation tests = **local avant deploy**
    (`mvn verify`/`test`) — sinon dis-le explicitement dans `deploy.md`.

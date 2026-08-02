@@ -9,8 +9,12 @@ Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (pla
 - Tu **suis le plan** du `spec-tech.md`, tu ne re-designes pas. Déviation ⇒ tu l'expliques et tu la fais
   valider avant de continuer.
 - **Les invariants sont la loi** : ton code ne doit en casser aucun (ils seront la checklist du reviewer).
-- **Multi-repo** : le plan peut toucher plusieurs repos → implémente dans **tous**. Si le working tree d'un
-  repo est occupé, utilise un **worktree isolé** (règle `worktree-paths` : `<parent>/_wt/<repo>/<branche>`).
+- **Worktree DÈS l'implémentation** : code dans le **worktree isolé** du ticket (`_wt/<repo>/<branche>`), pas
+  dans le working tree principal → N stories implémentables en parallèle, et le worktree porte
+  **implement→review→deploy→fix** en continu (les agents lisent le même worktree).
+- **Multi-repo** : le plan peut toucher plusieurs repos → implémente dans **tous** (chacun a son worktree).
+- **Mono vs worktree — pas les deux** : en `/implement` mono, écris **tout dans le worktree du ticket** ; ne
+  touche **jamais** le working tree principal du repo en parallèle (divergence avec ce que lisent les agents).
 - Jamais de code au-delà du plan ; pas de refacto hors-scope ; réutilise les patterns du repo (CLAUDE.md).
 
 ## Guidelines de code (matchées par la stack du repo)
@@ -19,7 +23,10 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
 **Annonce en une ligne** au démarrage les skills chargés par repo, ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`. Repo dont la stack n'a pas de skill (front, python, …) ⇒ liste vide, annonce `aucun`.
 
 ## Déroulé
-1. **Branche par repo** : `feat/<STORY>-<slug>` (jamais sur une branche protégée).
+1. **Worktree du ticket EN PREMIER** (une fois la branche décidée `feat/<STORY>-<slug>`, jamais protégée) :
+   `sdlc --project <PREFIX> workspace <STORY> --branch <BRANCH>` → crée/**réutilise** (idempotent) le worktree
+   `_wt/<repo>/<branche>` de **chaque** repo touché. **Code dans ces worktrees** (`git -C <worktree>`), pas dans
+   le working tree principal. `run-ticket` PREPARE réutilisera le même worktree (ne le recrée pas).
 2. **Code pas à pas** dans l'ordre des fichiers du plan.
 3. **Build après chaque changement significatif** (commande de build du repo, cf. son CLAUDE.md) — corrige
    les erreurs de compilation **immédiatement**, ne les accumule pas.
@@ -29,7 +36,10 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
 6. **Journalise** : écris `<EPIC>/stories/<STORY>/implement.md` (fichiers touchés par repo, décisions,
    déviations éventuelles, résultat build/tests, branche + éventuelle MR). Puis
    `link <STORY> implement <chemin>`.
-7. **Avance** : `set-status <STORY> implemented`.
+7. **Commit + PUSH avant de rendre la main** : dans **chaque** worktree touché, commit puis
+   **`git push -u origin <BRANCH>`**. Le deploy cible un **SHA poussé** — une branche non poussée = deploy sur du
+   vide/du périmé. Note le SHA poussé dans `implement.md`. (Jamais de push sur une branche protégée.)
+8. **Avance** : `set-status <STORY> implemented`.
 
 ## Sortie
 - Récap : fichiers par repo, statut build/tests, invariants vérifiés (✓/✗), branche(s)/MR.

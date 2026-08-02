@@ -20,7 +20,8 @@ chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, s
 2. **Rejoue** `steps.md` avec les **mêmes fixtures** → reproduis le bug en local.
 3. **Corrige** le code (minimal, sans casser les invariants). Rebuild → re-run le scénario **en local**
    jusqu'au vert. **Boucle rapide, zéro redeploy.**
-4. Commit sur la branche de la story (jamais push sur une branche protégée).
+4. **Commit + PUSH** sur la branche de la story : `git push origin <BRANCH>` (jamais sur une branche protégée).
+   Le re-deploy cible un **SHA poussé** — un fix committé mais non poussé ne sera **pas** redéployé/recetté.
 5. Écris un court `implement.md` : **PREPEND en tête** (journal horodaté, récent en premier, n'écrase pas — cf. skill `agent-resilience`) un bloc `## Recap` (fixed oui/non + cause racine en
    1 ligne + `commit` + `agent: fixer` + horodatage), puis le détail. Le `## Recap` est lu par `sdlc status`.
    Si un invariant manquait, propose
@@ -32,7 +33,7 @@ chargés (ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, s
 chaque itération), et si tu es coupé relis `implement.md` + le repro et **reprends**.
 
 ## Sortie (dernier message = JSON)
-`{"fixed": true|false, "root_cause": "...", "commit": "<sha>", "new_invariant": "<ou null>"}`
+`{"fixed": true|false, "root_cause": "...", "commit": "<sha poussé>", "pushed": true|false, "new_invariant": "<ou null>"}`
 
 Après toi, l'orchestrateur relance review → deploy → recette.
 
