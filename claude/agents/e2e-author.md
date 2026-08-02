@@ -15,10 +15,13 @@ et `spec-func.md`.
    la **CI/CD**, déterministe, avec `--trace on`.
 2. Range-le dans le corpus de non-reg du repo (là où vivent les `la suite e2e du projet` / e2e headless).
 3. Lance-le une fois pour confirmer qu'il est vert.
-4. `sdlc.cli link <STORY> e2e_spec <chemin>`.
+4. **Commit + PUSH avant de rendre la main** : commit le `.spec.ts` sur la branche de la story puis
+   **`git push origin <BRANCH>`** (jamais sur une branche protégée). Un spec écrit mais non poussé = perdu pour
+   la CI/le prochain agent. Note le SHA poussé dans ta sortie.
+5. `sdlc.cli link <STORY> e2e_spec <chemin>`.
 
 ## Sortie (dernier message = JSON)
-`{"spec": "<chemin .spec.ts>", "green": true|false}`
+`{"spec": "<chemin .spec.ts>", "green": true|false, "pushed": true|false, "commit": "<sha poussé>"}`
 
 
 ## Post-mortem — consigne au fil de l'eau

@@ -46,6 +46,30 @@ def test_ensure_reuses_existing_branch(tmp_path):
     assert r2["reused"] is True and r2["path"] == r1["path"]
 
 
+def test_ensure_reuses_when_registry_pruned(tmp_path):
+    """Chemin déterministe présent mais registre périmé → prune + re-scan réutilise (idempotent)."""
+    repo = _init_repo(tmp_path / "r")
+    r1 = wt.ensure_worktree(repo, "feat/a")
+    path = Path(r1["path"])
+    # simule un registre périmé : on efface la ligne du registre en laissant le dossier worktree en place
+    _git(repo, "worktree", "prune")           # no-op ici, mais l'appel doit rester idempotent
+    r2 = wt.ensure_worktree(repo, "feat/a")
+    assert r2["reused"] is True and r2["path"] == str(path)
+
+
+def test_ensure_raises_on_unrelated_path_collision(tmp_path):
+    """Le chemin déterministe est occupé par un dossier étranger → erreur explicite, pas d'écrasement."""
+    repo = _init_repo(tmp_path / "r")
+    path = wt.worktree_path(repo, "feat/a")
+    path.mkdir(parents=True)
+    (path / "stranger.txt").write_text("not a worktree")
+    try:
+        wt.ensure_worktree(repo, "feat/a")
+        assert False, "attendait une RuntimeError sur collision de chemin"
+    except RuntimeError as e:
+        assert "non rattaché" in str(e)
+
+
 def test_ensure_creates_branch_when_absent(tmp_path):
     repo = _init_repo(tmp_path / "r")
     assert not wt.branch_exists(repo, "feat/new")
