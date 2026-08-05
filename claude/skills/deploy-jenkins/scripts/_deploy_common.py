@@ -7,8 +7,14 @@ re-prompté. Sorties = JSON compact sur stdout (filtré, < 2 Ko).
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
+
+# PM-020: certains Replay Jenkins exigent le COOKIE de session en plus du crumb. On partage un cookie jar
+# entre l'obtention du crumb (GET) et le POST (replay/run) pour que le crumb soit lié à la même session.
+_COOKIE_JAR = os.path.join(tempfile.gettempdir(), "deploy_jenkins_cookies.txt")
 
 
 def job_url(job_path: str) -> str:
@@ -21,8 +27,8 @@ def _run(cmd: list[str]) -> subprocess.CompletedProcess:
 
 
 def curl_text(url: str) -> str:
-    """GET Jenkins en `curl -s -n` (jamais `-L`)."""
-    return _run(["curl", "-s", "-n", url]).stdout
+    """GET Jenkins en `curl -s -n` (jamais `-L`), cookie jar partagé (session-bound crumb, PM-020)."""
+    return _run(["curl", "-s", "-n", "-c", _COOKIE_JAR, "-b", _COOKIE_JAR, url]).stdout
 
 
 def curl_json(url: str) -> dict:
@@ -39,8 +45,9 @@ def crumb(jenkins: str) -> tuple[str | None, str | None]:
 
 def post(url: str, jenkins: str, data: list[tuple[str, str]] | None = None) -> str:
     """POST Jenkins avec crumb CSRF. Retourne le code HTTP (str). Jamais `-L`."""
-    field, val = crumb(jenkins)
-    cmd = ["curl", "-s", "-n", "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST"]
+    field, val = crumb(jenkins)  # peuple le cookie jar partagé (session)
+    cmd = ["curl", "-s", "-n", "-c", _COOKIE_JAR, "-b", _COOKIE_JAR,
+           "-o", "/dev/null", "-w", "%{http_code}", "-X", "POST"]
     if field:
         cmd += ["-H", f"{field}:{val}"]
     for k, v in (data or []):
