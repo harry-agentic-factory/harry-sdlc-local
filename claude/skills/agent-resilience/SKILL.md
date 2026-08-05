@@ -55,21 +55,45 @@ de les surveiller. Protocole **obligatoire** pour tout agent long lancé en dire
 
 1. **Enregistre** à chaque spawn : `{task-id, fichier .output, rôle, seuil}`. Le `.output` (transcript JSONL)
    est touché à chaque appel d'outil → son mtime = signal de vie.
-2. **Ping** périodiquement (à ~½ du seuil) avec le helper :
-   `bash claude/scripts/agent_watchdog.sh <seuil_s> <fichier.output>...` (ou `--dir <tasks_dir>`).
-   Sortie `OK/STALE/MISSING` + **exit 2** si un agent est figé. Planifie le ping via `ScheduleWakeup`
-   (fallback long, ≥ ½ seuil) ou une boucle `Monitor` bornée — **jamais** un `sleep` bloquant en direct.
-   ⚠️ **Ne ping QUE les agents encore en cours** (ceux dont tu n'as pas reçu la notif de fin) : le `.output`
-   d'un agent **terminé** est lui aussi STALE (il n'écrit plus) — le confondre avec un gel relancerait un
-   agent déjà fini. Le mode `--dir` est pratique mais filtre toi-même sur tes task-ids encore vivants.
-3. **Seuils par type** (s) : `deployer 600` · `recetteur 600` · `fixer 720` · `reviewer 600` ·
-   `nonreg-runner 600` · défaut `720`. (Un agent sain émet un heartbeat ≤ 5 min, cf. règle 9.)
-4. **STALE → relance en resume** : `TaskStop <task-id>`, puis **relance un agent frais** avec (a) l'ordre
-   *« REPRISE — relis d'abord ton artefact, NE recommence pas de zéro, continue »* et (b) les **faits déjà
-   acquis** (ex. « CI #155 SUCCESS, image X poussée → fais UNIQUEMENT le CD + vérif »). Le resume-safety
-   (règles 2-3) rend l'agent idempotent.
-5. **Plafonne les relances** (≤ 2) : au-delà, **escalade à l'humain** (le gel est probablement systémique :
-   creds, réseau, gate). Consigne un `pm add --kind incident`.
+2. **Ping** périodiquement (à ~½ du seuil) avec le helper. Deux modes :
+   - **Historique (préféré)** : `bash claude/scripts/agent_watchdog.sh --role <rôle> --history <store> <fichier.output>...`
+     → le seuil est **appris** des runs passés : `seuil = clamp(facteur × p90(durées du rôle), floor=300, hard-cap=1800)`
+     (`--factor` défaut 1.0). Verdicts `OK` / `STALE` (gap > seuil, < hard-cap) / **`HARDCAP`** (gap ≥ hard-cap) / `MISSING`.
+   - **Fixe (fallback si pas d'historique)** : `agent_watchdog.sh <seuil_s> <fichier.output>...`.
+   Planifie le ping via `ScheduleWakeup` (fallback long) ou une boucle `Monitor` bornée — **jamais** un
+   `sleep` bloquant en direct. ⚠️ **Ne ping QUE les agents encore en cours** (sans notif de fin) : le `.output`
+   d'un agent **terminé** est aussi STALE — le confondre relancerait un agent fini.
+3. **Alimente l'historique** : à **chaque** fin d'agent, enregistre sa durée (lue dans la `task-notification`,
+   `duration_ms`) : `bash claude/scripts/agent_record.sh <store> <rôle> <durée_s>`. Store hors repo (défaut
+   `~/.claude/sdlc/agent_runs.log`, données runtime). Plus l'historique grossit, plus le seuil « anormal »
+   colle à la réalité de CHAQUE type d'agent — au lieu d'un chiffre en dur qui sur- ou sous-réagit. Un agent
+   sain émet un heartbeat ≤ 5 min (règle 9) → gap petit → jamais STALE : c'est LA prévention n°1 des faux positifs.
+4. **STALE ≠ gel — NE TUE JAMAIS SUR UN SEUL PING.** `STALE` = « pas d'écriture depuis N s », **pas** « figé » :
+   un agent peut attendre légitimement une **op longue qu'il a lancée** (build Jenkins, rollout, `mvn`). Avant
+   tout `TaskStop`, **3 garde-fous cumulatifs** :
+   - **(a) Grâce** : exige **≥ 2 lectures `STALE` consécutives** espacées d'au moins ~½ seuil (un seul STALE
+     ne tue pas). Le harnais surveille aussi le mtime — laisse-lui sa chance.
+   - **(b) Cross-check d'un signal externe de progression** hors du `.output` : deployer → **build Jenkins
+     `building:true` ?** (`curl -s -n -g ".../job/.../api/json?tree=builds[number,building,result]{0,2}"`) ou
+     rollout k8s en cours ; recetteur/fixer → build/`mvn`/job en cours. **Si ça progresse → l'agent attend, PAS
+     figé → NE TUE PAS**, ré-arme le ping et attends la fin.
+   - **(c) Heartbeat absent confirmé** : conclus au gel seulement si l'agent n'a **rien** écrit ET **aucune**
+     progression externe visible.
+   Après (a)+(b)+(c) → `TaskStop <task-id>` puis **relance en resume** : (i) *« REPRISE — relis d'abord ton
+   artefact, NE recommence pas de zéro, continue »* + (ii) les **faits déjà acquis** (ex. « CI #157 SUCCESS,
+   image poussée → fais UNIQUEMENT le CD ») pour éviter un double build. Resume-safe (règles 2-3) = idempotent.
+5. **`HARDCAP` prime sur le cross-check — c'est l'anti-« plusieurs heures de stale ».** Un gap ≥ hard-cap
+   (~30 min) est **toujours** anormal : même un build qui se dit encore `building` depuis 30 min+ est
+   lui-même **coincé** (pas juste l'agent). Donc sur `HARDCAP` : ne te contente pas d'attendre — **agit**
+   (tuer/relancer l'agent ET, si le build externe est lui aussi bloqué, l'abandonner/relancer). C'est ce qui
+   empêche de re-vivre le gel de 7h. La grâce (a) et le cross-check (b) ne s'appliquent qu'entre `seuil` et
+   `hard-cap` ; au-delà, on ne laisse plus vivre.
+6. **Plafonne les relances** (≤ 2) : au-delà, **escalade à l'humain** (gel systémique : creds, réseau, gate).
+   `pm add --kind incident`.
+
+> **Coût d'un faux kill** : tuer un agent qui buildait relance tout (double build, temps perdu, double effet
+> de bord). Entre `seuil` et `hard-cap`, le défaut est **« laisser vivre »** (attendre + re-ping + cross-check).
+> Au-delà du `hard-cap`, le défaut s'inverse : **on n'attend plus des heures**.
 
 > Ne prédis/n'invente **jamais** le résultat d'un agent : le ping ne lit que le mtime, pas le contenu. Tant
 > que l'agent tourne (OK) et n'a pas notifié sa fin, son verdict est inconnu.
