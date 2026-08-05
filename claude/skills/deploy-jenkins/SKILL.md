@@ -162,8 +162,16 @@ dump complet), **écris `deploy.md` au fil de l'eau** (build#, statut), et si tu
 
 ## Verrou d'environnement partagé (multi-session) — obligatoire
 Plusieurs sessions partagent **un seul env de prod-intégration par repo** (« dernier deploy gagne ») → sans
-coordination elles s'écrasent (vécu : une session ENROL a écrasé un deploy `main`). Avant tout déploiement sur
-un env partagé, **l'orchestrateur** (pas le sous-agent) pose un verrou **auto-cicatrisant** :
+coordination elles s'écrasent (vécu : une session ENROL a écrasé un deploy `main`).
+
+> **Le verrou = DÉPLOIEMENT uniquement.** Il protège l'acte de **redéployer** l'env. Une **recette** (ou tout
+> consommateur read-only) **ne prend PAS le verrou** — elle ne redéploie pas ; au plus elle consulte
+> `env_lock.sh status <env-repo>` pour savoir si un deploy est en cours (et éventuellement attendre qu'il finisse
+> pour ne pas recetter un env qui bouge sous elle). Verrouiller pour une recette bloquerait inutilement les
+> déployeurs.
+
+Avant tout déploiement sur un env partagé, **l'orchestrateur** (pas le sous-agent) pose un verrou
+**auto-cicatrisant** :
 `bash claude/scripts/env_lock.sh <action> <env-repo> <owner>` (env-repo ex. `prod-integration--back-tenant`,
 owner = ta story/session).
 - **`acquire`** avant de spawner un deployer : `0` ACQUIRED (libre ou re-entrant) · `3` BUSY (tenu & frais →
