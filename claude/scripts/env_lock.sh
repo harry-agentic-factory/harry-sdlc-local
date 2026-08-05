@@ -43,8 +43,18 @@ case "$cmd" in acquire|refresh|release|steal) owner="${1:?owner required}"; shif
 while [ $# -gt 0 ]; do case "$1" in
   --ttl) ttl=$2; shift 2;; --phase) phase=$2; shift 2;; --note) note=$2; shift 2;; *) shift;; esac; done
 
+mkdir -p "$LOCK_ROOT" 2>/dev/null   # ensure the lock root exists so the atomic leaf mkdir means "held", not "no parent"
 dir="$LOCK_ROOT/$env"; meta="$dir/meta"
-age_of() { local hb; hb=$(mval "$meta" heartbeat_epoch); [ -n "$hb" ] && echo $(( $(now_epoch) - hb )) || echo 999999; }
+mtime_epoch() { if stat -f %m "$1" >/dev/null 2>&1; then stat -f %m "$1"; else stat -c %Y "$1"; fi; }
+# Age = time since last heartbeat. If meta is missing (a winner mid-acquire, between mkdir and write_meta, OR a
+# corrupt leftover) fall back to the DIR's mtime: a freshly-created bare dir → small age → BUSY (don't steal a
+# mid-acquire → preserves mutual exclusion); an OLD bare dir → large age → STALE (corrupt, reclaimable).
+age_of() {
+  local hb; hb=$(mval "$meta" heartbeat_epoch)
+  if [ -n "$hb" ]; then echo $(( $(now_epoch) - hb ))
+  elif [ -d "$dir" ]; then echo $(( $(now_epoch) - $(mtime_epoch "$dir") ))
+  else echo 999999; fi
+}
 
 case "$cmd" in
   acquire)
@@ -62,10 +72,13 @@ case "$cmd" in
     [ "$(mval "$meta" owner)" = "$owner" ] || { echo "NOTOWNER $env owner=$(mval "$meta" owner) — release refusé"; exit 3; }
     rm -rf "$dir"; ledger release "$env" "$owner" ""; echo "RELEASED $env (owner=$owner)"; exit 0;;
   status)
-    [ -f "$meta" ] || { echo "FREE $env"; exit 0; }
-    cur=$(mval "$meta" owner); age=$(age_of); cttl=$(mval "$meta" ttl_s)
-    if [ "$age" -le "$cttl" ]; then echo "HELD $env owner=$cur phase=$(mval "$meta" phase) age=${age}s ttl=${cttl}s"; exit 3
-    else echo "STALE $env owner=$cur age=${age}s > ttl=${cttl}s (reclaimable)"; exit 4; fi;;
+    # The lock IS the dir (atomic). No dir → FREE. Held (fresh, incl. a winner mid-acquire whose meta isn't
+    # written yet → age from dir mtime) → HELD. Only an OLD dir past ttl (dead holder / corrupt) → STALE.
+    # Age-based (same as acquire) so status and acquire NEVER disagree — no steal-race on a mid-acquire winner.
+    [ -d "$dir" ] || { echo "FREE $env"; exit 0; }
+    cur=$(mval "$meta" owner); age=$(age_of); cttl=$(mval "$meta" ttl_s); [ -n "$cttl" ] || cttl=900
+    if [ "$age" -le "$cttl" ]; then echo "HELD $env owner=${cur:-?} phase=$(mval "$meta" phase) age=${age}s ttl=${cttl}s"; exit 3
+    else echo "STALE $env owner=${cur:-?} age=${age}s > ttl=${cttl}s (reclaimable)"; exit 4; fi;;
   steal)
     prev=""; [ -f "$meta" ] && prev=$(mval "$meta" owner)
     mkdir -p "$dir"; write_meta "$dir" "$owner" "$ttl" "$phase" "$note"; ledger steal "$env" "$owner" "from=${prev:-none}"
