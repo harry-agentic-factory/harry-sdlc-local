@@ -35,6 +35,16 @@ def swap_code_branch(main_script: str, branch: str) -> str:
     out, n = p2.subn(lambda m: m.group(1) + branch + m.group(3), main_script)
     if n:
         return out
+    # PM-023: CODE_BRANCH porté par un envVar du podTemplate (pas un paramètre) —
+    # ex. `envVar(key: 'CODE_BRANCH', value: 'main')` (ordre key/value ou value/key).
+    p3 = re.compile(r"(envVar\(\s*key:\s*'CODE_BRANCH'\s*,\s*value:\s*')([^']*)(')")
+    out, n = p3.subn(lambda m: m.group(1) + branch + m.group(3), main_script)
+    if n:
+        return out
+    p4 = re.compile(r"(envVar\(\s*value:\s*')([^']*)('\s*,\s*key:\s*'CODE_BRANCH')")
+    out, n = p4.subn(lambda m: m.group(1) + branch + m.group(3), main_script)
+    if n:
+        return out
     raise ValueError("CODE_BRANCH introuvable dans le mainScript")
 
 
@@ -51,7 +61,13 @@ def main(argv=None) -> None:
         script = swap_code_branch(extract_main_script(curl_text(f"{base}/{a.frm}/replay/")), a.code_branch)
     except ValueError as e:
         die(str(e))
-    code = post(f"{base}/{a.frm}/replay/run", a.jenkins, [("mainScript", script), ("script", "")])
+    # Jenkins ReplayAction.doRun lit req.getSubmittedForm() → le corps DOIT porter un champ `json`
+    # (Stapler). Sans lib partagée, un seul script (mainScript). Fallback sur l'ancien format si besoin.
+    import json as _json
+    body = _json.dumps({"mainScript": script, "Submit": "Run"})
+    code = post(f"{base}/{a.frm}/replay/run", a.jenkins, [("json", body)])
+    if code not in ("200", "201", "302"):
+        code = post(f"{base}/{a.frm}/replay/run", a.jenkins, [("mainScript", script), ("script", "")])
     if code not in ("200", "201", "302"):
         die(f"POST replay/run → HTTP {code}")
     time.sleep(3)  # laisse le build entrer dans la queue
