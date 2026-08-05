@@ -38,7 +38,41 @@ taille.** Applique cette discipline **du début à la fin** :
    - **Tout poll a un plafond** : `for i in $(seq 1 40); do … ; sleep 20; done` (≤ ~13 min) **puis bail**
      (`{ok:false, note:"timeout"}`), jamais de boucle infinie. Sur `sleep` en foreground bloqué par le harness,
      mets le `sleep` **dans** une commande composée.
-   L'orchestration surveille aussi le **mtime** de ta sortie : >~15 min sans écriture = agent figé → tué.
+   L'orchestrateur te **ping** via le mtime de ta sortie (cf. « Watchdog orchestrateur » plus bas) : au-delà
+   du seuil de ton type d'agent (~10 min), tu es considéré **figé** → tué et **relancé** en resume.
+9. **Émets un heartbeat (obligatoire pour être ping-able).** Le ping orchestrateur repose sur le **mtime** de
+   ta sortie, qui n'avance qu'à chaque appel d'outil. Donc : **AVANT toute op potentiellement longue**
+   (build, déploiement, attente CI, gros poll) et **au moins toutes les ~5 min**, écris une **ligne de
+   heartbeat** dans ton artefact d'étape — ex. `PREPEND` `- <ISO 8601> ⏳ <ce que je fais / j'attends>`. Sans
+   heartbeat, une op longue mais saine peut être prise pour un gel (faux positif) ; avec, un vrai gel est
+   détecté vite. Un `safe_run.sh`/poll borné suffit à faire avancer le mtime — mais trace quand même l'étape.
+
+## Watchdog orchestrateur — ping mtime & relance (côté orchestrateur / Harry)
+Un agent qui gèle **sans notifier** bloque toute l'orchestration (vécu : un déployeur figé **~7h** sur un
+build, jamais tué). Les agents lancés par le **Workflow tool** ont déjà un watchdog mtime intégré ; ceux
+lancés **en direct** (Agent tool : deployer, recetteur, fixer…) **n'en ont pas** → c'est à l'orchestrateur
+de les surveiller. Protocole **obligatoire** pour tout agent long lancé en direct :
+
+1. **Enregistre** à chaque spawn : `{task-id, fichier .output, rôle, seuil}`. Le `.output` (transcript JSONL)
+   est touché à chaque appel d'outil → son mtime = signal de vie.
+2. **Ping** périodiquement (à ~½ du seuil) avec le helper :
+   `bash claude/scripts/agent_watchdog.sh <seuil_s> <fichier.output>...` (ou `--dir <tasks_dir>`).
+   Sortie `OK/STALE/MISSING` + **exit 2** si un agent est figé. Planifie le ping via `ScheduleWakeup`
+   (fallback long, ≥ ½ seuil) ou une boucle `Monitor` bornée — **jamais** un `sleep` bloquant en direct.
+   ⚠️ **Ne ping QUE les agents encore en cours** (ceux dont tu n'as pas reçu la notif de fin) : le `.output`
+   d'un agent **terminé** est lui aussi STALE (il n'écrit plus) — le confondre avec un gel relancerait un
+   agent déjà fini. Le mode `--dir` est pratique mais filtre toi-même sur tes task-ids encore vivants.
+3. **Seuils par type** (s) : `deployer 600` · `recetteur 600` · `fixer 720` · `reviewer 600` ·
+   `nonreg-runner 600` · défaut `720`. (Un agent sain émet un heartbeat ≤ 5 min, cf. règle 9.)
+4. **STALE → relance en resume** : `TaskStop <task-id>`, puis **relance un agent frais** avec (a) l'ordre
+   *« REPRISE — relis d'abord ton artefact, NE recommence pas de zéro, continue »* et (b) les **faits déjà
+   acquis** (ex. « CI #155 SUCCESS, image X poussée → fais UNIQUEMENT le CD + vérif »). Le resume-safety
+   (règles 2-3) rend l'agent idempotent.
+5. **Plafonne les relances** (≤ 2) : au-delà, **escalade à l'humain** (le gel est probablement systémique :
+   creds, réseau, gate). Consigne un `pm add --kind incident`.
+
+> Ne prédis/n'invente **jamais** le résultat d'un agent : le ping ne lit que le mtime, pas le contenu. Tant
+> que l'agent tourne (OK) et n'a pas notifié sa fin, son verdict est inconnu.
 
 ## Artefacts = journal horodaté, le plus RÉCENT en tête
 Ton artefact d'étape (`review.md` / `deploy.md` / `implement.md` / `acceptance.md`) est un **journal**,

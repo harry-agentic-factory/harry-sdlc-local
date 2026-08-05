@@ -38,8 +38,10 @@ bash $D/safe_run.sh <timeout_sec> -- <commande...>
 bash $D/pf_curl.sh <ns> <deploy> <containerPort> <path> [curl_opts...]   # sortie: corps + `__HTTP__<code>`
 ```
 Et **si tu polls un build**, poll avec un **max d'itérations** (ex. 40×20s=13min) puis **bail** `{ok:false,
-note:"timeout poll"}` — ne boucle jamais sans sortie. (L'orchestration doit aussi surveiller le mtime de ta
-sortie : au-delà de ~15 min sans écriture = agent figé à tuer.)
+note:"timeout poll"}` — ne boucle jamais sans sortie. Émets un **heartbeat** avant chaque attente longue
+(CI/CD) et au moins toutes les ~5 min (cf. skill `agent-resilience` règle 9) : l'orchestrateur te **ping**
+via le mtime de ta sortie (`claude/scripts/agent_watchdog.sh`, seuil deployer ~600 s) et te **relance en
+resume** si tu es figé.
 
 ## 1. Récupère les paramètres (source unique = le manifest)
 ```bash
