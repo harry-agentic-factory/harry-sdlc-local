@@ -160,6 +160,24 @@ dump complet), **écris `deploy.md` au fil de l'eau** (build#, statut), et si tu
   distinct dans le manifest). Ne suppose pas qu'un merge sur `main` est déployé : **vérifie l'image déployée vs la
   date des merges** (un front peut être mergé mais pas redéployé).
 
+## Verrou d'environnement partagé (multi-session) — obligatoire
+Plusieurs sessions partagent **un seul env de prod-intégration par repo** (« dernier deploy gagne ») → sans
+coordination elles s'écrasent (vécu : une session ENROL a écrasé un deploy `main`). Avant tout déploiement sur
+un env partagé, **l'orchestrateur** (pas le sous-agent) pose un verrou **auto-cicatrisant** :
+`bash claude/scripts/env_lock.sh <action> <env-repo> <owner>` (env-repo ex. `prod-integration--back-tenant`,
+owner = ta story/session).
+- **`acquire`** avant de spawner un deployer : `0` ACQUIRED (libre ou re-entrant) · `3` BUSY (tenu & frais →
+  **attends**, l'owner est affiché) · `4` STALE (tenu mais heartbeat > `ttl`, défaut 900 s → récupérable).
+- **`refresh`** à **chaque tour + chaque ping watchdog** tant que ton run (deploy+recette) tourne — une session
+  Claude n'a pas de démon, donc le heartbeat avance par tour ; le `ttl` couvre les trous.
+- **`release`** en fin de run (après validation). `release`/`refresh` = **owner-only**.
+- **Mort du porteur = JAMAIS un blocage** : plus de refresh → `STALE` en ≤ `ttl` → n'importe qui peut
+  **`steal`** (journalisé au ledger). **Avant `steal`**, cross-check l'activité réelle (build Jenkins
+  `building` ? rollout en cours ?) — on ne vole pas un porteur *vivant mais silencieux entre deux tours*, on
+  reprend un porteur *mort* (STALE **et** aucun build en vol). Même philosophie que le watchdog.
+- **« Prendre le relais »** = `env_lock.sh status <env-repo>` → `FREE`(0)/`STALE`(4) = acquérir ; `HELD`(3) =
+  attendre. Les signaux Jenkins (branche déployée = `main` ? build calme ?) restent un **cross-check** secondaire.
+
 ## Fallback connaissances profondes
 Détails d'un pipeline précis (Jenkinsfile, shared-lib, casse des jobs, quirks Replay) : le **Brain**
 du projet (`.brain` du manifest, ex. `deployments/*.md`) et le `CLAUDE.md` du repo. Le manifest reste
