@@ -9,6 +9,21 @@ description: Recette UI autonome via Playwright MCP — pilote un navigateur pou
 `mcp__playwright__*` (charge-les via ToolSearch si absents). Le paramétrage vient du manifest
 (`recette.<repo>` : `uiUrl`/`baseUrl`, `auth`) + un éventuel **skill projet** (sélecteurs/URL de login).
 
+## 0. Ressource partagée : verrou Playwright (multi-agent / multi-session)
+Le navigateur Playwright MCP est un **singleton mutable** : cookies + session de login **partagés**, pas de
+contexte isolé par appelant (les onglets `browser_tabs` partagent les cookies). Donc **deux usages concurrents
+se corrompent** (un login écrase l'autre → assertions faussées).
+- **Avant** de piloter le navigateur, prends le **verrou de ressource** — le **seul** verrou qu'une recette
+  prend (distinct du verrou de **déploiement**, que la recette ne prend pas) :
+  `bash <sdlc>/claude/scripts/env_lock.sh acquire playwright--$(hostname -s) <owner> --phase recette-ui --ttl 2700`
+  → `3` BUSY (un autre pilote le navigateur → **attends**) · `0`/`4` → acquiers. `refresh` à chaque tour,
+  `release` à la fin (cf. skill `agent-resilience` pour le heartbeat).
+- **JAMAIS 2 agents Playwright en parallèle dans la même session** : ils partagent l'unique navigateur.
+- **Multi-profils** (plateforme/portfolio/mono) DANS une recette = **re-login séquentiel** dans le même
+  navigateur (nettoie la session entre profils). Ce n'est PAS de la concurrence → normal, pas besoin de N
+  navigateurs.
+- Si chaque session a **son propre** serveur MCP (navigateurs séparés), le verrou est un **no-op inoffensif**.
+
 ## 1. Auth = étape CONTRÔLÉE, puis navigation LIBRE
 - **Connexion** : `browser_navigate` vers l'appli, effectue le **login** (page Keycloak / form) avec les
   **creds du compte de test via ENV** (jamais hardcodés, jamais affichés ; un **skill projet** fournit
