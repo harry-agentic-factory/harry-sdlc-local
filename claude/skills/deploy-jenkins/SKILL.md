@@ -32,11 +32,16 @@ la **mécanique passe par les scripts**.
 (bloquant par nature), un `while … curl … done` de polling, un `mvn`/`npm` long — sans borne. Utilise les
 wrappers :
 ```bash
-# borne N'IMPORTE QUELLE commande (jamais de hang ; rc=124 si dépassé) :
+# borne N'IMPORTE QUELLE commande (jamais de hang ; rc=124 si dépassé ; tue le GROUPE de procs) :
 bash $D/safe_run.sh <timeout_sec> -- <commande...>
 # port-forward + curl + kill, entièrement borné (health/API sur un deploy) :
 bash $D/pf_curl.sh <ns> <deploy> <containerPort> <path> [curl_opts...]   # sortie: corps + `__HTTP__<code>`
 ```
+⚠️ **Le pipe échappe au bornage** : `safe_run 40 -- kubectl ... | grep | head` ne borne QUE `kubectl` ; si
+`kubectl` stalle (ex. token AKS expiré → `kubelogin` orphelin) l'enfant garde le pipe ouvert et `grep|head`
+bloquent à l'infini. **Enveloppe TOUTE la pipeline** : `bash $D/safe_run.sh 40 -- bash -c 'kubectl ... | grep ... | head'`
+(safe_run tue alors le groupe entier, enfants compris). Incident vécu : deployer figé ~20 min sur un
+`get pods | grep` malgré un timeout de 40s.
 Et **si tu polls un build**, poll avec un **max d'itérations** (ex. 40×20s=13min) puis **bail** `{ok:false,
 note:"timeout poll"}` — ne boucle jamais sans sortie. Émets un **heartbeat** avant chaque attente longue
 (CI/CD) et au moins toutes les ~5 min (cf. skill `agent-resilience` règle 9) : l'orchestrateur te **ping**
