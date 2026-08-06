@@ -85,6 +85,16 @@ Complète avec `sdlc get <STORY>` : **branche** de la story, **MR**, et `refBran
   rejoue un build récent en surchargeant `CODE_BRANCH=<branche story>`. (Rejoue depuis un build
   **récent** : un vieux build ré-exécute son ancien Jenkinsfile → creds/étapes périmés.)
 
+### Dépendance à une lib partagée (AVANT de builder l'image)
+Si la story touche une **lib partagée** (un artefact versionné consommé par plusieurs services), **release-la
+d'abord depuis `main`** puis **pin** les services sur cette version, **avant** de builder/déployer. Un service
+qui dépend d'un **`-SNAPSHOT`** de lib **n'est pas reproductible** : son contenu = le dernier build ayant publié
+le snapshot (souvent une **branche**, pas `main`) → l'image déployée embarque du code de provenance opaque.
+Ordre sûr : **merge lib→`main` → release lib (depuis `main`) → pin services → build/deploy**. Gate simple :
+un `grep -R "SNAPSHOT" <service>/pom.xml` (ou l'équivalent gestionnaire de deps) sur les artefacts de la lib
+doit être **vide** ; sinon **escalade « lib à release d'abord »**. Les **specifics** (nom de la lib, job de
+release, properties de version) viennent du **manifest** / du **Brain** du projet — rien en dur ici.
+
 ## 4. Respecte l'escalation
 `sdlc config` → `.escalation.deploy` : si `human-confirm`, **demande validation** avant de déclencher.
 
