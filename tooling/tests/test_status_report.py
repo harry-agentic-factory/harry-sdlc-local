@@ -53,3 +53,23 @@ def test_recap_extraction_and_truncation(tmp_path):
     assert r.startswith("x") and r.endswith("…") and len(r) <= 501
     q = tmp_path / "b.md"; q.write_text("# pas de recap ici\ntexte")
     assert _recap(q) is None
+
+
+def test_all_tickets_tolerates_unknown_status_fields(tmp_path):
+    """A status.json carrying extra keys (e.g. supersededBy/supersededReason written to record a
+    supersede) must not crash the whole board load — regression for the `list`/`status` crash."""
+    ws = Workspace(tmp_path)
+    ws.create_epic("E", "epic")
+    ws.create_story(Ticket(id="E-1", epic="E", title="socle", status="superseded",
+                           supersededBy="E-2", supersededReason="absorbed"))
+    # simulate a hand-written extra key the model doesn't know at all
+    sp = tmp_path / "E" / "stories" / "E-1" / "status.json"
+    import json as _json
+    data = _json.loads(sp.read_text())
+    data["someFutureField"] = {"x": 1}
+    sp.write_text(_json.dumps(data))
+
+    tickets = ws.all_tickets()                          # must not raise
+    assert [t.id for t in tickets] == ["E-1"]
+    assert tickets[0].supersededBy == "E-2"             # known extra fields round-trip
+    assert ws.load("E-1").supersededReason == "absorbed"
