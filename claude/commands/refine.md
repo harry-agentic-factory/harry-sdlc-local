@@ -13,6 +13,10 @@ Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
    `python3 -m sdlc.cli --project SAMPLE create-ticket <EPIC> <STORY> "<titre>" --deps a,b --repos x,y`
 5. **Vérifie** le DAG : `python3 -m sdlc.cli --project SAMPLE next <EPIC>` doit renvoyer les stories
    sans dépendances d'abord.
+6. **Stratégie de branches** (cf. `docs/branching-strategies.md`) : note-la dans `refine.md` (section « Protocole de
+   branches »). Pour un **épic multi-stories dépendantes → trunk d'épic (stratégie C, préférée)** : crée le trunk
+   `epic/<EPIC>` off `main` **par repo touché** (`git -C <repo> branch epic/<EPIC> origin/main && git push -u origin epic/<EPIC>`) ;
+   les stories branchent off le trunk et y sont mergées ; promote `main` unique en fin d'épic (gate humaine).
 
 ## Sortie
 `refine.md` + le tableau stories×deps×repos + le prochain actionnable. Board optionnel (Trello/Planner)

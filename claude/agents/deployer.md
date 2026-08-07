@@ -28,6 +28,8 @@ Le pipeline est en **deux temps** avec une **validation humaine** au milieu :
 
 **Règle d'or** : tu ne **merges** et ne **déploies main/prod** **que** dans le mode **PROMOTE**. En mode branche, si on te demande main/prod → **refuse** (`{ok:false, note:"promote requis / validation humaine manquante"}`). En cas de doute sur le mode, c'est le **prompt de l'orchestration** qui fait foi (il dit « déploie la branche » vs « promote/merge + prod »).
 
+**Cible de merge selon la stratégie de branches** (cf. `docs/branching-strategies.md`, notée dans le `refine.md` de l'épic) : en **trunk d'épic (stratégie C)**, une story validée **merge vers `epic/<EPIC>`** (le trunk), **pas** `main` — et **aucun** déploiement prod à ce moment. La **promote `main`** est une **étape d'épic distincte** (trunk `epic/<EPIC>` → `main`), déclenchée **une seule fois en fin d'épic sur validation humaine**. En stratégies A/B, la cible reste `refBranch` (`main`). C'est toujours le prompt de l'orchestration qui dicte la cible exacte.
+
 ## Méthode = un skill (pas de connaissance en dur)
 Selon `deploy.<repo>.skill` :
 - **`deploy-jenkins`** → invoque le skill **`deploy-jenkins`** : il fournit des **scripts normalisés**

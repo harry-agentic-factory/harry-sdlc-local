@@ -10,6 +10,9 @@ annonce-le en une ligne. L'idée est souvent un **épic**.
    Itère avec l'humain jusqu'à un scope net.
 3. **PRD** : produis `sample-proj-sdlc-local/<EPIC>/prd.md` avec **Context / Problème / Besoin / Périmètre
    (repos) / Hors-scope / Critères de succès**. Alloue l'ID épic (`<PREFIX>-<n>`).
+   - **Stratégie de branching** (cf. `docs/branching-strategies.md`) : pour un **épic multi-stories**, **privilégier
+     le trunk d'épic** (stratégie C — `epic/<EPIC>` off main, stories mergées au trunk, promote `main` unique en fin
+     sur validation humaine). Le noter pour `/refine`.
 4. **Registre** : `python3 -m sdlc.cli --project SAMPLE create-epic <EPIC> "<titre>"`.
 
 ## Sortie
