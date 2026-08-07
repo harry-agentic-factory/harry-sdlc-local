@@ -26,6 +26,9 @@ class Ticket:
     mr: str | None = None
     artifacts: dict[str, str] = field(default_factory=dict)
     recette: dict | None = None
+    # Supersede bookkeeping (a story absorbed by another) — kept so `list`/`status` round-trip it.
+    supersededBy: str | None = None
+    supersededReason: str | None = None
 
     @property
     def next_step(self) -> str | None:
@@ -78,6 +81,10 @@ class Workspace:
         }
         if t.recette is not None:
             payload["recette"] = t.recette
+        if t.supersededBy is not None:
+            payload["supersededBy"] = t.supersededBy
+        if t.supersededReason is not None:
+            payload["supersededReason"] = t.supersededReason
         self._status_path(t.epic, t.id).write_text(json.dumps(payload, indent=2, ensure_ascii=False))
 
     def load(self, story: str) -> Ticket:
@@ -118,9 +125,14 @@ class Workspace:
         return (sp.parent / "journal.md") if sp else None
 
     def all_tickets(self) -> list[Ticket]:
+        # Tolerate unknown keys in status.json (e.g. supersededBy/supersededReason written by a
+        # human/agent to record a supersede) — same filtering as load(), so a single extra field
+        # never crashes `list`/`status` for the whole board.
+        known = {f.name for f in dataclasses.fields(Ticket)}
         out: list[Ticket] = []
         for p in sorted(self.root.glob("*/stories/*/status.json")):
-            out.append(Ticket(**json.loads(p.read_text())))
+            data = json.loads(p.read_text())
+            out.append(Ticket(**{k: v for k, v in data.items() if k in known}))
         return out
 
 
