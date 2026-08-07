@@ -49,14 +49,30 @@ Contenu : par **fichier Brain** à toucher (`per-repo/<repo>.md`, `technical/*.m
 **ce qu'on ajoute** (pointeurs + faits transverses). Termine par un « ## Application » (ouvrir une MR sur le Brain).
 Référence cette propale depuis le `post-mortem.md`.
 
+## Gate « enrichir le corpus e2e auto » (OBLIGATOIRE — épic validé)
+> Règle de workflow : **quand un épic est validé** (toutes stories `recette_ok`/`accepted`), sa recette
+> manuelle/live doit **devenir rejouable en CI** avant clôture. Un épic livré sans non-régression e2e = dette.
+
+À la clôture, **invoque `e2e-author` en mode ÉPIC** (pas story par story) : il agrège **tous** les `acceptance.md`
+de l'épic et **fige en Playwright programmatique + corpus non-reg** l'ensemble des parcours validés — **API ET UI**,
+et **plus loin que les seules stories** : les scénarios transverses/voisins validés en recette (frontières par rôle,
+non-régression d'un modèle ou d'une feature shippée touchée, cas d'intégration). Objectif : couvrir la **surface
+fonctionnelle réelle** exercée par l'épic, pas seulement le périmètre littéral des tickets.
+- Sortie attendue : les `.spec.ts` **poussés** dans le corpus non-reg du/des repo(s) + **verts** (lancés une fois).
+- Consigne dans `post-mortem.md` la **couverture e2e** produite (parcours figés) et ce qui reste `NON-COUVERT`
+  (ex. captcha manuel, dépendance externe) → devient une dette e2e ticketisable.
+- Gate : ne pas clôturer un épic « done » tant que les parcours **critiques** validés ne sont pas figés en CI
+  (ou explicitement assumés en dette avec justification).
+
 ## Déroulé
 1. Écris `<EPIC>/post-mortem.md` puis `<EPIC>/brain-update-propale.md` (factuels, zéro spéculation ; lis le
    code/les artefacts, ne devine pas). **Zéro secret** dans les deux.
-2. **Répercussion doc** : si `/doc-feature` n'a pas été fait sur les repos touchés, rappelle-le (la propale Brain
+2. **Enrichissement e2e** : invoque `e2e-author` (mode épic) pour figer les parcours validés en non-reg CI (cf. gate ci-dessus) ; reporte la couverture produite + le reste NON-COUVERT dans `post-mortem.md`.
+3. **Répercussion doc** : si `/doc-feature` n'a pas été fait sur les repos touchés, rappelle-le (la propale Brain
    pointe vers ces `docs/features/*.md`).
-3. **Commit** les 2 fichiers dans le **repo data** du projet (branche `docs/<epic>-post-mortem`, MR vers la branche
+4. **Commit** les 2 fichiers dans le **repo data** du projet (branche `docs/<epic>-post-mortem`, MR vers la branche
    de référence — jamais push direct). Aucune référence à Claude/AI dans commits/MR.
-4. **Note** : ces artefacts sont **epic-level** (pas de `sdlc link`, qui est story-level) ; ils vivent dans `<EPIC>/`.
+5. **Note** : ces artefacts sont **epic-level** (pas de `sdlc link`, qui est story-level) ; ils vivent dans `<EPIC>/`.
 
 ## Sortie
 Chemins des 2 fichiers + résumé (nb de dettes ticketisables, actions sécu, points Brain à appliquer) + la MR.

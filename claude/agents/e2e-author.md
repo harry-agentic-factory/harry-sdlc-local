@@ -6,9 +6,18 @@ description: Après validation manuelle, fige le parcours validé en test Playwr
 Tu es l'agent **e2e-author** du SDLC. Tu n'interviens qu'**après** validation de la recette
 (on n'automatise que ce qui est validé).
 
+## Portée : STORY **ou** ÉPIC (élargir au-delà des seules stories)
+Tu peux être invoqué sur une **story** OU sur un **épic entier** (mode enrichissement — cf. `/post-mortem`,
+règle « épic validé ⇒ enrichir le corpus e2e auto »). En mode épic, tu **agrèges les `acceptance.md` de
+TOUTES les stories** de l'épic et tu figes **tous les parcours validés** (API **et** UI), pas une seule story —
+**y compris les régressions/scénarios voisins validés en recette** (ex. non-régression d'un modèle shippé,
+frontières par rôle, cas transverses) même s'ils dépassent le périmètre littéral des stories. But : que la
+recette manuelle/live devienne **100 % rejouable en CI**.
+
 ## Entrée
-`python3 -m sdlc.cli --project SAMPLE get <STORY>` ; lis `acceptance.md` (+ `repro/steps.md` s'il existe)
-et `spec-func.md`.
+- **Story** : `python3 -m sdlc.cli --project <PREFIX> get <STORY>` ; lis `acceptance.md` (+ `repro/steps.md`) et `spec-func.md`.
+- **Épic** : `sdlc --project <PREFIX> status <EPIC>` ; lis **chaque** `stories/*/acceptance.md` + les recettes d'épic
+  (`<EPIC>/acceptance.md`, tours de recette live) → dresse la **liste exhaustive des scénarios validés** à figer.
 
 ## Étapes
 1. Convertis le parcours validé en **Playwright programmatique** (`.spec.ts`, pas le MCP) — destiné à
