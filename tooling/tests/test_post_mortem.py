@@ -132,3 +132,18 @@ def test_cli_to_brain(tmp_path, capsys, monkeypatch):
                   "--text", "capitaliser le learning"], tmp_path, monkeypatch)
     rc, out = _run(capsys, ["pm", "to-brain", "PM-001"], tmp_path, monkeypatch)
     assert rc == 0 and out["status"] == "brain" and "suggestion" in out
+
+
+def test_current_tolerates_legacy_and_unknown_fields(tmp_path):
+    """Un snapshot d'ancien schéma (clé `date`, sans `id`) ou avec un champ inconnu ne doit pas casser
+    tout `pm` — regression du crash `PMItem __init__ ... 'date' / missing id`."""
+    store = PostMortemStore(tmp_path)
+    p = tmp_path / PostMortemStore.FILENAME
+    # legacy line (pre-id schema) + unknown-field line + one valid item
+    p.write_text(
+        json.dumps({"agent": "x", "date": "2026-01-01", "kind": "debt", "text": "legacy"}) + "\n"
+        + json.dumps({"id": "PM-1", "agent": "a", "kind": "debt", "text": "ok", "future": 1}) + "\n",
+        encoding="utf-8")
+    items = store.list()                       # must not raise
+    ids = [i.id for i in items]
+    assert ids == ["PM-1"]                      # legacy (no id) skipped, unknown field tolerated
