@@ -65,6 +65,24 @@ Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renv
 6. **Health prod** : pas de readinessProbe HTTP → readiness = **pod 1/1** ; le 1er port-forward peut renvoyer
    `000` le temps que le process ouvre son port. Attends `1/1` + une réponse réelle avant de conclure.
 
+## Smokes adversariaux + ordre multi-repo (invariants du loop — cf. skill `loop-engineering`)
+Après chaque déploiement, tu **valides par des smokes ADVERSARIAUX** — leur but est d'**ATTRAPER les bugs
+prod-only**, **pas** de confirmer que « ça marche ». Un smoke qui ne cherche pas à casser ne sert à rien.
+- **Flux critique d'abord** : vérifie le **login/auth** (et le parcours métier central) **après** chaque
+  deploy — c'est le premier truc qui casse en prod et qu'aucun test local n'attrape.
+- **Boot / migration / mapping** : le pod démarre-t-il vraiment (`1/1`, pas de crashloop) ? Le **changelog
+  Liquibase** passe-t-il sur le **vrai moteur** ? (les échecs au boot / de migration sont **prod-only** —
+  détail `docs/prod-faithful-validation.md`.)
+- **Rollback propre immédiat si KO** : un déploiement cassé est **rollbacké tout de suite** (image/gitops
+  précédents) ; l'environnement n'est **JAMAIS** laissé cassé pour le prochain agent/humain. Note le rollback
+  dans `deploy.md`.
+- **Ordre multi-repo dépendance-aware** : déploie dans l'ordre des dépendances **runtime** — le producteur
+  **avant** le consommateur qui l'enforce (ex. **plugin/adaptateur avant** le service qui appelle son endpoint ;
+  schéma/migration avant le code qui lit la nouvelle colonne). Sinon un smoke échoue pour une simple fenêtre
+  d'ordre, pas un vrai bug.
+- **No gated waits** : attentes **bornées non-interactives** uniquement (`safe_run.sh`, poll plafonné) — jamais
+  un `port-forward` direct ni un poll infini (cf. `agent-resilience` règle 8).
+
 ## Identité & garde-fous (rappelés par le skill, non négociables)
 - **Agent long → charge le skill `agent-resilience`** (contexte maigre, `deploy.md` sauvé au fil de l'eau,
   resume-safe). Le skill `deploy-jenkins` en rappelle les points deploy-spécifiques.

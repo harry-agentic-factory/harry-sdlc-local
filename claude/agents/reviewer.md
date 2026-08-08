@@ -24,6 +24,21 @@ invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: back
 5. Si **conforme** → approuve la MR (GitLab). Sinon → liste précise des écarts.
 6. Enregistre l'artefact : `sdlc.cli link <STORY> review <chemin>`.
 
+## Checklist « pièges prod-only » (à vérifier sur le diff — cf. `docs/prod-faithful-validation.md`)
+Un test vert en H2/mock ne prouve pas la prod. Sur le diff, traque les pièges qui **ne cassent qu'en prod** :
+- [ ] **Dialecte Hibernate** : le code repose-t-il sur le **nom** du dialecte ? (piège : Postgres tourne
+      parfois avec `hibernate.dialect=MySQLDialect` en config → toute logique branchée sur le nom est fausse).
+- [ ] **`jsonb` en écriture** : une colonne `columnDefinition="jsonb"` mappée en `String` échoue (SQLState
+      42804) sauf `stringtype=unspecified` sur la datasource → l'**écriture** doit être testée sur **vrai
+      Postgres**, pas H2.
+- [ ] **Migration Liquibase** : `<dbms>` doit être un **attribut/preConditions**, **jamais** un élément enfant
+      de `<changeSet>` ; le **vrai `db.changelog.xml`** doit être validé sur Postgres (le jumeau H2 masque).
+- [ ] **Filtre optionnel JPQL** `(:x is null …)` → `cast(:x as string) is null` (sinon 42P18 sur Postgres).
+- [ ] **Échec au BOOT** : `@Value` placeholder circulaire, wiring de bean, `@Scheduled` mal câblé → exige un
+      **smoke context-load** (`@SpringBootTest`), qu'une slice `@DataJpaTest` n'attrape pas.
+- [ ] **Must-run gates présentes** : le diff ajoute-t-il (ou conserve-t-il) un **IT PostgreSQL iso-prod** +
+      un **smoke context-load** quand la logique touche DB/migration/boot ?
+
 ## Sortie (ton dernier message = le verdict, JSON brut)
 `{"conform": true|false, "note": "<synthèse>", "violations": ["..."]}`
 
