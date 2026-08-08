@@ -3,7 +3,10 @@
 > **Rôle** : c'est **le mode op** que « **vas-y en mode loop** » / « **en auto** » doit résoudre. Il décrit
 > comment Harry (l'orchestrateur) pousse une story **en autonomie** le long de la state-machine SDLC, quels
 > agents il spawne à chaque état, où il **s'arrête** (gates humaines), et comment il **capitalise**.
-> À lire avec `branching-strategies.md` (stratégie de branches) et les définitions d'agents (`claude/agents/*`).
+> À lire avec `branching-strategies.md` (stratégie de branches), `prod-faithful-validation.md` (bugs
+> prod-only), `scheduled-jobs.md` (pattern de job planifié) et les définitions d'agents (`claude/agents/*`).
+> **Version actionnable = le skill `loop-engineering`** (ce que « en mode loop » / « en auto » charge) ; ce
+> doc en est la version longue (le POURQUOI).
 
 ## Le cœur du loop = **recette ↔ fixing, jusqu'au résultat OK**
 « Loop » désigne **avant tout la boucle serrée** : **recette (manuelle/live)** → si **KO** → **fixing** → re-déploie →
@@ -45,7 +48,9 @@ gates humaines** et en **traçant tout** dans les artefacts + le `pm` (jamais se
   La conversation est éphémère ; **rien d'important ne vit que là**.
 - **Validation iso-prod** : un test vert en H2/mock ne suffit pas — valider **dans les conditions de prod** (même
   DB/dialecte, boot complet du contexte). Les smokes de déploiement sont **adversariaux** : leur job est d'**attraper**
-  les bugs prod-only (migration, mapping DB, placeholder, dialecte), pas de confirmer.
+  les bugs prod-only (migration, mapping DB, placeholder, dialecte), pas de confirmer. **Must-run gates** = un
+  **IT PostgreSQL iso-prod** (vrai changelog + dialecte réel + écriture jsonb) **+** un **smoke context-load**
+  (`@SpringBootTest`). Catalogue des pièges vécus → `prod-faithful-validation.md`.
 - **Commit-early** : dès que le code de prod compile, on commit/push — avant d'écrire tous les tests (anti-perte si
   un agent meurt en cours).
 - **No gated waits en auto** : aucune attente ne doit ouvrir un prompt de permission (pas de `Monitor`/until-loop ni

@@ -28,8 +28,12 @@ taille.** Applique cette discipline **du début à la fin** :
    jetable dans le **scratch de ta bulle** (`<workspace>/scratch/`, fourni par `sdlc workspace`) ou, à
    défaut, le dossier du ticket. `/tmp` est **hors de ton périmètre** → **popup de permission** + fichier
    non contenu/non nettoyé. Le scratch, lui, est dans ton périmètre et part avec la bulle.
-8. **⛔ BORNE TOUTE OP BLOQUANTE — JAMAIS DE HANG.** *(règle apprise à la dure : un agent s'est figé **9h** sur
-   un `kubectl port-forward` lancé en direct.)* Certaines commandes **ne rendent jamais la main** :
+8. **⛔ BORNE TOUTE OP BLOQUANTE — JAMAIS DE HANG NI DE GATED WAIT.** *(règle apprise à la dure : un agent
+   s'est figé **9h** sur un `kubectl port-forward` lancé en direct.)* Deux pièges distincts, même remède : une
+   op qui **pend** (ne rend jamais la main) **et** une op qui **ouvre un prompt de permission** puis attend une
+   réponse humaine qui, en run auto, ne viendra pas (`Monitor`/until-loop, `port-forward` interactif). Les deux
+   figent l'agent. **Toute attente doit être BORNÉE et NON-INTERACTIVE.** Certaines commandes **ne rendent
+   jamais la main** :
    `kubectl port-forward` (bloquant par nature), un `while … done` de **polling sans max d'itérations**, un
    `mvn`/`npm`/`curl` qui pend sur le réseau. **N'en lance AUCUNE en direct.** Deux réflexes :
    - **Wrappers bornés** (dans `deploy-jenkins/scripts/`) :
@@ -46,6 +50,12 @@ taille.** Applique cette discipline **du début à la fin** :
    heartbeat** dans ton artefact d'étape — ex. `PREPEND` `- <ISO 8601> ⏳ <ce que je fais / j'attends>`. Sans
    heartbeat, une op longue mais saine peut être prise pour un gel (faux positif) ; avec, un vrai gel est
    détecté vite. Un `safe_run.sh`/poll borné suffit à faire avancer le mtime — mais trace quand même l'étape.
+10. **Commit-early — sécurise le travail qui compile AVANT de continuer.** Si tu écris du code (fixer,
+    implement), **commit/push dès que le code de prod compile**, **avant** d'écrire tous les tests ou de
+    lancer une op longue. Un agent peut mourir (`Connection closed mid-response`) à tout moment : ce qui est
+    poussé survit, ce qui est en working tree local est **perdu** (et le re-deploy cible un **SHA poussé** —
+    un fix non poussé ne sera ni redéployé ni recetté). Puis complète tests/fix et re-commit. Corollaire de
+    la règle 2 (persiste au fil de l'eau) appliqué au **code**, pas seulement aux artefacts.
 
 ## Watchdog orchestrateur — ping mtime & relance (côté orchestrateur / Harry)
 Un agent qui gèle **sans notifier** bloque toute l'orchestration (vécu : un déployeur figé **~7h** sur un
