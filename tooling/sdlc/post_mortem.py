@@ -77,10 +77,17 @@ class PostMortemStore:
         return out
 
     def _current(self) -> dict[str, PMItem]:
-        """État courant : dernier snapshot par `id` gagne (ordre du fichier = ordre des appends)."""
+        """État courant : dernier snapshot par `id` gagne (ordre du fichier = ordre des appends).
+        Tolère les clés inconnues d'un snapshot (ex. `date` écrit par une version anterieure/un agent) :
+        on filtre sur les champs connus de PMItem, sinon un seul champ en trop casse tout `pm`."""
+        known = {f.name for f in dataclasses.fields(PMItem)}
         cur: dict[str, PMItem] = {}
         for snap in self._snapshots():
-            cur[snap["id"]] = PMItem(**snap)
+            # Skip legacy/malformed snapshots (old schema without `id`, e.g. the pre-`id` `date` form):
+            # a single such line must not break every `pm` command.
+            if not snap.get("id"):
+                continue
+            cur[snap["id"]] = PMItem(**{k: v for k, v in snap.items() if k in known})
         return cur
 
     def _append(self, item: PMItem) -> PMItem:
