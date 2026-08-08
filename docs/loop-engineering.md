@@ -5,6 +5,14 @@
 > agents il spawne à chaque état, où il **s'arrête** (gates humaines), et comment il **capitalise**.
 > À lire avec `branching-strategies.md` (stratégie de branches) et les définitions d'agents (`claude/agents/*`).
 
+## Le cœur du loop = **recette ↔ fixing, jusqu'au résultat OK**
+« Loop » désigne **avant tout la boucle serrée** : **recette (manuelle/live)** → si **KO** → **fixing** → re-déploie →
+**re-recette** → … **répété jusqu'à ce que la recette soit verte**. C'est ça, le loop. Tout le reste de la pipeline
+(implement, deploy) sert à **amener à la première recette** ; une fois là, **on itère recette↔fix sans relâche** jusqu'au
+vert (puis merge trunk). La recette **fait foi** : tant qu'elle n'est pas OK (assertions chiffrées, live + IT), on ne
+sort pas de la boucle. Le **fixer** corrige **en local, iso-prod, sans redéployer à chaque essai** ; on ne redéploie que
+pour re-recetter. Un KO produit un **bundle repro** que le fixer rejoue → corrige → re-vérifie.
+
 ## Principe : SDLC = les rails, le loop = la locomotive
 La **SDLC** fournit la **structure** : state-machine par story (`draft → spec_func → spec_tech → spec_validated →
 implemented → reviewed → deployed → recette_ok → accepted → done`), les **artefacts** (`prd/refine/spec-*/implement/
