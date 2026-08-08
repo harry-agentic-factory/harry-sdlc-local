@@ -35,7 +35,7 @@ claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
   commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket, sdlc (état en session)
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
-  skills/      deploy-jenkins · recette · agent-resilience (méthodes + discipline agents longs)
+  skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)
   sdlc/        harry.md (persona)
 tooling/
   sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/
