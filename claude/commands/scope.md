@@ -3,8 +3,9 @@ Cadre une nouvelle idée jusqu'à un PRD : $ARGUMENTS
 Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), et
 annonce-le en une ligne. L'idée est souvent un **épic**.
 
-> Exécution autonome (« vas-y en mode loop » / « en auto ») → suis le **mode opératoire** `docs/loop-engineering.md`
-> (couplage loop ↔ state-machine SDLC : un agent par état, fix-loop jusqu'au vert, gates humaines, capitalisation).
+> Exécution autonome (« vas-y en mode loop » / « en auto ») → charge le **skill `loop-engineering`** (actionnable ;
+> version longue `docs/loop-engineering.md`) : couplage loop ↔ state-machine SDLC — un agent par état, boucle
+> recette↔fixing jusqu'au vert, gates humaines, capitalisation. Stratégie de branches → `docs/branching-strategies.md`.
 
 ## Déroulé (interactif — c'est une gate d'affinage, pas un one-shot)
 1. **Contexte** : lis le **Brain du projet** s'il existe (repo de doc, pointé par la config du projet) et le

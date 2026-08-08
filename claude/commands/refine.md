@@ -3,6 +3,9 @@ Découpe un épic (PRD) en stories + tasks avec leurs dépendances : $ARGUMENTS
 Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), annonce-le.
 Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
 
+> Exécution autonome ensuite (« en mode loop » / « en auto ») → skill `loop-engineering` (couplage loop ↔
+> state-machine). Stratégie de branches → `docs/branching-strategies.md` (trunk d'épic préféré si multi-stories).
+
 ## Déroulé
 1. **Découpe** l'épic en **stories** (1 task par story). Simple = 1 story.
 2. **Dépendances** : établis le **DAG** (qui dépend de qui) — sans cycle. Propose l'ordre

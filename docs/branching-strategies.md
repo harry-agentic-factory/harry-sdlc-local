@@ -64,3 +64,23 @@ merge dans le trunk de ce repo ; la promote finale se fait repo par repo.
 La stratégie retenue est notée dans le `refine.md` de l'épic (section « Protocole de branches »). Le `deployer`
 lit cette cible de merge : en stratégie C, une story merge vers `epic/<EPIC>` (pas `main`) ; la promote `main` est
 une étape d'épic distincte, humaine.
+
+## Checklist discipline git (toutes stratégies — non négociable)
+
+À appliquer à **chaque** transition de story, quelle que soit la stratégie (renforcé pour C — trunk d'épic) :
+
+- [ ] **1 branche par story + sa MR** — `feat/<STORY>` ; jamais deux stories sur la même branche.
+- [ ] **Worktree dédié par story** — `<parent>/_wt/<repo>/<branche-slug>` (jamais `/tmp`), pour bosser
+      plusieurs stories sans se marcher dessus. Vérifie `git -C <repo> branch --show-current` **avant tout
+      commit**.
+- [ ] **Jamais de push direct** sur une branche protégée (`main`, ni le **trunk `epic/<EPIC>`**) : tout passe
+      par une **MR** (story→trunk, ou trunk→main pour la promote).
+- [ ] **`git fetch` puis brancher off la cible À JOUR** — jamais un `main`/trunk **local périmé** (le `main`
+      local peut retarder ; cible `origin/main` / `origin/epic/<EPIC>`).
+- [ ] **Vérifier le merge distant AVANT la story suivante** — en série (B) ou trunk (C), confirme sur le
+      **remote** que la MR précédente a bien atterri (`git ls-remote` / MR `merged`) **avant** de brancher la
+      suivante off la cible à jour. Sinon la story N+1 ne voit pas le schéma/API de la story N.
+- [ ] **Auto-promote = seulement ses PROPRES MR validées** — un run auto ne merge jamais une MR préexistante
+      ou d'autrui ; « merge tout » = uniquement les MR de la session.
+- [ ] **Promote `trunk→main` = gate humaine** (stratégie C) — `escalation.promote = human` ; une seule
+      intégration à valider/déployer en fin d'épic.
