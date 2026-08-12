@@ -85,6 +85,27 @@ Complète avec `sdlc get <STORY>` : **branche** de la story, **MR**, et `refBran
   rejoue un build récent en surchargeant `CODE_BRANCH=<branche story>`. (Rejoue depuis un build
   **récent** : un vieux build ré-exécute son ancien Jenkinsfile → creds/étapes périmés.)
 
+### ⛔ RÈGLE — jamais déployer une version EN RETARD sur `main` (rebase-first + cible trunk)
+**Objectif : l'image déployée ne doit JAMAIS être en retard sur `main`.** À l'arrivée sur le repo, AVANT de
+déclencher quoi que ce soit :
+1. **Une branche est déjà déployée / en cours de déploiement dans l'env cible ?** → **NE déploie PAS par-dessus**.
+   **Reste en attente** tant que `main` n'est pas repassée en déploiement (on ne double pas un deploy de branche
+   en vol, on ne laisse pas deux branches se marcher dessus). L'env d'intégration = **une file, pas un empilement**.
+2. **`main` a été (re)déployée** (ou a simplement avancé) ? → **rebase SYSTÉMATIQUEMENT** ta branche/trunk sur
+   `origin/main` **avant** de builder/déployer (`git fetch origin` puis rebase). Une branche coupée d'un vieux
+   `main` = build périmé = régressions silencieuses (tu réintroduis ce que `main` a corrigé).
+3. **Le rebase est impactant** (conflits non triviaux, fichiers partagés modifiés des 2 côtés) ? → **re-vérifie
+   de zéro** que **ça compile** ET que le **minimum de tests passe** (build + tests ciblés) **avant** de déployer.
+   Un rebase silencieusement cassé qui part en prod-intégration est pire que l'attente.
+4. **Cible du deploy en stratégie C (trunk d'épic)** : quand plusieurs stories vivent dans le **même repo**, ne
+   déploie pas une **branche de story isolée** (elle ne contient pas les stories déjà mergées au trunk) → déploie
+   le **trunk `epic/<EPIC>`** (qui accumule les stories, **rebasé sur `main`**), ou à défaut la story **rebasée sur
+   le trunk**. Mono-story/repo : la branche = le trunk, pas de sujet. Au **promote**, c'est le **trunk rebasé sur
+   `main`** qui part sur `main` (ff propre, jamais en retard).
+
+> Court-circuite ces 4 points uniquement si le manifest/Brain du projet documente explicitement un autre modèle
+> (ex. env d'intégration multi-branches isolées). Par défaut : **file d'attente + rebase-first + cible trunk.**
+
 ### Dépendance à une lib partagée (AVANT de builder l'image)
 Si la story touche une **lib partagée** (un artefact versionné consommé par plusieurs services), **release-la
 d'abord depuis `main`** puis **pin** les services sur cette version, **avant** de builder/déployer. Un service
