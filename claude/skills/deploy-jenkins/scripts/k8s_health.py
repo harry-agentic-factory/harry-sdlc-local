@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Santé d'un service déployé : `kubectl port-forward` + `curl` health. Sortie JSON `{ok, http, status}`.
 
-    python3 k8s_health.py --ns hia-tenant --deploy hia-back-tenant-ht --remote-port 8088 --path /actuator/health
+    python3 k8s_health.py --ns <namespace> --deploy <deployment> --remote-port <containerPort> --path /actuator/health
 
 Le port-forward est ouvert PUIS refermé par le script (rien ne fuit ; pas de process orphelin).
 """

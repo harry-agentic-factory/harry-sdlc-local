@@ -19,15 +19,30 @@ les artefacts + `pm` (jamais seulement dans la conversation, éphémère).
 La boucle serrée, non négociable :
 
 ```
-recette (live, assertions CHIFFRÉES) ──KO──▶ bundle repro ──▶ fixer (local, iso-prod, sans redeploy)
-        ▲                                                              │
-        └────────────── re-deploy (uniquement pour re-recetter) ◀──────┘
-        │
-       OK ──▶ merge story → trunk d'épic
+                    ┌─────────────── RÉ-ENTRÉE (fixFrom) ───────────────┐
+                    ▼                                                   │
+  fixer ──▶ deployer ──▶ recetteur ──KO──▶ bundle repro ────────────────┘
+                              │
+                             OK
+                              ▼
+                RECETTE MANUELLE en session ──KO──▶ pm + repro ──▶ (ré-entrée ci-dessus)
+                              │
+                             OK ──▶ gate humaine ──▶ promote : merge main + recette SUR MAIN
 ```
+
+**Le triplet `fixer → deployer → recetteur` est le cœur, et il tourne depuis deux endroits** : le
+workflow l'enchaîne seul sur une recette agent KO (`MAX_FIX = 2`), et la session le **relance depuis le
+fixer** — `Workflow({…, fixFrom:'<repro>'})` — quand c'est la recette **manuelle** qui a trouvé des bugs.
+On ne recommence jamais par la review ni par le premier déploiement : ils sont déjà faits.
 
 - La **recette fait foi** : tant qu'elle n'est pas verte (assertions **chiffrées**, sur le **DÉPLOYÉ**),
   on **ne sort pas** de la boucle. Un « ça s'affiche » ne vaut rien.
+- **Et la recette qui fait foi est la MANUELLE.** Le `recette_ok` d'un agent est un **candidat**, pas une
+  conclusion : un recetteur se fait tromper par un mock, une assertion molle, un écran qui s'affiche sans
+  rien prouver. Le vert de l'agent **déclenche** donc une recette manuelle en session (UI *et/ou* API,
+  en croisant) — KO ⇒ un item `pm` par bug + `reject --to implemented` + relance ; OK ⇒ seulement alors
+  la gate humaine. La boucle interne du workflow (`MAX_FIX = 2`) traite l'échec ; celle-ci traite le
+  **succès**, et c'est elle qu'on oublie.
 - Le **fixer** corrige **en local, iso-prod** (même moteur DB + dialecte réel + boot complet — pas H2/mock),
   **itère sans redéployer** ; on **ne redéploie que pour re-recetter**.
 - Un KO produit un **bundle repro** que le fixer rejoue → corrige → re-vérifie.
@@ -51,8 +66,10 @@ Déroule, pour chaque story actionnable du DAG :
    **jusqu'au vert**.
 8. **`recette_ok`** — recetteur API **+** UI, assertions **chiffrées**, croise API↔UI, sur le **DÉPLOYÉ**.
 9. **merge trunk** — merge `feat/<STORY>` → **`epic/<EPIC>`** (stratégie C), **jamais `main`**.
-10. **`accepted`/`done` + promote** — demo + **validation humaine** → promote `epic/<EPIC>` → `main` → prod.
-    **Gate.**
+10. **`accepted`/`done` + promote** — demo + **validation humaine**. Sur son feu vert, le Workflow relancé
+    avec `{promote:true}` merge sur `main`, redéploie main et **rejoue la même recette sur main** : on
+    vérifie que ce qui passait sur la branche tient une fois mergé. **Gate.** La mise en production, sa
+    CI/CD et sa recette classique sont hors de ce loop — le loop vit dans le monde du développeur.
 11. **`/post-mortem`** — capitalise la dette (`pm`), e2e-author fige les parcours en non-reg, **propale
     Brain + harnais** (pour que les futurs runs héritent du mode op amélioré).
 

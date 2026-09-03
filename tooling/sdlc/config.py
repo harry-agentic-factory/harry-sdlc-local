@@ -155,8 +155,8 @@ def _join(root: str | None, value: str) -> str | None:
 def resolve_repos(cfg: dict) -> dict[str, str | None]:
     """`repos` (liste de noms **ou** map name→path) → map name→chemin absolu (None si non résoluble).
 
-    - liste `["back-tenant", ...]` → chaque nom résolu via `reposRoot`.
-    - map `{"back-tenant": "/abs"}` → chemin tel quel (absolu) ou joint à `reposRoot` (relatif),
+    - liste `["<repo>", ...]` → chaque nom résolu via `reposRoot`.
+    - map `{"<repo>": "/abs"}` → chemin tel quel (absolu) ou joint à `reposRoot` (relatif),
       `null` → résolu via `reposRoot/<nom>`.
     """
     root = cfg.get("reposRoot")
@@ -221,6 +221,49 @@ def resolve_stacks(cfg: dict, repos: dict) -> dict:
     for name, path in repos.items():
         out[name] = explicit.get(name) or detect_stack(path)
     return out
+
+
+LOGICAL_ENVS = ("dev", "integration")
+
+
+def resolve_deploy_target(cfg: dict, repo: str, env: str) -> dict:
+    """Résout un environnement **LOGIQUE** (`dev` pré-merge, `integration` post-merge) en cible CONCRÈTE.
+
+    L'agent deployer raisonne en logique et ne connaît jamais les URL ni les noms de jobs : c'est le
+    projet qui dit ce que `dev` veut dire. Trois formes acceptées dans `deploy.<repo>` :
+
+      "environments": { "dev": {...}, "integration": {...} }   # deux cibles distinctes
+      "environments": { "dev": {...}, "integration": "dev" }   # ALIAS : même cible (un seul env)
+      { "ci": ..., "cd": ... }                                 # forme plate historique : dev = integration
+
+    Renvoie la cible enrichie de `env` (le logique demandé), `label` (ce que la cible EST réellement —
+    `prod` par défaut, faute de mieux) et `autoDeploy` (défaut **False** : le silence est restrictif).
+    """
+    if env not in LOGICAL_ENVS:
+        raise ValueError(f"environnement logique inconnu : {env!r} (attendu : {' | '.join(LOGICAL_ENVS)})")
+    blk = (cfg.get("deploy") or {}).get(repo)
+    if not isinstance(blk, dict):
+        raise KeyError(f"aucun bloc deploy pour le repo {repo!r} — le deployer n'a rien à lire")
+    envs = blk.get("environments")
+    if isinstance(envs, dict):
+        target = envs.get(env)
+        seen = {env}
+        while isinstance(target, str):            # alias, éventuellement chaîné
+            if target in seen:
+                raise ValueError(f"alias d'environnement circulaire sur {repo}: {target!r}")
+            seen.add(target)
+            target = envs.get(target)
+        if not isinstance(target, dict):
+            raise KeyError(f"{repo}: environnement logique {env!r} non défini dans `environments`")
+        base = {k: v for k, v in blk.items() if k != "environments"}
+        base.update(target)
+        target = base
+    else:
+        target = dict(blk)                        # forme plate : la même cible pour les deux
+    target["env"] = env
+    target.setdefault("label", "prod")            # inconnu -> traité comme la prod
+    target.setdefault("autoDeploy", False)        # inconnu -> gate humaine
+    return target
 
 
 def resolved_manifest(project: str | None = None, workspace: str | Path | None = None) -> dict:

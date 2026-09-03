@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Image/tag actuellement déployé pour un Deployment k8s. Sortie JSON `{ok, image, tag}`.
 
-    python3 k8s_version.py --ns hia-tenant --deploy hia-back-tenant-ht [--container 0]
+    python3 k8s_version.py --ns <namespace> --deploy <deployment> [--container 0]
 """
 from __future__ import annotations
 

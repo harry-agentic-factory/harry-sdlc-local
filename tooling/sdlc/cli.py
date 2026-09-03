@@ -16,7 +16,7 @@ import difflib
 import json
 import sys
 
-from .config import resolve_workspace
+from .config import current_project, load_config, resolve_deploy_target, resolve_workspace, resolved_manifest
 from .board import NullBoard
 from .service import Sdlc
 from .workspace import Workspace
@@ -119,7 +119,7 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("epic", help="ID épic")
     a = sub.add_parser("set-status", help="change le statut d'une story (transition d'orchestration)")
     a.add_argument("story", help="ID story")
-    a.add_argument("status", help="spec_func|spec_tech|implemented|reviewed|deployed|recette_ok|accepted|done")
+    a.add_argument("status", help="spec_func|spec_func_validated|spec_tech|implemented|reviewed|deployed|recette_ok|accepted|done")
     a = sub.add_parser("link", help="attache un artefact (doc) à une story")
     a.add_argument("story", help="ID story")
     a.add_argument("kind", help="type : prd|spec_func|spec_tech|implement|review|deploy|acceptance|demo")
@@ -141,6 +141,19 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("--repo", help="limiter à un repo (sinon tous)")
     a = sub.add_parser("status", help="statut exact d'un ticket/épic (état + artefacts + recaps agents)")
     a.add_argument("target", nargs="?", help="ID ticket ou épic (sinon : projet entier)")
+    a = sub.add_parser("deploy-target",
+                       help="résout un environnement LOGIQUE (dev = pré-merge, integration = post-merge) "
+                            "en cible CONCRÈTE pour un repo. Le deployer appelle ça et ne devine rien.")
+    a.add_argument("repo", help="nom du repo")
+    a.add_argument("--env", required=True, choices=["dev", "integration"], help="environnement logique")
+
+    a = sub.add_parser("journal", help="consigne un EVENEMENT DE RUN dans le journal d'une story "
+                                       "(arret de workflow, reprise, decision d'orchestration) — "
+                                       "pour que le fait ne vive pas QUE dans la conversation")
+    a.add_argument("story", help="ID story")
+    a.add_argument("--entry", required=True, help="le fait, en clair (jamais de secret)")
+    a.add_argument("--by", default="harry", help="auteur (defaut: harry)")
+
     a = sub.add_parser("reject", help="rejette une story (gate) → route vers spec_func|spec_tech|implemented + note (journal)")
     a.add_argument("story", help="ID story")
     a.add_argument("--to", required=True, help="étape de retour : spec_func | spec_tech | implemented")
@@ -150,6 +163,14 @@ def run(argv: list[str] | None = None) -> dict:
                        help="GATE specs : spec_tech→spec_validated (story OU épic entier). La review harry-archi "
                             "+ l'escalade humaine se font en AMONT (orchestration) ; cette commande CONSIGNE la validation.")
     a.add_argument("target", help="ID story OU épic (épic = batch toutes ses stories en spec_tech)")
+    a.add_argument("--review", help="chemin du spec-review.md (artefact de gate) à consigner sur l'épic/la story")
+
+    a = sub.add_parser("validate-func",
+                       help="GATE fonctionnelle : spec_func→spec_func_validated (story OU épic entier). "
+                            "Au niveau ÉPIC elle valide le PRD + tous les spec-func d'un coup, AVANT que le "
+                            "technique soit écrit par-dessus. Comme validate-spec, elle CONSIGNE une review "
+                            "faite en amont (harry-archi + escalade humaine).")
+    a.add_argument("target", help="ID story OU épic (épic = batch toutes ses stories en spec_func)")
     a.add_argument("--review", help="chemin du spec-review.md (artefact de gate) à consigner sur l'épic/la story")
 
     # --- worktrees / workspace agent ---
@@ -202,19 +223,16 @@ def run(argv: list[str] | None = None) -> dict:
         return {"prefix": args.prefix, "registered": register_project(args.prefix, args.path)}
     if args.cmd == "projects":
         from .project import list_projects
-        from .config import current_project
         # `current` = projet déduit du CWD (lève l'ambiguïté quand plusieurs sont enregistrés).
         # `--project` explicite l'emporte s'il est fourni et connu.
         projects = list_projects()
         cur = args.project if args.project in projects else current_project()
         return {"projects": projects, "current": cur}
     if args.cmd == "config":
-        from .config import load_config, resolved_manifest
         if args.raw:
             return load_config(resolve_workspace(args.project))
         return resolved_manifest(args.project)
     if args.cmd == "skills":
-        from .config import resolved_manifest
         man = resolved_manifest(args.project)
         stacks = man.get("stacks", {})
         sbr = man.get("skillsByRepo", {})
@@ -277,6 +295,24 @@ def run(argv: list[str] | None = None) -> dict:
                     f"validate-spec: « {args.target} » n'est ni une story ni un épic avec des stories en spec_tech")
         validated = [s.set_status(tid, "spec_validated").id for tid in targets]
         return {"gate": "spec_validated", "target": args.target, "validated": validated, "review": args.review}
+    if args.cmd == "deploy-target":
+        return resolve_deploy_target(load_config(resolve_workspace(args.project)), args.repo, args.env)
+    if args.cmd == "journal":
+        return s.journal(args.story, args.entry, actor=args.by)
+    if args.cmd == "validate-func":
+        # GATE fonctionnelle (harry-archi + escalade humaine faites en amont) → spec_func → spec_func_validated.
+        # target = une story, OU un épic (batch de toutes ses stories encore en spec_func = gate au niveau PRD).
+        all_t = s.list_backlog(None)
+        ids = {t.id for t in all_t}
+        if args.target in ids:
+            targets = [args.target]
+        else:
+            targets = [t.id for t in all_t if t.epic == args.target and t.status == "spec_func"]
+            if not targets:
+                raise ValueError(
+                    f"validate-func: « {args.target} » n'est ni une story ni un épic avec des stories en spec_func")
+        validated = [s.set_status(tid, "spec_func_validated").id for tid in targets]
+        return {"gate": "spec_func_validated", "target": args.target, "validated": validated, "review": args.review}
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
         return build_agent_workspace(args.project, args.story, branch=args.branch, agent=args.agent)
@@ -284,7 +320,6 @@ def run(argv: list[str] | None = None) -> dict:
         from .agentws import clean_workspace
         return clean_workspace(args.project, args.story, branch=args.branch, ref=args.ref)
     if args.cmd == "worktree":
-        from .config import resolved_manifest
         from . import worktree as wt
         t = s.get_ticket(args.story)
         branch = args.branch or t.get("branch")

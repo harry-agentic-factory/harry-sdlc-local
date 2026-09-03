@@ -64,6 +64,21 @@ class Sdlc:
         return t
 
     # --- rejet routé (gate humaine : review/recette KO → spec_func|spec_tech|implemented) ---
+    def journal(self, story: str, entry: str, actor: str = "harry") -> dict:
+        """Consigne un EVENEMENT DE RUN dans le journal de la story (newest-first, append-only).
+
+        Sert a ce que la conversation ne soit pas le seul endroit ou vit un fait : un arret de workflow
+        (`stopped_at`/`reason`), une reprise, une decision d'orchestration. Sans ca, le signal qui
+        declenche la boucle externe -- recette manuelle, `pm add`, correction, relance -- meurt avec la
+        session, ce que l'invariant de tracabilite du loop interdit.
+
+        N'ecrase JAMAIS `acceptance.md` (preuve de recette) ni les entrees plus anciennes.
+        """
+        from datetime import datetime, timezone
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        self.ws.journal_add(story, f"## {stamp} -- {actor}\n\n{entry.strip()}")
+        return {"story": story, "journal": str(self.ws.journal_path(story)), "at": stamp}
+
     def reject(self, story: str, to: str, note: str, actor: str = "humain",
                now: str | None = None) -> dict:
         """Consigne une décision de rejet dans le journal (append-only) PUIS route le ticket.

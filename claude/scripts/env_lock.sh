@@ -37,7 +37,7 @@ EOF
 }
 
 cmd="${1:?usage: env_lock.sh <acquire|refresh|release|status|steal> <env-repo> [owner] [opts]}"; shift
-env="${1:?env-repo required (e.g. prod-integration--back-tenant)}"; shift
+env="${1:?env-repo required (e.g. prod-integration--<repo>)}"; shift
 owner=""; ttl=900; phase=""; note=""
 case "$cmd" in acquire|refresh|release|steal) owner="${1:?owner required}"; shift;; esac
 while [ $# -gt 0 ]; do case "$1" in
