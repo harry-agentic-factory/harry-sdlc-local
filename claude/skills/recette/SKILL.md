@@ -87,7 +87,7 @@ resume-safe, découpe si long). Spécifique recette : **filtre** chaque réponse
 
 ## Pièges & astuces (vécus en prod)
 - **Accès backend sans port-forward** : si le repo a un **ingress public**, curl-le **directement** (plus fiable que
-  le port-forward). Ex. HIA : `https://prod.client.hiasecure.com/back-tenant/api/…` (le front proxie `/back-tenant`).
+  le port-forward). Ex. : `https://<host-public>/<module>/api/…` quand le front proxie le préfixe du module.
   → évite le piège port-forward.
 - **Présence d'un endpoint sans token** : un `GET` sans auth qui renvoie **302/401** = endpoint **présent + sécurisé** ;
   **404** = endpoint **absent** (pas déployé). Check rapide avant de sortir l'artillerie d'auth.
@@ -96,14 +96,14 @@ resume-safe, découpe si long). Spécifique recette : **filtre** chaque réponse
   Mint = `client_credentials` (SA de recette) **ou** ROPC (user de recette), **secret lu d'un fichier**, jamais en argv.
 - **Erreur générique `{"field":null,"key":"unknown.error"}`** (HTTP 400) = **échec en aval mappé** par le
   gestionnaire d'exception (pas une validation de champ). → **LIS le code de la méthode aval** (relais), n'ASSUME
-  jamais la cause. *(Vécu, leçon à la dure : j'ai d'abord assumé « back-hia rejette un code absent de son `SettingEnum`,
-  il faut releaser le domaine » — **FAUX**. En lisant enfin la méthode aval `updateSettingClient`, la vraie cause était
-  que back-hia ne fait qu'un **update des lignes EXISTANTES matchées par ID** (`findAllByClientId` + `stg.getId().equals`),
-  **sans upsert-by-code** → un relais qui envoie des settings **neufs sans id** ne matche rien / NPE. Aucun rapport avec
-  le domaine. J'ai perdu une release + un build à chasser la mauvaise piste.)* **Règle : `curl` la cause hypothétique
+  jamais la cause. *(Vécu, leçon à la dure : j'ai d'abord assumé que le service aval rejetait une valeur absente de son
+  énumération, et qu'il fallait releaser la lib de domaine — **FAUX**. En lisant enfin la méthode aval, la vraie cause
+  était qu'elle ne fait qu'un **update des lignes EXISTANTES matchées par ID**, **sans upsert** → un relais qui envoie
+  des entités **neuves sans id** ne matche rien / NPE. Aucun rapport avec le domaine. J'ai perdu une release + un build
+  à chasser la mauvaise piste.)* **Règle : `curl` la cause hypothétique
   puis `grep`/`Read` la méthode aval AVANT d'ouvrir un chantier release/infra.**
-- **Un test unitaire vert ne prouve pas l'intégration** : le relais cross-repo (back-tenant→back-hia) était **mocké**
-  → le PUT passait en test. La **recette live attrape** le mismatch de contrat (upsert attendu vs update-by-id réel).
+- **Un test unitaire vert ne prouve pas l'intégration** : le relais cross-repo était **mocké** → le PUT passait en
+  test. La **recette live attrape** le mismatch de contrat (upsert attendu vs update-by-id réel).
 
 ## Fallback connaissances profondes
 Spécifiques d'auth/endpoint d'un projet : le **Brain** (`.brain` du manifest) + le `CLAUDE.md` du repo.

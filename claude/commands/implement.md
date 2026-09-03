@@ -20,7 +20,7 @@ Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (pla
 ## Guidelines de code (matchées par la stack du repo)
 Avant de coder, lis `sdlc --project <PREFIX> skills` (résout **stack → skills** par repo ; `--repo <repo>` pour
 un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `rest-best-practices, spring-boot-api, java-spring-testing`) et applique-les.
-**Annonce en une ligne** au démarrage les skills chargés par repo, ex. `🧩 skills: back-tenant (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`. Repo dont la stack n'a pas de skill (front, python, …) ⇒ liste vide, annonce `aucun`.
+**Annonce en une ligne** au démarrage les skills chargés par repo, ex. `🧩 skills: <repo> (java-spring) → rest-best-practices, spring-boot-api, java-spring-testing`. Repo dont la stack n'a pas de skill (front, python, …) ⇒ liste vide, annonce `aucun`.
 
 ## Déroulé
 1. **Worktree du ticket EN PREMIER** (une fois la branche décidée `feat/<STORY>-<slug>`, jamais protégée) :
@@ -48,6 +48,26 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
   e2e-author → nonreg → demo → accept`, orchestré par
   `Workflow({scriptPath:'~/.claude/workflows/run-ticket.js', args:{ticket,epic,prefix,repoName,branch}})`.
   Toi (Harry) tu tiens les gates ; les agents ne font PAS avancer l'état.
+- **Le Workflow rend un `{stopped_at, reason}` — ce n'est pas la fin.** `run-ticket` plafonne sa fix-loop
+  à `MAX_FIX = 2` puis rend `needs_human`. Ce retour ne vit **que** dans la conversation : consigne-le
+  (`sdlc journal <STORY> --entry "…"`), puis reprends la main — recette **manuelle** sur le déployé, un
+  item `pm` par bug, correction, relance, jusqu'à épuisement. Cette boucle externe n'est faisable que
+  depuis la session principale ; le détail est dans `/run-story`.
+
+## Avant toute écriture — ouvre la bulle scopée
+
+```bash
+sdlc --project <PREFIX> workspace <STORY> --branch <BRANCHE>
+```
+
+→ **worktree isolé par repo** + `.claude/settings.json` (`additionalDirectories` = worktrees + brain +
+repo data) + symlink des skills projet. **Code dans le worktree, jamais dans le working tree partagé** :
+c'est ce qui permet de mener plusieurs stories de front sans se marcher dessus, et d'éviter le classique
+« j'ai codé sur la branche d'une autre story ».
+
+La commande **crée ou assure** — elle est idempotente. La phase `Prepare` de `run-ticket.js` appelle
+exactement la même : deux points d'appel, une seule logique, dans le CLI. Le premier qui passe crée, le
+second résout. Ne réimplémente ni l'un ni l'autre.
 
 ## Garde-fous
 - Transitions de statut = propriété de l'orchestration, pas de l'implémenteur ad hoc : n'avance qu'à

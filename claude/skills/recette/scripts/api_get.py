@@ -2,8 +2,8 @@
 """GET authentifié vers un service déployé (générique). **Token lu d'un FICHIER, jamais affiché ni en argv**
 (header via `curl -H @hdr`). Accès direct (`--base`) ou via port-forward (`--pf`). Sortie JSON filtrée.
 
-    api_get.py --pf hia-tenant/deploy/hia-back-tenant-ht:8088 --path /api/v1/applications \
-               --token-file <scratch>/token --fields clientId,enabled,authFlow,receptionMode
+    api_get.py --pf <ns>/deploy/<deployment>:<containerPort> --path /api/v1/<resource> \
+               --token-file <scratch>/token --fields id,enabled,<autres-champs>
 
 Logique pure testée offline : build_url, filter_obj. Le port-forward est ouvert PUIS refermé.
 """

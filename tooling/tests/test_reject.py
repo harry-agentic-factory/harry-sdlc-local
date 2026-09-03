@@ -70,3 +70,24 @@ def test_cli_reject(tmp_path, capsys, monkeypatch):
     rc = cli.main(["reject", "E-1", "--to", "spec_tech", "--note", "revoir le mécanisme"])
     out = json.loads(capsys.readouterr().out)
     assert rc == 0 and out["to"] == "spec_tech"
+
+
+# --- journal : un événement de run laisse une trace sur DISQUE ---
+
+def test_journal_records_a_run_event(tmp_path):
+    """Le retour `{stopped_at, reason}` d'un workflow ne vit que dans la conversation.
+    `journal` est ce qui l'ancre : sans lui, le signal qui déclenche la boucle externe est perdu."""
+    s = _sdlc(tmp_path, status="deployed")
+    out = s.journal("E-1", "workflow stoppé: recette/needs_human — 2 fix-loops épuisées", actor="harry")
+    body = (tmp_path / "E" / "stories" / "E-1" / "journal.md").read_text(encoding="utf-8")
+    assert "recette/needs_human" in body and "harry" in body
+    assert out["journal"].endswith("journal.md")
+
+
+def test_journal_is_append_only_newest_first(tmp_path):
+    s = _sdlc(tmp_path, status="deployed")
+    s.journal("E-1", "premier arrêt")
+    s.journal("E-1", "second arrêt")
+    body = (tmp_path / "E" / "stories" / "E-1" / "journal.md").read_text(encoding="utf-8")
+    assert body.index("second arrêt") < body.index("premier arrêt")   # le plus récent en tête
+    assert "premier arrêt" in body                                     # rien n'est écrasé

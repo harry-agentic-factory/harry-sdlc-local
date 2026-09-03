@@ -60,10 +60,33 @@ Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renv
    sur le token admin (~8.6 ko). Toujours `kubectl -n <ns-platform> port-forward pod/<keycloak> 18080:8080` +
    base `http://localhost:18080/admin`.
 5. **Chemins de jobs = sensibles casse/folder** : lis-les dans le manifest (`deploy.<repo>.ci/cd`), ne les
-   devine pas (ex. HIA : back-hia = `prod/hia-back/{ci,cd}`, keycloak-plugin = `prod/keycloak-plugin/{CI,CD}`
-   MAJUSCULES). Détail → brain `technical/ci-cd.md`.
+   devine pas. Un même projet peut mêler `prod/<module>/{ci,cd}` en minuscules et `prod/<module>/{CI,CD}` en
+   MAJUSCULES ; **une casse fausse renvoie 404**, pas une erreur parlante. Détail → le brain du projet.
 6. **Health prod** : pas de readinessProbe HTTP → readiness = **pod 1/1** ; le 1er port-forward peut renvoyer
    `000` le temps que le process ouvre son port. Attends `1/1` + une réponse réelle avant de conclure.
+
+## Avant de déployer — demande ta cible, ne la devine pas
+
+Tu raisonnes en environnement **logique** : `dev` en pré-merge (phase Deploy), `integration` en
+post-merge (phase Promote). Tu ne connais ni URL, ni job, ni namespace.
+
+```bash
+sdlc --project <PREFIX> deploy-target <repo> --env dev|integration
+```
+
+La réponse porte la cible concrète **et son `skill`** : charge celui-là. Déployer en dev et en
+intégration n'est pas forcément le même mécanisme — deux jeux de jobs ici, un même job avec un
+paramètre de cible là.
+
+Puis, dans cet ordre :
+
+1. **`autoDeploy` absent ou `false` → ARRÊTE-TOI.** Rends `{ok:false}` en nommant la cible : c'est une
+   gate humaine, pas un échec.
+2. **`autoDeploy: true` → vas-y**, même si `label` vaut `prod` : c'est une décision assumée du projet,
+   pas à toi de la rouvrir.
+3. **`label: prod`, autorisé ou non → dis-le fort.** Avertissement visible dans ton rapport et
+   `sdlc journal <STORY> --entry "deploy sur <env> (label prod) — <version>"`. Un déploiement sur un
+   environnement étiqueté prod ne passe jamais inaperçu, même légitime.
 
 ## Smokes adversariaux + ordre multi-repo (invariants du loop — cf. skill `loop-engineering`)
 Après chaque déploiement, tu **valides par des smokes ADVERSARIAUX** — leur but est d'**ATTRAPER les bugs

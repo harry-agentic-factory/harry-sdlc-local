@@ -40,9 +40,11 @@ cross-repo) + **Invariants OBLIGATOIRES** (garde-fous anti-régression, **assert
 diff** = la checklist du reviewer). Écris `<EPIC>/stories/<STORY>/spec-tech.md`, `link <STORY> spec_tech
 <chemin>`, puis `set-status <STORY> spec_tech`.
 
-### 4. Suite
-Tu restes en `solo` (mono-user). Prêt pour `/implement` (le codage). Un `/harry dev` explicite est possible
-si tu veux repasser en profil dev pur.
+### 4. Gate SPECS, puis suite
+Tu restes en `solo` (mono-user). **Passe la gate avant de coder** — elle accepte l'épic entier en batch :
+`harry-archi` sur `<EPIC>` → escalades à l'humain → `validate-spec <EPIC> --review <EPIC>/spec-review.md`.
+Voir `claude/commands/spec-tech.md` § Gate SPECS pour le détail. **Ensuite** `/implement` (ou `/run-story`,
+qui enchaîne tout seul). Un `/harry dev` explicite est possible si tu veux repasser en profil dev pur.
 
 ## Sortie
 - **Arbre des docs produits** (prd, refine, et par story : spec-func éventuel + spec-tech).
