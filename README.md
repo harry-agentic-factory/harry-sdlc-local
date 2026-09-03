@@ -32,58 +32,52 @@ Prérequis : Python 3.11+ ; Claude Code pour les slash-commands & workflows.
 Deux segments de nature différente, deux gates, et une boucle qui se referme sur le **fixer**.
 
 ```mermaid
-flowchart TD
-    subgraph SESSION1["🧑 Session — commandes · interactif · l'humain tranche"]
-        direction TB
-        SC["/scope"] --> RF["/refine"] --> SF["/spec-func"]
-        SF --> GF{{"GATE FONCTIONNELLE<br/>harry-archi → sdlc validate-func<br/>PRD + refine + TOUS les spec-func<br/>(épic en batch, ou story)"}}
+flowchart TB
+    subgraph S1["1 · SPÉCIFIER — 🧑 commandes, en session"]
+        direction LR
+        AM["/scope<br/>/refine"] --> SF["/spec-func"]
+        SF --> GF{{"GATE<br/>FONCTIONNELLE"}}
         GF -->|validée| ST["/spec-tech"]
-        ST --> GT{{"GATE TECHNIQUE<br/>harry-archi → sdlc validate-spec<br/>plan + invariants"}}
-        GT -->|validée| IM["/implement<br/>ouvre la bulle scopée<br/>worktree isolé + skills projet"]
-        FSP["/full-spec<br/>tout l'amont en UNE passe"] -.-> GF
+        ST --> GT{{"GATE<br/>TECHNIQUE"}}
+        GT -->|validée| IM["/implement"]
+        FSP["/full-spec"] -.->|l'amont en 1 passe| GF
+        GF & GT -.->|escalade| HUM1(["👤 humain"])
     end
 
-    GF -->|escalade produit / sécu / PII| HUM1(["👤 humain"])
-    GT -->|escalade| HUM1
-
-    IM ==>|"Workflow(run-ticket.js)"| PREP
-
-    subgraph WF["🤖 Contextes isolés — agents · autonome · ne parlent pas à l'humain"]
-        direction TB
-        PREP["Prepare<br/><i>general-purpose</i><br/>assure le worktree"] --> REV["Review<br/><i>reviewer</i><br/>diff vs invariants"]
-        REV --> DEP["Deploy<br/><i>deployer</i><br/>cible : dev dédié ou éphémère"]
-        DEP --> REC["Recette<br/><i>recetteur</i><br/>assertions chiffrées"]
-        REC -->|KO| FIX["<b>fixer</b>"]
-        FIX --> RDP["deployer<br/>redéploie"]
-        RDP --> REC
+    subgraph LOOP["2 · LA BOUCLE — 🤖 agents isolés · 🧑 la session tranche"]
+        direction LR
+        PREP["🤖 Prepare"] --> REV["🤖 Review"] --> DEP["🤖 Deploy<br/>cible : dev"]
+        DEP --> REC["🤖 Recette"]
+        REC -->|"KO · max 2"| FIX["🤖 fixer<br/>+ deployer"] --> REC
+        REC ==>|"vert = un CANDIDAT"| MAN["🧑 RECETTE MANUELLE<br/>assertions chiffrées"]
+        MAN -->|KO| BUGS["bugs pm<br/>+ repro"]
+        BUGS ==>|"fixFrom"| FIX
+        MAN -->|OK| HUM2(["👤 GATE"])
     end
 
-    REC ==>|"vert → await_validation<br/>(un CANDIDAT, pas une conclusion)"| MAN
-
-    subgraph SESSION2["🧑 Session — la boucle externe"]
-        direction TB
-        MAN["<b>RECETTE MANUELLE</b><br/>UI (Playwright MCP) et/ou API<br/>assertions CHIFFRÉES, sur le déployé"]
-        MAN -->|KO| BUGS["1 item pm par bug<br/>sdlc journal<br/>bundle repro<br/>reject --to implemented"]
-        MAN -->|OK| HUM2(["👤 GATE HUMAINE"])
+    subgraph PR["3 · PROMOTE — 🤖 après le feu vert"]
+        direction LR
+        PM["merge → main<br/>puis déploie"] --> PRC["la MÊME recette<br/>sur main"] --> FIN(["done"])
     end
 
-    BUGS ==>|"Workflow(fixFrom: repro)<br/><b>ré-entrée AU FIXER</b>"| FIX
-    HUM2 ==>|"{promote:true}"| PM
+    S1 ==>|"Workflow(run-ticket)"| LOOP
+    LOOP ==>|"promote:true"| PR
 
-    subgraph PROM["🤖 Promote — après ton feu vert"]
-        direction TB
-        PM["deployer<br/>merge → main + redéploie main<br/>cible : INTÉGRATION"] --> PRC["recetteur<br/>rejoue LA MÊME recette SUR MAIN"]
-    end
-
-    PRC --> FIN(["done"])
-
-    style GF fill:#fff3cd,stroke:#856404
-    style GT fill:#fff3cd,stroke:#856404
-    style HUM1 fill:#f8d7da,stroke:#721c24
-    style HUM2 fill:#f8d7da,stroke:#721c24
-    style FIX fill:#d1ecf1,stroke:#0c5460
-    style MAN fill:#d4edda,stroke:#155724
+    classDef gate fill:#fff3cd,stroke:#856404,stroke-width:2px
+    classDef human fill:#f8d7da,stroke:#721c24,stroke-width:2px
+    classDef fixer fill:#d1ecf1,stroke:#0c5460,stroke-width:2px
+    classDef manual fill:#d4edda,stroke:#155724,stroke-width:2px
+    class GF,GT gate
+    class HUM1,HUM2 human
+    class FIX fixer
+    class MAN,BUGS manual
 ```
+
+| Bande | Qui | Ce qui s'y joue |
+|---|---|---|
+| **1 · Spécifier** | 🧑 session | `/scope /refine /spec-func` → **gate fonctionnelle** (`validate-func` : PRD + refine + TOUS les spec-func, en batch ou story par story) → `/spec-tech` → **gate technique** (`validate-spec` : plan + invariants). `harry-archi` tranche, escalade produit / sécu / PII. `/implement` ouvre la **bulle scopée** (worktree + skills projet). |
+| **2 · La boucle** | 🤖 + 🧑 | `Workflow(run-ticket.js)` enchaîne *Prepare → Review → Deploy → Recette*, agents à contextes isolés. La **recette manuelle** de la session tranche ; chaque bug devient un item `pm` + un bundle repro, et le tour suivant **ré-entre au fixer**. |
+| **3 · Promote** | 🤖 | Après le feu vert humain seulement : merge → `main`, redéploiement sur **l'intégration**, puis **la même recette rejouée sur main**. |
 
 ### Ce que le dessin dit, en trois phrases
 
@@ -102,31 +96,38 @@ vise l'intégration. La mise en production, sa CI/CD et sa recette classique son
 
 ```mermaid
 stateDiagram-v2
-    direction LR
-    [*] --> draft
-    draft --> spec_func : /spec-func
-    draft --> spec_tech : story triviale
-    spec_func --> spec_func_validated : validate-func
-    spec_func --> spec_tech : gate sautée
-    spec_func_validated --> spec_tech : /spec-tech
-    spec_tech --> spec_validated : validate-spec
-    spec_tech --> implemented : gate sautée
-    spec_validated --> implemented : /implement
-    implemented --> reviewed : reviewer
-    reviewed --> deployed : deployer
-    deployed --> recette_ok : recetteur
-    recette_ok --> accepted : 👤 accept
-    accepted --> done : 👤 promote
-    done --> [*]
-
-    reviewed --> implemented : reject
-    deployed --> implemented : reject
-    recette_ok --> implemented : reject — recette manuelle KO
+    [*] --> SPEC
+    state "1 · SPÉCIFIER — 🧑 en session" as SPEC {
+        direction LR
+        draft --> spec_func : /spec-func
+        spec_func --> spec_func_validated : validate-func
+        spec_func_validated --> spec_tech : /spec-tech
+        spec_tech --> spec_validated : validate-spec
+        draft --> spec_tech : story triviale
+        spec_func --> spec_tech : gate sautée
+    }
+    state "2 · RÉALISER — 🤖 agents, 🧑 recette manuelle" as BUILD {
+        direction LR
+        implemented --> reviewed : reviewer
+        reviewed --> deployed : deployer
+        deployed --> recette_ok : recetteur
+        reviewed --> implemented : reject
+        deployed --> implemented : reject
+        recette_ok --> implemented : reject · recette manuelle KO
+    }
+    state "3 · CLORE — 👤 gate humaine" as CLOSE {
+        direction LR
+        accepted --> done : promote
+    }
+    SPEC --> BUILD : /implement
+    BUILD --> CLOSE : accept
+    CLOSE --> [*]
 ```
 
-Les deux gates sont **sautables** dans la machine — la version dure est portée par l'orchestration, la
-machine tolère le saut pour ne pas casser les flux existants. `reject --to` est la sortie de secours,
-et elle journalise sa raison.
+Les deux gates sont **sautables** dans la machine — `spec_func → spec_tech` et `spec_tech → implemented`
+(cette dernière est la flèche `/implement` sortant de la bande 1 depuis `spec_tech`). La version dure est
+portée par l'**orchestration** ; la machine tolère le saut pour ne pas casser les flux existants.
+`reject --to` est la sortie de secours, et elle journalise sa raison.
 
 ### Qui tourne où, et pourquoi la coupure est là
 
