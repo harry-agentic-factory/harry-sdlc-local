@@ -10,7 +10,7 @@ qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de d
 ```bash
 git clone <repo-url> harry-sdlc-local && cd harry-sdlc-local
 make install     # symlinke l'engine dans ~/.claude + crée la commande globale `sdlc`
-make test        # 27 tests (déterministe, offline)
+make test        # 113 tests (déterministe, offline)
 
 # 1 projet = 1 repo data
 sdlc init-project SAMPLE --path ../sample-proj-sdlc-local --repos app-repo,web-repo
@@ -161,7 +161,7 @@ claude/
 tooling/
   sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/
   cockpit/     board + Inbox HITL (FastAPI + page)
-  tests/       27 tests (déterministe, offline)
+  tests/       113 tests (déterministe, offline)
 docs/PRD.md
 ```
 
