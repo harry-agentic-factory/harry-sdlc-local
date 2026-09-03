@@ -63,10 +63,10 @@ flowchart TB
     S1 ==>|"Workflow(run-ticket)"| LOOP
     LOOP ==>|"promote:true"| PR
 
-    classDef gate fill:#fff3cd,stroke:#856404,stroke-width:2px
-    classDef human fill:#f8d7da,stroke:#721c24,stroke-width:2px
-    classDef fixer fill:#d1ecf1,stroke:#0c5460,stroke-width:2px
-    classDef manual fill:#d4edda,stroke:#155724,stroke-width:2px
+    classDef gate fill:#fff3cd,stroke:#856404,stroke-width:2px,color:#1b1b1b
+    classDef human fill:#f8d7da,stroke:#721c24,stroke-width:2px,color:#1b1b1b
+    classDef fixer fill:#d1ecf1,stroke:#0c5460,stroke-width:2px,color:#1b1b1b
+    classDef manual fill:#d4edda,stroke:#155724,stroke-width:2px,color:#1b1b1b
     class GF,GT gate
     class HUM1,HUM2 human
     class FIX fixer
