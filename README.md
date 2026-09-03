@@ -27,13 +27,133 @@ Prérequis : Python 3.11+ ; Claude Code pour les slash-commands & workflows.
 4. **Fleet + orchestration** (agents + Workflow). Agents à contextes **isolés** → mémoire + coordination
 **externalisées** (couches 2 & 4), sinon le lifecycle tourne dans le vide.
 
+## Le workflow, de bout en bout
+
+Deux segments de nature différente, deux gates, et une boucle qui se referme sur le **fixer**.
+
+```mermaid
+flowchart TD
+    subgraph SESSION1["🧑 Session — commandes · interactif · l'humain tranche"]
+        direction TB
+        SC["/scope"] --> RF["/refine"] --> SF["/spec-func"]
+        SF --> GF{{"GATE FONCTIONNELLE<br/>harry-archi → sdlc validate-func<br/>PRD + refine + TOUS les spec-func<br/>(épic en batch, ou story)"}}
+        GF -->|validée| ST["/spec-tech"]
+        ST --> GT{{"GATE TECHNIQUE<br/>harry-archi → sdlc validate-spec<br/>plan + invariants"}}
+        GT -->|validée| IM["/implement<br/>ouvre la bulle scopée<br/>worktree isolé + skills projet"]
+        FSP["/full-spec<br/>tout l'amont en UNE passe"] -.-> GF
+    end
+
+    GF -->|escalade produit / sécu / PII| HUM1(["👤 humain"])
+    GT -->|escalade| HUM1
+
+    IM ==>|"Workflow(run-ticket.js)"| PREP
+
+    subgraph WF["🤖 Contextes isolés — agents · autonome · ne parlent pas à l'humain"]
+        direction TB
+        PREP["Prepare<br/><i>general-purpose</i><br/>assure le worktree"] --> REV["Review<br/><i>reviewer</i><br/>diff vs invariants"]
+        REV --> DEP["Deploy<br/><i>deployer</i><br/>cible : dev dédié ou éphémère"]
+        DEP --> REC["Recette<br/><i>recetteur</i><br/>assertions chiffrées"]
+        REC -->|KO| FIX["<b>fixer</b>"]
+        FIX --> RDP["deployer<br/>redéploie"]
+        RDP --> REC
+    end
+
+    REC ==>|"vert → await_validation<br/>(un CANDIDAT, pas une conclusion)"| MAN
+
+    subgraph SESSION2["🧑 Session — la boucle externe"]
+        direction TB
+        MAN["<b>RECETTE MANUELLE</b><br/>UI (Playwright MCP) et/ou API<br/>assertions CHIFFRÉES, sur le déployé"]
+        MAN -->|KO| BUGS["1 item pm par bug<br/>sdlc journal<br/>bundle repro<br/>reject --to implemented"]
+        MAN -->|OK| HUM2(["👤 GATE HUMAINE"])
+    end
+
+    BUGS ==>|"Workflow(fixFrom: repro)<br/><b>ré-entrée AU FIXER</b>"| FIX
+    HUM2 ==>|"{promote:true}"| PM
+
+    subgraph PROM["🤖 Promote — après ton feu vert"]
+        direction TB
+        PM["deployer<br/>merge → main + redéploie main<br/>cible : INTÉGRATION"] --> PRC["recetteur<br/>rejoue LA MÊME recette SUR MAIN"]
+    end
+
+    PRC --> FIN(["done"])
+
+    style GF fill:#fff3cd,stroke:#856404
+    style GT fill:#fff3cd,stroke:#856404
+    style HUM1 fill:#f8d7da,stroke:#721c24
+    style HUM2 fill:#f8d7da,stroke:#721c24
+    style FIX fill:#d1ecf1,stroke:#0c5460
+    style MAN fill:#d4edda,stroke:#155724
+```
+
+### Ce que le dessin dit, en trois phrases
+
+**La boucle se referme sur le fixer, pas au début.** `fixFrom` saute la review et le premier
+déploiement — déjà faits. Le triplet `fixer → deployer → recetteur` tourne depuis **deux portes** : le
+workflow l'enchaîne seul quand la recette *agent* échoue (`MAX_FIX = 2`), la session le relance quand
+c'est la recette *manuelle* qui trouve. On boucle jusqu'à épuisement du stock de bugs.
+
+**Le vert d'un agent n'est pas une conclusion.** Un recetteur se fait tromper par un mock, une assertion
+molle, un écran qui s'affiche sans rien prouver. C'est la recette **manuelle** qui fait foi.
+
+**Le loop vit dans le monde du développeur.** Deploy vise un dev dédié ou un éphémère de story, Promote
+vise l'intégration. La mise en production, sa CI/CD et sa recette classique sont un autre univers.
+
+### La state-machine
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> draft
+    draft --> spec_func : /spec-func
+    draft --> spec_tech : story triviale
+    spec_func --> spec_func_validated : validate-func
+    spec_func --> spec_tech : gate sautée
+    spec_func_validated --> spec_tech : /spec-tech
+    spec_tech --> spec_validated : validate-spec
+    spec_tech --> implemented : gate sautée
+    spec_validated --> implemented : /implement
+    implemented --> reviewed : reviewer
+    reviewed --> deployed : deployer
+    deployed --> recette_ok : recetteur
+    recette_ok --> accepted : 👤 accept
+    accepted --> done : 👤 promote
+    done --> [*]
+
+    reviewed --> implemented : reject
+    deployed --> implemented : reject
+    recette_ok --> implemented : reject — recette manuelle KO
+```
+
+Les deux gates sont **sautables** dans la machine — la version dure est portée par l'orchestration, la
+machine tolère le saut pour ne pas casser les flux existants. `reject --to` est la sortie de secours,
+et elle journalise sa raison.
+
+### Qui tourne où, et pourquoi la coupure est là
+
+| | Commandes (`/scope` … `/implement`) | Agents (`run-ticket.js`) |
+|---|---|---|
+| Contexte | la **session** | **isolé**, un par phase |
+| Peut parler à l'humain | oui | non — rend du JSON |
+| Nature du travail | jugement, arbitrages produit | mécanique, parallélisable |
+| « auto » veut dire | « je n'attends pas ton feu vert à chaque étape » | « sans toi, jusqu'à la gate » |
+
+On ne met donc **pas** `/scope` dans un script Workflow : le Workflow orchestre des agents, pas des
+commandes. Corollaire technique — un script Workflow n'a **aucune primitive shell** (`agent`, `parallel`,
+`pipeline`, `log`, `phase`, pas de `bash`) : c'est pourquoi la phase `Prepare` est un agent dont le seul
+travail est de lancer `sdlc workspace` et d'en rendre le JSON. `/implement` appelle la **même** commande,
+qui « crée ou assure » — deux points d'appel, zéro logique dupliquée.
+
+**`/run-story <STORY>`** déroule tout ça depuis l'état où la story se trouve, et s'arrête aux gates.
+C'est ce que veut dire « vas-y en mode auto ».
+
 ## Contenu
 ```
 VERSION                    # version d'engine (semver)
 install.sh · Makefile      # make install  → symlink dans ~/.claude
 claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
-  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket, sdlc (état en session)
+  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket,
+               run-story (le « mode auto » : enchaîne tout depuis l'état courant), sdlc (état en session)
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
   skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)
   sdlc/        harry.md (persona)

@@ -22,4 +22,21 @@ Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
 4. **Avance l'état** : `python3 -m sdlc.cli --project SAMPLE set-status <STORY> spec_func`.
 
 ## Sortie
-Le chemin `spec-func.md` + la liste des critères d'acceptation. Enchaîne sur `/spec-tech`.
+Le chemin `spec-func.md` + la liste des critères d'acceptation.
+
+**Ensuite — la gate FONCTIONNELLE, de préférence au niveau ÉPIC.** Quand tous les `spec-func` de l'épic
+sont écrits :
+
+```bash
+# harry-archi relit le PRD + le refine + TOUS les spec-func → <EPIC>/spec-review.md
+sdlc --project <PREFIX> validate-func <EPIC> --review <EPIC>/spec-review.md   # batch
+sdlc --project <PREFIX> validate-func <STORY> --review …                      # ou story par story
+```
+
+Pourquoi à l'épic plutôt que par story : une erreur fonctionnelle coûte d'autant plus cher qu'on a déjà
+bâti le technique par-dessus. La valider **avant** `/spec-tech`, sur tout le lot, attrape les
+incohérences **entre** stories — celles qu'une relecture story par story ne voit jamais.
+
+Sur une story isolée et triviale, la gate est sautable (`spec_func → spec_tech` reste permis) : note-le.
+
+**Puis** `/spec-tech`.

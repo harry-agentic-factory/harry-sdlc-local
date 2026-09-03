@@ -8,6 +8,69 @@ description: Déploie un module de code via un pipeline Jenkins (CI puis CD/gito
 Tu **ne devines pas** l'infra : tu lis les paramètres dans le manifest, puis tu appliques la procédure.
 C'est le **savoir-faire** (méthode) ; les **valeurs** (host, jobs, image, ns) viennent du projet.
 
+
+## Les deux cibles de déploiement — ce n'est pas le même environnement
+
+Le loop déploie **deux fois**, et jamais au même endroit :
+
+| Phase | Quand | Cible |
+|-------|-------|-------|
+| **Deploy** | pré-merge, sur la branche | un environnement de **dev dédié**, ou un **éphémère monté à la demande** pour la story |
+| **Promote** | post-merge, sur `main` | l'environnement d'**INTÉGRATION** |
+| — | — | **jamais la production** : elle a sa propre CI/CD et sa propre recette, hors de ce loop |
+
+L'éphémère par story est le cas idéal : deux stories en vol ne se marchent pas dessus, et le
+`env_lock` devient inutile. À défaut, un dev partagé — et là le lock reprend tout son sens.
+
+### Le deployer raisonne en environnement LOGIQUE, jamais en URL
+
+Deux noms, et deux seulement : **`dev`** (cible pré-merge, phase Deploy) et **`integration`** (cible
+post-merge, phase Promote). L'agent ne connaît ni les URL, ni les noms de jobs, ni les namespaces — il
+demande, le projet répond :
+
+```bash
+sdlc --project <PREFIX> deploy-target <repo> --env dev|integration
+```
+
+C'est la **seule** façon d'obtenir une cible. Ne lis pas `deploy.<repo>` à la main, ne devine rien.
+
+### Ce que le projet déclare
+
+```json
+"deploy": { "<repo>": {
+    "skill": "deploy-jenkins",  "image": "…",            // commun aux deux environnements
+    "environments": {
+      "dev":         { "ci": "dev/<mod>/ci",  "cd": "dev/<mod>/cd",  "label": "dev",         "autoDeploy": true },
+      "integration": { "ci": "int/<mod>/ci",  "cd": "int/<mod>/cd",  "label": "integration", "autoDeploy": true }
+    }
+} }
+```
+
+Trois formes acceptées, de la plus riche à la plus simple :
+
+| Forme | Quand |
+|---|---|
+| deux blocs distincts | deux environnements réels, deux jeux de jobs |
+| `"integration": "dev"` — **alias** | un seul environnement sert les deux phases |
+| bloc **plat**, sans `environments` | forme historique : la même cible pour tout |
+
+**Le `skill` se choisit par environnement**, et c'est le point important. Déployer en dev et déployer en
+intégration ne sont pas forcément le même mécanisme : ici ce sont deux jeux de jobs Jenkins, là c'est le
+**même job avec un paramètre de cible**, ailleurs c'est autre chose. La cible résolue porte donc son
+`skill` — charge celui-là, pas celui que tu supposais. Ce qui est commun (image, namespace, URL Jenkins)
+se déclare une fois au niveau du repo et s'hérite.
+
+| Champ | Absent vaut | Effet |
+|---|---|---|
+| `label` | `prod` | ce que la cible **est** réellement, indépendamment de son nom logique |
+| `autoDeploy` | **`false`** | la phase devient une **gate humaine** |
+
+`label` et `autoDeploy` sont séparés à dessein : « quel environnement ? » et « ai-je le droit d'y aller
+seul ? » sont deux questions. Un projet peut n'avoir qu'un environnement, l'appeler prod parce que c'est
+son nom, et décider en connaissance de cause que c'est là qu'on travaille. Refuser sur la foi d'une
+étiquette n'aide personne ; y aller en silence serait pire — d'où la règle : **cible étiquetée `prod` ⇒
+avertissement visible + entrée `sdlc journal`**, autorisée ou non.
+
 ## 0. Outils NORMALISÉS — appelle ces scripts, n'improvise PAS de `curl`/`python -c`/`/tmp`
 Le skill embarque des scripts (`scripts/` à côté de ce SKILL.md). **Utilise-les** : surface fermée,
 allowlistable (`Bash(python3 …/deploy-jenkins/scripts/*.py:*)`), auth `curl -s -n` **interne** (jamais de
@@ -182,7 +245,7 @@ coordination elles s'écrasent (vécu : une session ENROL a écrasé un deploy `
 
 Avant tout déploiement sur un env partagé, **l'orchestrateur** (pas le sous-agent) pose un verrou
 **auto-cicatrisant** :
-`bash claude/scripts/env_lock.sh <action> <env-repo> <owner>` (env-repo ex. `prod-integration--back-tenant`,
+`bash claude/scripts/env_lock.sh <action> <env-repo> <owner>` (env-repo ex. `prod-integration--<repo>`,
 owner = ta story/session).
 - **`acquire`** avant de spawner un deployer : `0` ACQUIRED (libre ou re-entrant) · `3` BUSY (tenu & frais →
   **attends**, l'owner est affiché) · `4` STALE (tenu mais heartbeat > `ttl`, défaut 900 s → récupérable).

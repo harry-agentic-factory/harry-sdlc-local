@@ -1,13 +1,13 @@
 ---
 name: easy-ms-validator
-description: Pattern de validation fluide EasyMS (`com.easyms.rest.ms.rest.Validator`) utilisé dans les microservices Java/Spring Harington (back-hia, back-tenant…). Explique l'API (of/validate/validateIf/execute + extraction Function + validation CONDITIONNELLE doNothing/ifMatch), la sémantique exacte (assert-vrai vs throw-si-vrai), comment écrire une validation ADAPTÉE À UN MODE, et l'intégration avec le RestExceptionHandler EasyMS. À charger dès qu'on écrit/relit une validation d'entrée dans un `*Resource`/`*Service` d'un repo qui utilise EasyMS.
+description: Pattern de validation fluide EasyMS (`com.easyms.rest.ms.rest.Validator`) utilisé dans les microservices Java/Spring bâtis sur le socle EasyMS. Explique l'API (of/validate/validateIf/execute + extraction Function + validation CONDITIONNELLE doNothing/ifMatch), la sémantique exacte (assert-vrai vs throw-si-vrai), comment écrire une validation ADAPTÉE À UN MODE, et l'intégration avec le RestExceptionHandler EasyMS. À charger dès qu'on écrit/relit une validation d'entrée dans un `*Resource`/`*Service` d'un repo qui utilise EasyMS.
 ---
 
 # Pattern de validation EasyMS — `Validator`
 
 `com.easyms.rest.ms.rest.Validator<T>` (jar `easyms-rest-starter`) = builder fluide de validation. On enchaîne
-des assertions sur un objet, puis `execute()` **lève** si au moins une a échoué. Utilisé partout dans les
-`ValidationService` HIA (back-hia, back-tenant). **Réutilise-le, n'invente pas un mécanisme parallèle.**
+des assertions sur un objet, puis `execute()` **lève** si au moins une a échoué. C'est le mécanisme de validation
+d'entrée du socle : **réutilise-le, n'invente pas un mécanisme parallèle** dans un `ValidationService` maison.
 
 ## API (décodée du bytecode)
 ```
@@ -28,7 +28,7 @@ Validator.throwException(Throwable)                                // utilitaire
 ## Sémantique — LE point à ne pas confondre
 - **`validate(p, ex)`** = « **p DOIT être vrai** ». Si `p(obj)==false` → exception. (ex. `validate(Optional::isPresent, …)`.)
 - **`validateIf(p, ex)`** = « **si p est vrai, c'est une erreur** ». Si `p(obj)==true` → exception. (ex. `validateIf(CollectionUtils::isEmpty, …)` = interdit vide.)
-- **`execute()`** lève (dans HIA, une `IllegalStateException` qui *porte les exceptions collectées en suppressed*).
+- **`execute()`** lève — typiquement une `IllegalStateException` qui *porte les exceptions collectées en suppressed*.
   Le **RestExceptionHandler EasyMS** mappe ensuite l'exception métier (ex. `UnprocessedEntityException` → HTTP
   422/400, `ResourceAccessException` → 404) vers le format `ApiError`. **Ne construis pas de `ResponseEntity`
   d'erreur à la main.** Sans `execute()`, **rien n'est levé** (piège classique : oublier `.execute()`).
@@ -38,10 +38,10 @@ Passe soit une **`String`** (clé d'erreur i18n, ex. `HiaMessage.hia_convention_
 soit un **`Supplier<X>`** d'exception métier (`() -> new UnprocessedEntityException("…")`,
 `() -> new ResourceAccessException(HiaMessage.x.getErrorKey())`). Préfère la **clé i18n** quand elle existe.
 
-## Validation ADAPTÉE À UN MODE (le cas HIA-ENROL)
+## Validation ADAPTÉE À UN MODE
 Quand la contrainte dépend d'un « mode » (champ optionnel présent/absent, type de requête…), deux voies :
 1. **Branche explicite** (la plus lisible) : `if (mode == DEFAULT) return;` puis `Validator.of(...).validateIf(...).execute()`
-   pour le mode explicite. C'est ce qu'on a fait pour l'enrôlement :
+   pour le mode explicite. Exemple, sur une requête qui accepte un mode implicite et un mode explicite :
    ```java
    public void validateEnrollmentFamilySelection(ConventionFamilySelection sel) {
        if (sel == null) return;                       // mode DEFAULT : famille résolue serveur, aucune contrainte d'entrée
@@ -56,8 +56,8 @@ Quand la contrainte dépend d'un « mode » (champ optionnel présent/absent, ty
    explicite sauf chaîne longue.
 
 > ⚠️ **Ne valide pas trop tôt** : une validation d'entrée qui exige un champ que le **defaulting serveur**
-> remplira plus tard **court-circuite** le defaulting (bug vécu HIA-ENROL-1 : `validateListConventionFamilys`
-> au contrôleur exigeait la famille en dur → le defaulting par settings ne s'appliquait jamais). **Valide selon
+> remplira plus tard **court-circuite** le defaulting. *Cas vécu* : une validation au contrôleur exigeait en dur
+> une valeur de liste que le serveur savait déduire des settings → le defaulting ne s'appliquait jamais. **Valide selon
 > le mode**, et laisse le **garde-fou aval** (sur la valeur RÉSOLUE) rejeter le cas vraiment invalide.
 
 ## Où valider quoi

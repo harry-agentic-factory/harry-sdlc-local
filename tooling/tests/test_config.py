@@ -133,3 +133,56 @@ def test_infer_project_from_cwd(tmp_path, monkeypatch):
     assert infer_project_workspace(tmp_path / "ailleurs") is None       # hors périmètre
     # resolve_workspace sans --project ni env : déduit par le CWD
     assert str(resolve_workspace(start=repos / "app")) == str(data)
+
+
+# --- résolution d'un environnement LOGIQUE en cible CONCRÈTE ---
+
+def _cfg(deploy):
+    return {"deploy": deploy}
+
+
+def test_deploy_target_flat_block_serves_both_logical_envs():
+    """Forme historique (un seul bloc plat) : dev et integration pointent la même cible."""
+    from sdlc.config import resolve_deploy_target
+    cfg = _cfg({"r": {"skill": "deploy-jenkins", "ci": "x/ci"}})
+    for env in ("dev", "integration"):
+        t = resolve_deploy_target(cfg, "r", env)
+        assert t["ci"] == "x/ci" and t["env"] == env
+
+
+def test_deploy_target_defaults_are_restrictive():
+    """Silence = prod + pas d'auto-deploy : mieux vaut une gate de trop."""
+    from sdlc.config import resolve_deploy_target
+    t = resolve_deploy_target(_cfg({"r": {"ci": "x"}}), "r", "dev")
+    assert t["label"] == "prod" and t["autoDeploy"] is False
+
+
+def test_deploy_target_alias_points_at_the_same_env():
+    """`"integration": "dev"` = un seul environnement pour les deux phases."""
+    from sdlc.config import resolve_deploy_target
+    cfg = _cfg({"r": {"environments": {"dev": {"ci": "d/ci", "autoDeploy": True}, "integration": "dev"}}})
+    a, b = (resolve_deploy_target(cfg, "r", e) for e in ("dev", "integration"))
+    assert a["ci"] == b["ci"] == "d/ci" and b["env"] == "integration"
+
+
+def test_deploy_target_env_overrides_repo_level_including_the_skill():
+    """Le skill se choisit PAR ENVIRONNEMENT : déployer en dev et en intégration n'est pas
+    forcément le même mécanisme (autres jobs, ou même job avec un paramètre de cible)."""
+    from sdlc.config import resolve_deploy_target
+    cfg = _cfg({"r": {"skill": "deploy-jenkins", "image": "img",
+                      "environments": {"dev": {"skill": "deploy-jenkins-param", "target": "DEV"},
+                                       "integration": {"ci": "int/ci"}}}})
+    d = resolve_deploy_target(cfg, "r", "dev")
+    i = resolve_deploy_target(cfg, "r", "integration")
+    assert d["skill"] == "deploy-jenkins-param" and d["target"] == "DEV"
+    assert i["skill"] == "deploy-jenkins"          # hérité du niveau repo
+    assert d["image"] == i["image"] == "img"       # le commun reste hérité
+
+
+def test_deploy_target_rejects_unknown_and_missing():
+    from sdlc.config import resolve_deploy_target
+    import pytest as _p
+    with _p.raises(ValueError):
+        resolve_deploy_target(_cfg({"r": {}}), "r", "staging")
+    with _p.raises(KeyError):
+        resolve_deploy_target(_cfg({}), "absent", "dev")

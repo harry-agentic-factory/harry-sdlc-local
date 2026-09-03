@@ -12,6 +12,7 @@ from enum import Enum
 class Status(str, Enum):
     DRAFT = "draft"            # créé par /refine
     SPEC_FUNC = "spec_func"    # /spec-func (skippable)
+    SPEC_FUNC_VALIDATED = "spec_func_validated"  # gate FONCTIONNELLE : PRD + spec-func validés (épic ou story)
     SPEC_TECH = "spec_tech"    # /spec-tech
     SPEC_VALIDATED = "spec_validated"  # gate: specs validées par harry-archi (+ escalade humaine) AVANT implem
     IMPLEMENTED = "implemented"  # /implement
@@ -23,7 +24,8 @@ class Status(str, Enum):
 
 
 PIPELINE: list[Status] = [
-    Status.DRAFT, Status.SPEC_FUNC, Status.SPEC_TECH, Status.SPEC_VALIDATED, Status.IMPLEMENTED,
+    Status.DRAFT, Status.SPEC_FUNC, Status.SPEC_FUNC_VALIDATED, Status.SPEC_TECH,
+    Status.SPEC_VALIDATED, Status.IMPLEMENTED,
     Status.REVIEWED, Status.DEPLOYED, Status.RECETTE_OK, Status.ACCEPTED, Status.DONE,
 ]
 
@@ -35,6 +37,11 @@ def _build_allowed() -> dict[Status, set[Status]]:
     allowed[Status.DONE] = set()
     # spec-func skippable (feature triviale) : DRAFT peut aller direct en SPEC_TECH
     allowed[Status.DRAFT].add(Status.SPEC_TECH)
+    # gate FONCTIONNELLE skippable : SPEC_FUNC -> SPEC_TECH direct. Elle vaut surtout au niveau ÉPIC
+    # (valider le PRD + tous les spec-func d'un coup, AVANT d'écrire le technique par-dessus) ; sur une
+    # story isolée elle est souvent du cérémonial. Comme la gate technique, la version « dure » est portée
+    # par l'ORCHESTRATION (`validate-func`), la state-machine tolère le saut.
+    allowed[Status.SPEC_FUNC].add(Status.SPEC_TECH)
     # gate spec_validated SKIPPABLE (backward-compat + features triviales) : SPEC_TECH -> IMPLEMENTED direct.
     # La gate "dure" (review harry-archi + escalade) est portée par l'ORCHESTRATION (`validate-spec` passe par
     # SPEC_VALIDATED) ; la state-machine tolère le skip pour ne pas casser les flux existants.

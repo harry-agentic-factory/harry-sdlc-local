@@ -47,3 +47,22 @@ def test_spec_validated_gate_is_skippable():
 def test_spec_validated_cannot_skip_from_spec_func():
     with pytest.raises(InvalidTransition):
         validate_transition(Status.SPEC_FUNC, Status.SPEC_VALIDATED)
+
+
+def test_functional_gate():
+    # gate fonctionnelle : spec_func -> spec_func_validated -> spec_tech
+    assert validate_transition(Status.SPEC_FUNC, Status.SPEC_FUNC_VALIDATED) == Status.SPEC_FUNC_VALIDATED
+    assert validate_transition(Status.SPEC_FUNC_VALIDATED, Status.SPEC_TECH) == Status.SPEC_TECH
+
+
+def test_functional_gate_is_skippable():
+    # elle vaut surtout au niveau épic ; sur une story isolée le saut reste toléré
+    assert validate_transition(Status.SPEC_FUNC, Status.SPEC_TECH) == Status.SPEC_TECH
+
+
+def test_functional_gate_does_not_reach_the_technical_one():
+    # les deux gates restent distinctes : on ne saute pas de l'une à l'autre
+    with pytest.raises(InvalidTransition):
+        validate_transition(Status.SPEC_FUNC_VALIDATED, Status.SPEC_VALIDATED)
+    with pytest.raises(InvalidTransition):
+        validate_transition(Status.SPEC_FUNC_VALIDATED, Status.IMPLEMENTED)

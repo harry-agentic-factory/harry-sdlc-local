@@ -2,8 +2,8 @@
 # pf_curl.sh — port-forward BORNÉ + curl + kill. Ne bloque JAMAIS (le port-forward est
 # une commande bloquante par nature → ici il est backgroundé, sondé, puis tué).
 # Usage : pf_curl.sh <ns> <deploy> <containerPort> <path> [curl_opts...]
-#   ex : pf_curl.sh hia-tenant hia-back-tenant-ht 8088 /actuator/health
-#   ex : pf_curl.sh hia-tenant hia-back-tenant-ht 8088 /api/v1/enrollment-settings -H "Authorization: Bearer $TOK"
+#   ex : pf_curl.sh <ns> <deploy> <containerPort> /actuator/health
+#   ex : pf_curl.sh <ns> <deploy> <containerPort> /api/v1/<resource> -H "Authorization: Bearer $TOK"
 # Sortie : le corps de la réponse + une dernière ligne `__HTTP__<code>`. Toujours nettoyé.
 set -uo pipefail
 NS="${1:?ns}"; DEP="${2:?deploy}"; PORT="${3:?containerPort}"; PATHQ="${4:?path}"; shift 4
