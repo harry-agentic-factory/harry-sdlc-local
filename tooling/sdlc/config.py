@@ -120,6 +120,12 @@ def load_config(workspace: str | Path) -> dict:
     cfg.setdefault("refBranch", "main")
     cfg.setdefault("deploy", {})
     cfg.setdefault("recette", {})
+    # Accès d'INVESTIGATION (agent `investigator`) : ce qui existe et où — cluster, base, identité,
+    # CI, mail, UI, bac à sable. Chaque entrée nomme le skill qui porte son mode d'emploi, de sorte
+    # que l'agent reste agnostique du projet et ne charge que les accès dont son enquête a besoin.
+    # Un accès ABSENT de ce bloc n'existe pas pour l'agent : il ne le cherche pas, il le déclare
+    # manquant. Le bloc `sandbox` borne sa SEULE capacité d'écriture (reproduction).
+    cfg.setdefault("infra", {})
     # type/stack technique par repo : { "<repo>": "java-spring" | "java" | "node" | "python" | ... }.
     #   Explicite côté projet ; à défaut, le CLI l'auto-détecte (pom+spring-boot -> java-spring, package.json
     #   -> node, pyproject/requirements -> python, …). C'est LE critère de matching des skills.
@@ -294,5 +300,6 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "permissions": cfg.get("permissions", {}),
         "escalation": cfg["escalation"],
         "board": cfg["board"],
+        "infra": cfg["infra"],
         "schemaVersion": cfg.get("schemaVersion", "0.1.0"),
     }
