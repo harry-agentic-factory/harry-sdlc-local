@@ -126,6 +126,9 @@ def load_config(workspace: str | Path) -> dict:
     # Un accès ABSENT de ce bloc n'existe pas pour l'agent : il ne le cherche pas, il le déclare
     # manquant. Le bloc `sandbox` borne sa SEULE capacité d'écriture (reproduction).
     cfg.setdefault("infra", {})
+    # Source des signalements (Trello, Planner…) : d'où viennent les bugs et comment les relire.
+    # Lu par `/investigate` et par l'ingestion, pour qu'aucune commande ne code un board en dur.
+    cfg.setdefault("tracker", {})
     # type/stack technique par repo : { "<repo>": "java-spring" | "java" | "node" | "python" | ... }.
     #   Explicite côté projet ; à défaut, le CLI l'auto-détecte (pom+spring-boot -> java-spring, package.json
     #   -> node, pyproject/requirements -> python, …). C'est LE critère de matching des skills.
@@ -301,5 +304,6 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "escalation": cfg["escalation"],
         "board": cfg["board"],
         "infra": cfg["infra"],
+        "tracker": cfg["tracker"],
         "schemaVersion": cfg.get("schemaVersion", "0.1.0"),
     }
