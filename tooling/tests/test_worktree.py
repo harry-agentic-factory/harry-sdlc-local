@@ -134,3 +134,56 @@ def test_cli_worktree(tmp_path, capsys, monkeypatch):
     out = json.loads(capsys.readouterr().out)
     assert rc == 0 and out["branch"] == "feat/X-1"
     assert Path(out["worktrees"]["app-repo"]["path"]).is_dir()
+
+
+# --- une story part TOUJOURS de la branche de référence, jamais du HEAD courant ---
+
+def test_fetch_base_prefers_the_remote_ref(tmp_path):
+    """`origin/<ref>` gagne sur la copie locale : c'est elle qui fait autorité."""
+    origin = _init_repo(tmp_path / "origin")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+    assert wt.fetch_base(clone, "main") == "origin/main"
+
+
+def test_fetch_base_falls_back_when_there_is_no_remote(tmp_path):
+    repo = _init_repo(tmp_path / "solo")
+    assert wt.fetch_base(repo, "main") == "main"
+    # ref inconnue : ni distante ni locale
+    assert wt.fetch_base(repo, "nope") == "HEAD"
+
+
+def test_worktree_starts_from_ref_branch_not_from_current_head(tmp_path, monkeypatch):
+    """Le bug historique : le repo est sur une branche de travail qui ne contient PAS main,
+    et la story en héritait en silence."""
+    origin = _init_repo(tmp_path / "origin")
+    clone = tmp_path / "repo"
+    subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+
+    # une branche de travail divergente, depuis laquelle main n'est plus atteignable
+    _git(clone, "checkout", "-q", "--orphan", "feat/elsewhere")
+    (clone / "other.txt").write_text("y")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-q", "-m", "orphan")
+    assert not wt.is_based_on(clone, "feat/elsewhere", "origin/main")
+
+    base = wt.fetch_base(clone, "main")
+    res = wt.ensure_worktree(clone, "fix/story-1", base=base)
+
+    assert res["created_branch"] is True
+    assert wt.is_based_on(clone, "fix/story-1", "origin/main"), "la story doit descendre de origin/main"
+
+
+def test_worktree_reports_a_branch_cut_from_a_stale_base(tmp_path):
+    """Une branche préexistante est réutilisée telle quelle : le défaut doit être VISIBLE,
+    pas corrigé en douce."""
+    origin = _init_repo(tmp_path / "origin")
+    clone = tmp_path / "repo"
+    subprocess.run(["git", "clone", "-q", str(origin), str(clone)], check=True)
+    _git(clone, "checkout", "-q", "--orphan", "fix/stale")
+    (clone / "z.txt").write_text("z")
+    _git(clone, "add", "-A")
+    _git(clone, "commit", "-q", "-m", "stale")
+    _git(clone, "checkout", "-q", "main")
+
+    assert wt.is_based_on(clone, "fix/stale", "origin/main") is False
