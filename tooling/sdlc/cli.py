@@ -333,13 +333,24 @@ def run(argv: list[str] | None = None) -> dict:
         if not branch:
             raise ValueError(f"aucune branche pour {args.story} (ticket.branch vide, passe --branch)")
         man = resolved_manifest(args.project)
+        ref = man.get("refBranch") or "main"
         names = ([args.repo] if args.repo else t.get("repos")) or []
         out: dict[str, dict] = {}
         for name in names:
             p = man["repos"].get(name)
-            out[name] = ({"error": "repo non résolu dans le manifest (reposRoot/repos ?)"}
-                         if not p else wt.ensure_worktree(p, branch, base=args.base))
-        return {"story": args.story, "branch": branch, "worktrees": out}
+            if not p:
+                out[name] = {"error": "repo non résolu dans le manifest (reposRoot/repos ?)"}
+                continue
+            # A story ALWAYS starts from the project's reference branch, fetched. Falling back to the
+            # repo's current HEAD used to base stories on whatever branch happened to be checked out.
+            base = args.base or wt.fetch_base(p, ref)
+            res = wt.ensure_worktree(p, branch, base=base)
+            res["base"] = base
+            # Surfaced, never silently corrected: an existing branch is reused as-is, so a branch cut
+            # from a stale base stays stale — the caller has to see it.
+            res["basedOnRef"] = wt.is_based_on(p, branch, base)
+            out[name] = res
+        return {"story": args.story, "branch": branch, "refBranch": ref, "worktrees": out}
     raise SystemExit(2)
 
 

@@ -103,6 +103,31 @@ def ensure_worktree(repo: str | Path, branch: str, base: str | None = None) -> d
     return {"path": str(path), "reused": False, "created_branch": created_branch}
 
 
+def fetch_base(repo: str | Path, ref: str) -> str:
+    """Fetches `ref` from origin and returns the revision a new branch must start from.
+
+    Returns `origin/<ref>` when it resolves after the fetch, `<ref>` when only a local branch of that
+    name exists, and `HEAD` as a last resort (repo with no origin, offline, unknown ref).
+
+    A story must ALWAYS start from the project's reference branch. Defaulting to `HEAD` silently
+    based a story on whatever branch the repo happened to be checked out on — a real incident: a
+    worktree created while the repo sat on a feature branch produced a story built on a base that
+    did not even contain `main`, and nothing said so.
+    """
+    _git(repo, "fetch", "--quiet", "origin", ref)
+    remote = f"origin/{ref}"
+    if _git_ok(repo, "rev-parse", "--verify", "--quiet", remote):
+        return remote
+    if _git_ok(repo, "rev-parse", "--verify", "--quiet", ref):
+        return ref
+    return "HEAD"
+
+
+def is_based_on(repo: str | Path, branch: str, base: str) -> bool:
+    """True when `base` is an ancestor of `branch` — i.e. the branch really starts from it."""
+    return _git_ok(repo, "merge-base", "--is-ancestor", base, branch)
+
+
 def is_merged(repo: str | Path, branch: str, ref: str) -> bool:
     """`branch` est-elle intégrée dans `ref` ? (ses commits sont ancêtres de `ref`)."""
     return _git_ok(repo, "merge-base", "--is-ancestor", branch, ref)
