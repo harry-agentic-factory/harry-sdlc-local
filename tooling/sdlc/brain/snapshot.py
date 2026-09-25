@@ -64,6 +64,13 @@ def snapshot(repo: str | Path, ref: str | None, out: str | Path, *, excludes: It
     _check_out(out)
     ns = collect(brain, rr.commit, excludes=excludes, map_path=map_path)
     contents = read_blobs(brain, ns.notes)
+    root = out.absolute()
+    for path in contents:
+        # Defence in depth: git already rejects such tree entries, but a snapshot must never
+        # write outside `out`, whatever repository it is pointed at.
+        parts = path.split("/")
+        if path.startswith("/") or ".." in parts or not (root / path).absolute().is_relative_to(root):
+            raise BrainError("git_failed", f"unsafe note path in tree: {path!r}")
     manifest = _manifest(brain, rr, ns, contents)
     links = links_for(contents, brain.repo_names)
     out.mkdir(parents=True, exist_ok=True)

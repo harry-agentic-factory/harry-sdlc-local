@@ -911,3 +911,22 @@ def test_brain_not_found_and_not_git(capsys, tmp_path):
     plain.mkdir()
     rc, _, err = run(capsys, "brain", "lint", "--repo", plain)
     assert rc == 2 and json.loads(err)["code"] == "brain_not_git"
+
+
+@pytest.mark.parametrize("name", ["nope.md", "has space.md", "two spaces here.md"])
+def test_read_notes_missing_path_with_spaces_is_note_not_found(fx, name):
+    import sdlc.brain as b
+    with pytest.raises(b.BrainError) as ei:
+        b.read_notes(fx.path, fx.c2, [name])
+    assert ei.value.code == "note_not_found"
+
+
+def test_snapshot_refuses_path_outside_out(fx, tmp_path, monkeypatch):
+    import importlib
+    snap = importlib.import_module("sdlc.brain.snapshot")
+    monkeypatch.setattr(snap, "read_blobs", lambda brain, notes: {"../escape.md": b"x"})
+    out = tmp_path / "snap"
+    with pytest.raises(snap.BrainError) as ei:
+        snap.snapshot(fx.path, "main", out)
+    assert ei.value.code == "git_failed"
+    assert not (tmp_path / "escape.md").exists() and not out.exists()

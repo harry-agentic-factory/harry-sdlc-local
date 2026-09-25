@@ -185,7 +185,9 @@ def cat_file(top: str, names: Iterable[str]) -> list[bytes | None]:
     for _ in names:
         nl = out.index(b"\n", pos)
         header = out[pos:nl].split(b" ")
-        if len(header) != 3:              # "<name> missing" / "<name> ambiguous"
+        # "<name> missing" / "<name> ambiguous": the name may itself contain spaces, so a
+        # 3-field header is a blob header only when its last field is a size.
+        if len(header) != 3 or not header[2].isdigit():
             res.append(None)
             pos = nl + 1
             continue
