@@ -10,7 +10,7 @@ qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de d
 ```bash
 git clone <repo-url> harry-sdlc-local && cd harry-sdlc-local
 make install     # symlinke l'engine dans ~/.claude + crée la commande globale `sdlc`
-make test        # 113 tests (déterministe, offline)
+make test        # 216 tests (déterministe, offline)
 
 # 1 projet = 1 repo data
 sdlc init-project SAMPLE --path ../sample-proj-sdlc-local --repos app-repo,web-repo
@@ -159,9 +159,9 @@ claude/
   skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)
   sdlc/        harry.md (persona)
 tooling/
-  sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/
+  sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/, brain/
   cockpit/     board + Inbox HITL (FastAPI + page)
-  tests/       113 tests (déterministe, offline)
+  tests/       216 tests (déterministe, offline)
 docs/PRD.md
 ```
 
@@ -225,11 +225,32 @@ Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-
   "repos": { "app-repo": null, "ops-repo": "/opt/ops" },  // name→path (null ⇒ via reposRoot)
   "roles": { "app-repo": "code", "ops-repo": "gitops" },
   "brain": "sample-brain",                 // pointeur connaissance (résolu abs)
+  "brainRef": "main",                      // optionnel : branche, tag ou sha lu dans le Brain (défaut main puis master)
   "refBranch": "main",                     // cible de merge ⇒ cleanup worktree
   "deploy": { "app-repo": { "skill": "deploy-jenkins", "ci": "prod/app/ci", "gitops": "ops@prod" } },
   "escalation": { … }, "schemaVersion": "0.2.0" }
 ```
 `sdlc config` renvoie la vue **résolue** (chemins absolus) ; `sdlc config --raw` renvoie le fichier brut.
+`sdlc config` ajoute `brainRef` (la ref retenue), `brainCommit` (sha résolu, **sans fetch**) et `brainRefFrom`
+(`origin` | `local` | `tag` | `sha`) ; ref introuvable ou Brain hors git ⇒ `null` + un avertissement JSON sur stderr.
+
+### Brain (`sdlc brain`) — le dépôt de connaissance lu à un commit
+Le Brain est un dépôt git (ou un sous-dossier d'un dépôt) ; git est sa seule vérité. Une **note** = un `*.md` suivi
+au commit lu, hors `.claude/` et `hooks/` ; seul en-tête exigé : `category` (`produit`, `usage`, `archi`, `repo`,
+`config`, `cicd`, `exploit`, `observ`). Rien n'est lu dans la copie de travail. Référence : [`docs/brain.md`](docs/brain.md).
+```bash
+sdlc brain normalize --repo <brain> [--map brain-map.yaml] [--base main] [--branch b] [--dry-run] [--report r.md]
+sdlc brain lint      --repo <brain> [--ref HEAD] [--strict] [--format json|text]   # CI : exit 1 = bloquant
+sdlc brain snapshot  --repo <brain> --ref <ref> --out <dir>    # notes exactes + manifest.json + links.json
+sdlc brain diff      --repo <brain> <refA> <refB>  |  --manifests a.json b.json
+sdlc brain history   --repo <brain> <note> [--ref HEAD]
+```
+- `normalize` déduit `category` du chemin (règles de `brain-map.yaml` du Brain **puis** celles du moteur) et commite
+  sur une **branche neuve** (jamais `main`/`master`/branche par défaut, jamais de push) ; le corps des notes est
+  intact octet pour octet ; la copie de travail, l'index et la branche courante ne sont jamais touchés.
+- Codes de sortie : **0** succès (lint avec seuls avertissements compris) ; **1** lint en erreur (ou avertissements
+  avec `--strict`) ; **2** usage/refus/ref inconnue/dépôt absent ou hors git (stderr `{"error", "code"}`).
+- Bibliothèque Python `sdlc.brain` (stdlib seule) : même algorithme pour la CLI et les appelants.
 
 **Identité (`credentials.source`)** : `host` (défaut) = creds **ambiantes de l'opérateur** —
 `curl -s -n`/`~/.netrc`, `~/.kube/config`, keyring `gh`/`glab` — **utilisées sans jamais être lues ni

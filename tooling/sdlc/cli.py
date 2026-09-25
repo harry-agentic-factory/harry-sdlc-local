@@ -209,7 +209,14 @@ def run(argv: list[str] | None = None) -> dict:
     a = pmsub.add_parser("to-brain", help="marque l'item pour le Brain + suggère l'entrée de propale")
     a.add_argument("id", help="ID item (PM-…)")
 
+    # --- brain: read a git knowledge repo at a commit (sdlc.brain library) ---
+    from .brain import cli as brain_cli
+    brain_cli.add_parser(sub)
+
     args = p.parse_args(_autocorrect(argv, list(sub.choices)))
+
+    if args.cmd == "brain":
+        return brain_cli.dispatch(args)
 
     if args.cmd == "migrate":
         from .migrations import apply_migrations
@@ -231,7 +238,7 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "config":
         if args.raw:
             return load_config(resolve_workspace(args.project))
-        return resolved_manifest(args.project)
+        return resolved_manifest(args.project, with_brain_ref=True)
     if args.cmd == "skills":
         man = resolved_manifest(args.project)
         stacks = man.get("stacks", {})
@@ -348,9 +355,18 @@ def run(argv: list[str] | None = None) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from .brain import BrainError
+    from .brain.cli import CommandResult
     try:
-        print(json.dumps(run(argv), indent=2, ensure_ascii=False))
+        res = run(argv)
+        if isinstance(res, CommandResult):
+            print(res.text if res.text is not None else json.dumps(res.payload, indent=2, ensure_ascii=False))
+            return res.exit_code
+        print(json.dumps(res, indent=2, ensure_ascii=False))
         return 0
+    except BrainError as e:  # brain library error: stable code, exit 2
+        print(json.dumps({"error": e.message, "code": e.code}, ensure_ascii=False), file=sys.stderr)
+        return 2
     except Exception as e:  # noqa: BLE001 — CLI: message propre
         print(json.dumps({"error": str(e)}, ensure_ascii=False), file=sys.stderr)
         return 1
