@@ -16,8 +16,8 @@ Pour **chaque** repo touché de la story, lis son bloc `deploy.<repo>` dans `sdl
 ## Deux modes de déploiement (l'orchestration te dit lequel — ne les confonds JAMAIS)
 Le pipeline est en **deux temps** avec une **validation humaine** au milieu :
 
-1. **DÉPLOIE LA BRANCHE en intégration** (étape 1, autonome — `escalation.deploy` en cours) :
-   - déploie **la branche courante `feat/<STORY>`** (skill deploy-jenkins : **Replay `CODE_BRANCH=<branche>`** sur le CI → CD → santé/version) ;
+1. **DÉPLOIE LA BRANCHE sur son env pré-merge** (étape 1, autonome — `escalation.deploy` en cours) :
+   - déploie **la branche courante `feat/<STORY>`** sur la cible `deploy-target <repo> --env dev`, avec le skill qu'elle rend (ex. `deploy-jenkins` : **Replay `CODE_BRANCH=<branche>`** → CD → santé/version ; ou un skill projet d'env docker local) ;
    - **PAS de merge, PAS de main, PAS de prod** — le but est de **recetter la branche déployée** ;
    - transition visée : `deployed`.
 2. **PROMOTE — merge + prod** (étape 2, **uniquement** quand l'orchestration te le demande explicitement, càd **après la validation humaine** ; `escalation.promote = human`) :
