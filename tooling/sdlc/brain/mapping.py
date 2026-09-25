@@ -11,7 +11,7 @@ character other than `/`; `[` and `{` are literal (no classes, no braces).
       - per-repo/**: repo
     exclude:
       - drafts/
-      - "**/tmp-*.md"
+      - "**/scratch-*.md"
 
 Anything else is rejected with `mapping_unsupported`; an unknown category with
 `mapping_invalid_category`.
