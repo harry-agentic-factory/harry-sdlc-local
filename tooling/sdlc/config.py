@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 DEFAULT_ESCALATION = {
@@ -266,8 +267,32 @@ def resolve_deploy_target(cfg: dict, repo: str, env: str) -> dict:
     return target
 
 
-def resolved_manifest(project: str | None = None, workspace: str | Path | None = None) -> dict:
-    """Vue **résolue** du manifest (chemins absolus) — la sortie de `sdlc config`, lue par les agents."""
+def _brain_ref_keys(brain: str | None, raw_ref: str | None) -> dict:
+    """`brainRef` / `brainCommit` / `brainRefFrom` of the manifest (resolved without any fetch).
+
+    Unresolvable ref or brain outside git: raw `brainRef`, null commit/source, and ONE JSON warning
+    line on stderr (never a key of the stdout JSON).
+    """
+    if not brain:
+        return {"brainRef": None, "brainCommit": None, "brainRefFrom": None}
+    from .brain import BrainError, BrainRefUnresolved, resolve_brain_ref
+    try:
+        rr = resolve_brain_ref(brain, raw_ref)
+    except BrainError as e:
+        code = "brain_ref_unresolved" if isinstance(e, BrainRefUnresolved) else "brain_not_git"
+        print(json.dumps({"warning": code, "message": e.message}, ensure_ascii=False), file=sys.stderr)
+        return {"brainRef": raw_ref, "brainCommit": None, "brainRefFrom": None}
+    return {"brainRef": rr.ref, "brainCommit": rr.commit, "brainRefFrom": rr.source}
+
+
+def resolved_manifest(project: str | None = None, workspace: str | Path | None = None, *,
+                      with_brain_ref: bool = False) -> dict:
+    """Vue **résolue** du manifest (chemins absolus) — la sortie de `sdlc config`, lue par les agents.
+
+    `with_brain_ref=True` (only `sdlc config`) adds `brainRef` (optional manifest key: branch, tag or
+    sha; default main then master), `brainCommit` and `brainRefFrom` (origin|local|tag|sha).
+    Default: unchanged keys, no git call.
+    """
     ws = Path(workspace) if workspace else resolve_workspace(project)
     cfg = load_config(ws)
     repos = resolve_repos(cfg)
@@ -277,7 +302,7 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
     skills_by_repo = {
         name: list(guidelines.get(st, [])) for name, st in stacks.items() if st and guidelines.get(st)
     }
-    return {
+    out = {
         "prefix": cfg.get("prefix"),
         "workspace": str(ws),
         "reposRoot": _expand(cfg["reposRoot"]) if cfg.get("reposRoot") else None,
@@ -296,3 +321,6 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "board": cfg["board"],
         "schemaVersion": cfg.get("schemaVersion", "0.1.0"),
     }
+    if with_brain_ref:
+        out.update(_brain_ref_keys(out["brain"], cfg.get("brainRef")))
+    return out
