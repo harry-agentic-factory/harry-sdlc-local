@@ -42,8 +42,8 @@ LATEST_SCHEMA = MIGRATIONS[-1][1] if MIGRATIONS else "0.1.0"
 
 
 def engine_version() -> str:
-    v = Path(__file__).resolve().parents[3] / "VERSION"   # tooling/sdlc/migrations -> racine engine
-    return v.read_text().strip() if v.exists() else "0.1.0"
+    from ..version import engine_version as _engine_version
+    return _engine_version()
 
 
 def _config_path(workspace: str | Path) -> Path:

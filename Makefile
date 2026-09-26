@@ -1,14 +1,20 @@
 VERSION := $(shell cat VERSION)
 
-.PHONY: install test migrate version
-install:  ## Symlink l'engine dans ~/.claude
-	@bash install.sh
+.PHONY: install test migrate version dist release-check
+install:  ## Dev mode: this working copy becomes the active engine (install.sh --dev)
+	@bash install.sh --dev $(CURDIR)
 
 test:  ## Tests du cœur déterministe
 	cd tooling && python3 -m pytest
 
 version:
 	@echo harry-sdlc-local $(VERSION)
+
+dist:  ## Build the harry-sdlc wheel and sdist into tooling/dist
+	cd tooling && uv build --out-dir dist
+
+release-check:  ## Local dry run of the release workflow for v$(VERSION)
+	scripts/ci-local.sh --release v$(VERSION)
 
 # Migre la data d'un projet vers la version d'engine courante.
 # Usage : make migrate PROJECT=SAMPLE   (ou WORKSPACE=/chemin/vers/<projet>-sdlc-local)

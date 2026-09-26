@@ -1,9 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
 [project]
-name = "sample-proj-sdlc-local-tooling"
-version = "0.1.0"
-description = "Cœur déterministe du SDLC local Harry (state-machine, DAG, workspace, board port)"
+name = "harry-sdlc"
+dynamic = ["version"]
+description = "Deterministic core of the local agentic SDLC engine: state machine, story DAG, run workspace, brain tooling and the sdlc CLI"
 requires-python = ">=3.11"
 dependencies = []
+license = "MIT"
+
+[project.scripts]
+sdlc = "sdlc.cli:main"
+
+# The version has a single source: the VERSION file at the repository root (see hatch_build.py).
+[tool.hatch.metadata.hooks.custom]
+
+[tool.hatch.build.targets.wheel]
+packages = ["sdlc"]
+exclude = ["**/__pycache__", "**/*.pyc"]
+
+# Wheel only: generates sdlc/_version.py (never written in the source tree).
+[tool.hatch.build.targets.wheel.hooks.custom]
+
+[tool.hatch.build.targets.sdist]
+only-include = ["sdlc", "pyproject.toml", "hatch_build.py"]
+exclude = ["**/__pycache__", "**/*.pyc", "sdlc/_version.py"]
+
+# The sdist carries VERSION so that the wheel built from the unpacked sdist reads it.
+[tool.hatch.build.targets.sdist.force-include]
+"../VERSION" = "VERSION"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

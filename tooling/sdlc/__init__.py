@@ -1,10 +1,10 @@
-"""sample-proj-sdlc-local tooling — cœur déterministe du SDLC local « Harry ».
+"""harry-sdlc — deterministic core of the local agentic SDLC engine.
 
-Board-agnostique : la state-machine des statuts, le DAG des stories et le
-workspace .md sont la source de vérité ; un `Board` (Trello / Planner / cockpit /
-Fake) n'est qu'un miroir enfichable. 100 % stdlib → testable offline.
+Board agnostic: the status state machine, the story DAG and the Markdown workspace
+are the source of truth; a `Board` (Trello / Planner / cockpit / fake) is only a
+pluggable mirror. Runtime is 100 % stdlib, so everything is testable offline.
 
-Cadrage : docs/PRD.md
+Engine version: `sdlc.version.engine_version()` (`sdlc --version` on the command line).
 """
 
 from .status import Status, PIPELINE, ALLOWED, InvalidTransition, validate_transition

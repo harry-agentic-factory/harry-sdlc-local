@@ -20,6 +20,7 @@ from .config import current_project, load_config, resolve_deploy_target, resolve
 from .board import NullBoard
 from .service import Sdlc
 from .workspace import Workspace
+from .version import version_line
 
 
 def _csv(v: str | None) -> list[str]:
@@ -85,6 +86,15 @@ def _autocorrect(argv: list[str] | None, commands: list[str]) -> list[str]:
     return src
 
 
+class _VersionAction(argparse.Action):
+    """`--version`: computes the version line only when the option is given, then exits 0."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        sys.stdout.write(version_line() + "\n")
+        sys.stdout.flush()
+        parser.exit(0)
+
+
 def _sdlc(project: str | None) -> Sdlc:
     ws = resolve_workspace(project)
     return Sdlc(Workspace(ws), NullBoard())
@@ -99,6 +109,8 @@ def run(argv: list[str] | None = None) -> dict:
                "reviewed→deployed→recette_ok→accepted→done).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    p.add_argument("--version", action=_VersionAction, nargs=0,
+                   help="print the engine version and mode, then exit")
     p.add_argument("--project", default=None, help="préfixe projet (ex. SAMPLE) ; sinon workspace résolu par défaut")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="<commande>",
                            title="commandes", help="(voir `sdlc <commande> -h`)")
