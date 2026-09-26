@@ -1,6 +1,6 @@
 ---
 name: deploy-jenkins
-description: Déploie un module de code via un pipeline Jenkins (CI puis CD/gitops), piloté par les paramètres du manifest SDLC (`sdlc config` → `deploy.<repo>`). Couvre trigger normal ou Replay(CODE_BRANCH), crumb CSRF, polling du build, vérif santé et rollback. Générique et project-agnostic : toutes les valeurs projet viennent du manifest, rien n'est en dur. À utiliser dès qu'un agent (deployer) doit déployer une story dont le repo a un bloc `deploy` de type Jenkins.
+description: "Déploie un module de code via un pipeline Jenkins (CI puis CD/gitops), piloté par les paramètres du manifest SDLC (`sdlc config` → `deploy.<repo>`). Couvre trigger normal ou Replay(CODE_BRANCH), crumb CSRF, polling du build, vérif santé et rollback. Générique et project-agnostic : toutes les valeurs projet viennent du manifest, rien n'est en dur. À utiliser dès qu'un agent (deployer) doit déployer une story dont le repo a un bloc `deploy` de type Jenkins."
 ---
 
 # Déployer via Jenkins (paramétré par le manifest)

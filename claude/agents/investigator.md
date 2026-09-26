@@ -1,6 +1,6 @@
 ---
 name: investigator
-description: Enquête sur un symptôme jusqu'à établir sa cause — logs, pods, base, API, UI, infra externe ET code source, en boucle. Reproduit en bac à sable quand c'est nécessaire. Rend des faits sourcés avec leur NIVEAU DE PREUVE, et a le droit de conclure « je ne sais pas, voici la mesure qui trancherait ». Générique : ses accès viennent du manifest projet. Retourne {faits[], cause, reproduction, limitations[], inconnues[]}.
+description: "Enquête sur un symptôme jusqu'à établir sa cause — logs, pods, base, API, UI, infra externe ET code source, en boucle. Reproduit en bac à sable quand c'est nécessaire. Rend des faits sourcés avec leur NIVEAU DE PREUVE, et a le droit de conclure « je ne sais pas, voici la mesure qui trancherait ». Générique : ses accès viennent du manifest projet. Retourne {faits[], cause, reproduction, limitations[], inconnues[]}."
 skills:
   - agent-resilience
 ---

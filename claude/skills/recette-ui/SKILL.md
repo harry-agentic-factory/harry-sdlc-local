@@ -1,6 +1,6 @@
 ---
 name: recette-ui
-description: Recette UI autonome via Playwright MCP — pilote un navigateur pour valider une story FRONT vs les critères d'acceptation. Même modèle que la recette API mais côté UI : l'AUTH (connexion) est l'étape contrôlée (spécifique projet, creds via ENV jamais exposés) ; UNE FOIS CONNECTÉ, navigation LIBRE dans les pages. Normalise la procédure (navigate/snapshot/assert), anti-flaky, acceptance.md newest-first. À utiliser quand `recette.<repo>.tool = ui`.
+description: "Recette UI autonome via Playwright MCP — pilote un navigateur pour valider une story FRONT vs les critères d'acceptation. Même modèle que la recette API mais côté UI : l'AUTH (connexion) est l'étape contrôlée (spécifique projet, creds via ENV jamais exposés) ; UNE FOIS CONNECTÉ, navigation LIBRE dans les pages. Normalise la procédure (navigate/snapshot/assert), anti-flaky, acceptance.md newest-first. À utiliser quand `recette.<repo>.tool = ui`."
 ---
 
 # Recette UI (Playwright MCP) — pendant de la recette API
