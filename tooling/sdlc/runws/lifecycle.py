@@ -48,6 +48,15 @@ def _read_json(path: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+# Fields of run.json that name the run; sealed at init, checked by finish (the workspace run.json is
+# writable by the agent, `seal.json` is the reference).
+IDENTITY_KEYS = ("run_uid", "agent", "phase", "feature", "story", "mission", "ticket")
+
+
+def _identity(run: dict) -> dict:
+    return {k: run.get(k) for k in IDENTITY_KEYS}
+
+
 def _write(path: Path, data: bytes) -> None:
     with open(path, "wb") as f:
         f.write(data)
@@ -135,7 +144,8 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
         _write(partial / "in" / "manifest.json", manifest_bytes)
         _write(partial / "in" / "settings.json", settings_bytes)
         _write(partial / "seal.json", dump_json({"manifest_sha256": sha256(manifest_bytes),
-                                                 "settings_sha256": sha256(settings_bytes)}))
+                                                 "settings_sha256": sha256(settings_bytes),
+                                                 "run": _identity(run)}))
         _write(partial / "run.json", dump_json(run))
         os.rename(partial, final)
     except BaseException:
@@ -175,6 +185,32 @@ def _locate(run, backend) -> tuple[str, Path | None]:
 
 # --- finish ---
 
+def _check_identity(uid: str, current: dict, seal: dict) -> dict:
+    """Sealed identity of the run; `run_invalid` when the workspace run.json no longer matches it."""
+    sealed = seal.get("run")
+    if not isinstance(sealed, dict) or set(sealed) != set(IDENTITY_KEYS):
+        raise RunError("run_invalid", "seal.json: no sealed run identity")
+    if sealed.get("run_uid") != uid:
+        raise RunError("run_invalid", "seal.json: run_uid differs from the workspace")
+    diff = sorted(k for k in IDENTITY_KEYS if current.get(k) != sealed[k])
+    if diff:
+        raise RunError("run_invalid", "run.json differs from seal.json: " + ",".join(diff))
+    validate_agent(sealed["agent"])
+    validate_phase(sealed["phase"], sealed["agent"])
+    for k in ("feature", "story", "mission"):
+        if sealed[k] is not None:
+            validate_scope_id(sealed[k])
+    return sealed
+
+
+def _check_scope(sealed: dict, manifest: dict | None) -> None:
+    """The sealed identity names the scope the sealed manifest was pulled for."""
+    scope = manifest.get("scope") if isinstance(manifest, dict) else None
+    if not isinstance(scope, dict) or manifest.get("run_uid") != sealed["run_uid"] \
+            or any(scope.get(k) != sealed[k] for k in ("feature", "story", "mission")):
+        raise RunError("run_invalid", "run identity differs from the scope of in/manifest.json")
+
+
 def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = None) -> dict:
     """Checks, then publication through the backend, then clean (unless `keep`). All or nothing."""
     outcome = validate_outcome(outcome)
@@ -192,8 +228,9 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
     if current.get("state") not in ("open", "rejected"):
         raise RunError("run_state_invalid", str(current.get("state")))
 
-    manifest = _read_json(root / "in" / "manifest.json")
-    res = controls.check(root, manifest)
+    seal = _read_json(root / "seal.json")
+    sealed = _check_identity(uid, current, seal) if seal is not None else None
+    res = controls.check(root)
     if res.reasons:
         current["state"] = "rejected"
         current["reasons"] = res.reasons
@@ -201,18 +238,19 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
         return {"run_uid": uid, "state": "rejected", "published": [], "warnings": res.warnings,
                 "reasons": res.reasons}
 
+    if sealed is None or res.manifest_data is None:    # unreachable: the checks reject both
+        raise RunError("run_invalid", f"{root}: unsealed workspace")
+    _check_scope(sealed, res.manifest)
+
+    # publication: only the sealed identity and the bytes the checks read (never read again)
     at = iso(utc_now())
     published = []
     for doc_type in res.docs:
-        data = (root / "rw" / "out" / layout.doc_rel(doc_type)).read_bytes()
-        meta = {"category": "artifact", "kind": doc_type, "run_uid": uid, "agent": current.get("agent"),
-                "phase": current.get("phase"), "feature": current.get("feature"),
-                "story": current.get("story"), "mission": current.get("mission"),
-                "ticket": current.get("ticket"), "at": at}
+        meta = {"category": "artifact", "kind": doc_type, **{k: sealed[k] for k in IDENTITY_KEYS}, "at": at}
         key = layout.doc_key(uid, doc_type)
-        put = backend.put(key, data, meta)
+        put = backend.put(key, res.doc_data[doc_type], meta)
         published.append({"type": doc_type, "round": put.get("round"), "path": key})
-    backend.put(layout.run_key(uid, "manifest.json"), (root / "in" / "manifest.json").read_bytes(),
+    backend.put(layout.run_key(uid, "manifest.json"), res.manifest_data,
                 {"category": "run_meta", "run_uid": uid})
     final = dict(current)
     final.update({"state": outcome or "published", "finished_at": at, "reasons": [], "published": published})

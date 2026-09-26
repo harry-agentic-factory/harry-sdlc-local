@@ -6,6 +6,9 @@
 - `rw/out/`: only `docs/<type>.md` (regular file, known type) and the content of `sources/`.
 - size of each document; warnings `no_recap` and `sources_not_published`.
 
+The bytes read by the checks are kept in the result (`manifest_data`, `doc_data`): `finish` publishes
+exactly what was checked and never reads a document a second time.
+
 Only `in/` and `rw/out/` are walked: the agent's other folders are never read.
 """
 from __future__ import annotations
@@ -25,6 +28,9 @@ class CheckResult:
     reasons: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     docs: list[str] = field(default_factory=list)      # types to publish, sorted
+    doc_data: dict[str, bytes] = field(default_factory=dict)   # type -> checked bytes
+    manifest_data: bytes | None = None                 # checked bytes of in/manifest.json
+    manifest: dict | None = None                       # parsed `manifest_data` (None if not a JSON object)
 
 
 def _read_regular(path: Path) -> bytes | None:
@@ -38,6 +44,14 @@ def _read_regular(path: Path) -> bytes | None:
         return None
     with os.fdopen(fd, "rb") as f:
         return f.read()
+
+
+def _parse(data: bytes) -> dict | None:
+    try:
+        value = json.loads(data.decode("utf-8"))
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def _walk(top: Path, prune: set[str]) -> list[tuple[str, bool]]:
@@ -71,8 +85,14 @@ def _check_in(root: Path, manifest: dict | None, res: CheckResult) -> None:
         res.reasons.append("seal_invalid")
     for name, key in (("manifest.json", "manifest_sha256"), ("settings.json", "settings_sha256")):
         data = _read_regular(in_dir / name)
-        if data is None or not isinstance(seal, dict) or sha256(data) != seal.get(key):
+        sealed = data is not None and isinstance(seal, dict) and sha256(data) == seal.get(key)
+        if not sealed:
             res.reasons.append(f"in_modified:{name}")
+        if name == "manifest.json" and data is not None:
+            if manifest is None:
+                manifest = _parse(data)    # walked even when unsealed: more precise reasons
+            if sealed:
+                res.manifest_data, res.manifest = data, _parse(data)
     if manifest is None:
         return
     files = {e["key"]: e for e in manifest.get("files", []) if isinstance(e, dict) and "sha256" in e}
@@ -134,6 +154,7 @@ def _check_out(root: Path, res: CheckResult) -> None:
                        for line in data.decode("utf-8", errors="ignore").splitlines()):
                 recap_missing = True
             res.docs.append(parts[1][:-3])
+            res.doc_data[parts[1][:-3]] = data
             continue
         res.reasons.append(f"unexpected_file:{rel}")
     try:
@@ -147,8 +168,10 @@ def _check_out(root: Path, res: CheckResult) -> None:
         res.warnings.append("sources_not_published")
 
 
-def check(root: Path, manifest: dict | None) -> CheckResult:
-    """Run every check of `finish` on the workspace `root` (`manifest` = parsed `in/manifest.json`)."""
+def check(root: Path, manifest: dict | None = None) -> CheckResult:
+    """Run every check of `finish` on the workspace `root`.
+
+    `manifest` defaults to the sealed `in/manifest.json` read by the checks themselves."""
     res = CheckResult()
     _check_in(root, manifest, res)
     _check_out(root, res)
