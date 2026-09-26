@@ -44,6 +44,47 @@ Un `/harry <profil>` explicite reste possible pour forcer un profil.
 L'orchestration lourde passe par le Workflow `run-ticket` (éphémère, 1 par ticket) ; toi tu tiens
 les gates. Escalation humaine configurable par étape (`sdlc.config.json` → `escalation`).
 
+## Écrire un document vivant
+Verrou optimiste (décision 20 du PRD AISDLC-RUNWS) pour **tout document vivant du dépôt data** écrit
+directement (`prd.md`, `refine.md`, `spec-func.md`, `spec-tech.md`, `review.md`, `deploy.md`, `acceptance.md`,
+`implement.md`, `nonreg.md`, `demo.md`, `spec-review.md`, `analysis.md`…), en session interactive comme en
+sous-agent. **Exemptés** : les tours de run (`sdlc doc add` en workspace de run : ajout seul, le moteur les
+rend en tête sous verrou), `journal.md`, `status.json` (via `sdlc`).
+
+**Sections** : un document est découpé par ses titres ATX (`#` à `######`) hors blocs de code clôturés ; la
+clé d'une section = le chemin de ses titres ; le préambule avant le 1ᵉʳ titre est une section. Une section a
+*changé* si elle est ajoutée, retirée ou si son texte diffère (espaces de fin ignorés). **Divergente** =
+changée à la fois par la version intermédiaire (base → dernière) et par moi (base → ce que j'allais écrire),
+sauf si les deux ont produit le même texte ; s'y ajoute tout apport intermédiaire qui **contredit** mon
+écriture. Document sans titre = une seule section (double modification ⇒ divergente).
+
+1. **Lire** : avant de préparer l'écriture, copier la version lue dans le brouillon de la session et noter
+   `base = git hash-object <fichier>` (`none` si absent).
+2. **Juste avant d'écrire** : recalculer `git hash-object <fichier>`. Égale ⇒ écrire **avec Edit/Write**
+   seulement (jamais par redirection Bash, `sed -i`, `tee`). Différente, ou outil qui refuse
+   (« modified since read ») ⇒ **conflit**.
+3. **Conflit** : relire la dernière version ; `diff -u <copie de base> <fichier>` = ce que la version
+   intermédiaire a apporté ; classer les sections.
+   - **Sans divergence** : refaire l'écriture sur la dernière version en gardant ses apports, puis le dire —
+     sous une story : `sdlc journal <STORY> --entry "doc <type> refait sur <empreinte courte> : <apport>"` ;
+     au-dessus (épic, mission) : dans le rapport final.
+   - **Divergence** : **ne rien écrire** (ni document ni `set-status`).
+     - **Session interactive** : exposer les sections dans le chat (ce que dit la version intermédiaire, ce
+       que j'allais écrire) et **demander** avant d'écrire.
+     - **Sous-agent** : terminer avec le bloc `conflict` ci-dessous (rapport final ou dernier message JSON).
+
+```json
+{"conflict": {"doc": "<chemin relatif au dépôt data>", "base": "<empreinte lue>", "latest": "<empreinte courante>",
+              "intermediate": "<ce que la version intermédiaire a apporté>", "divergent": ["<titre de section>"],
+              "intended": "<ce que j'allais écrire, en résumé>"}}
+```
+
+**Rôle de la session principale** quand un sous-agent (ou le workflow `run-ticket`, arrêt `doc_conflict`) rend
+un `conflict` : le **présenter** à l'utilisateur (sections divergentes, apport intermédiaire, intention du
+sous-agent), **re-cadrer** avec lui, puis **relancer** le sous-agent — même agent par message, ou nouvel agent
+— avec le bloc `conflict` et la décision prise. La relance ne contourne jamais la bulle du sous-agent (pas
+d'écriture à sa place hors de son périmètre) ; le sous-agent relancé réapplique la règle depuis l'étape 1.
+
 ## Règles
 - **Transitions de statut = propriété de l'orchestration, jamais de l'agent.** Les agents renvoient un
   *verdict* + enregistrent leurs artefacts (`link`) ; ils n'avancent pas l'état. En autonome, le workflow

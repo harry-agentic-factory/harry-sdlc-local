@@ -19,6 +19,8 @@ annonce-le en une ligne. L'idée est souvent un **épic**.
      sur validation humaine). Le noter pour `/refine`.
 4. **Registre** : `python3 -m sdlc.cli --project SAMPLE create-epic <EPIC> "<titre>"`.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 Le chemin du `prd.md` + un résumé de 3 lignes + la proposition d'enchaîner sur `/refine`.
 Ne code rien. Ne crée pas encore les stories (c'est `/refine`).

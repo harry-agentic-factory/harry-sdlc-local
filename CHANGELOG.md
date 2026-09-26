@@ -7,6 +7,24 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-26
+
+### Added
+
+- Persona rule « Écrire un document vivant » (`claude/sdlc/harry.md`): optimistic locking for sessions and
+  sub-agents writing a living document of the data repository (`git hash-object` on read, re-check before
+  writing, Edit/Write only, `conflict` block on divergence); the 15 commands and agents that write such a
+  document point to it (AISDLC-RUNWS-13).
+
+### Changed
+
+- Local rendering of a round into `<STORY>/<type>.md` is a compare-and-swap: re-read just before the atomic
+  rename, redone on the latest bytes if the file changed underneath (at most 3 times), then `put_conflict`
+  with the run left replayable (AISDLC-RUNWS-13).
+- `run-ticket` (off mode): the prompts that write a living document remind the rule, and a result with
+  `conflict` stops the workflow with `doc_conflict` and the observed `status_now`, without transition. Run
+  workspace mode is unchanged (AISDLC-RUNWS-13).
+
 ## [0.7.0] - 2026-09-26
 
 ### Added

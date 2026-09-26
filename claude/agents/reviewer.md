@@ -39,6 +39,8 @@ Un test vert en H2/mock ne prouve pas la prod. Sur le diff, traque les pièges q
 - [ ] **Must-run gates présentes** : le diff ajoute-t-il (ou conserve-t-il) un **IT PostgreSQL iso-prod** +
       un **smoke context-load** quand la logique touche DB/migration/boot ?
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie (ton dernier message = le verdict, JSON brut)
 `{"conform": true|false, "note": "<synthèse>", "violations": ["..."]}`
 

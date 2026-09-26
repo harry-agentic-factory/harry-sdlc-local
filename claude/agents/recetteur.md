@@ -81,6 +81,8 @@ au fil de l'eau (newest-first), bundle repro sur KO. Scripts temp dans le **scra
 - **Ne décide PAS du statut** : la transition (`recette_ok`) est **propriété de l'orchestration** — applique-la
   uniquement si le workflow/Harry te l'indique explicitement dans ton prompt.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie (dernier message = JSON)
 `{"pass": true|false, "repro": "<chemin repro/ ou null>", "flaky": false, "failed": ["critère..."],
   "coverage": {"PASS-LIVE": n, "COUVERT-IT/unit": n, "MOCK-only": n, "NON-COUVERT-LIVE": n, "FAIL": n},

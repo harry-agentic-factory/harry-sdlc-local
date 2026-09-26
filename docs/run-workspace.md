@@ -220,6 +220,30 @@ byte, and the artifact is linked to the story (as `sdlc link`). A header line wh
 uid means "already rendered" (replay). Mission ⇒ 1 + number of final traces of the same mission that
 published this type; no aggregated file.
 
+### Concurrency
+
+Optimistic locking on every document (decision 20 of the AISDLC-RUNWS PRD) — what it means for the engine:
+
+- **Rounds are exempt.** A run writes its documents under its own key `runs/<uid>/out/docs/<type>.md`, once
+  (add-only `put`: same bytes ⇒ no-op, other bytes ⇒ `put_conflict`), and its round is prepended to the
+  story document. Two concurrent runs produce two distinct rounds: nothing is ever overwritten, so there is
+  no lost update to protect and no base version to declare. At the end of a run the only concurrency refusal
+  is the existing one: the story changed state since the Prepare (`status_invalid:<now>-><target>`, run
+  `rejected`, nothing published).
+- **Compare-and-swap rendering (local backend).** The `flock` of `put` serialises engines, not a human or a
+  session editing `<STORY>/<type>.md` with its own tools. The rendering therefore writes the new bytes to a
+  temporary file, re-reads the target just before the atomic rename and renames only if the bytes are still
+  those it read. Otherwise it redoes the rendering on the latest bytes (prepending cannot diverge: both
+  contents are kept), at most 3 times, then fails with `put_conflict:<path>`: `finish` stops before its last
+  `put`, the run stays `open`, and a later `finish` replays idempotently (the header of this `run_uid`, if
+  already rendered, is recognised). An abandoned attempt removes its temporary file. Residual window: the
+  rename itself (between the re-read and `os.replace`); the session rule below covers the other side.
+- **Sessions and sub-agents** writing a living document directly (off mode, interactive commands) follow the
+  persona rule « Écrire un document vivant » (`claude/sdlc/harry.md`): `git hash-object` noted on read,
+  re-checked just before writing, write only with Edit/Write; on divergence nothing is written, the
+  interactive session asks in the chat and a sub-agent returns a `conflict` block that the main session
+  presents, re-scopes and relaunches.
+
 ## `sdlc run clean` and `sdlc run list`
 
 - `clean <run_uid|root>` removes the workspace without publishing anything (`{run_uid, cleaned: true}`);
@@ -461,6 +485,15 @@ A Prepare without `run_uid`/`root` stops the workflow (`needs_human`, `prepare_f
 neither `published` nor `already` stops it (`finish_rejected`, `reasons`); a fix not `fixed` or a redeploy
 not `ok` stops it (`fix_failed` / `redeploy_failed`). The reference orchestrator (`orchestrator.py`,
 `run_workspace=`) follows the same rules.
+
+Off mode (no run workspace): the prompts of the roles that write a living document of the story
+(`reviewPrompt`, `deployPrompt`, `promotePrompt`, `recettePrompt`, `fixPrompt`) end with `LIVING_DOC_RULE`,
+the reminder of the persona rule, and their result schema admits `conflict`. A result with `conflict` stops
+the workflow before any further step: one `general-purpose` step `status:<TICKET>` reads the state
+(`sdlc get`) and the result is `{stopped_at, reason: "needs_human", detail: "doc_conflict", conflict,
+status_now}`. The workflow never changes nor reverts the state (the rule tells the agent not to transition
+in conflict; a fixer's `set-status implemented` at start, before any write, is admitted and shows in
+`status_now`). Run workspace prompts are unchanged.
 
 Stub harness (no LLM, `node:*` only): `node tooling/tests/js/run_ticket_harness.mjs --script
 claude/workflows/run-ticket.js --scenario <json> [--exec]` journals every agent call `{prompt, agentType,
