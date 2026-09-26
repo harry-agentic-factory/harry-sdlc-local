@@ -1,0 +1,27 @@
+{
+  "calls": [
+    {
+      "prompt": "Story SDLC **DEMO-E-1** — **PROMOTE**. Recette de branche validée par l'humain.\n1) **Merge** la MR/PR de la branche `feat/DEMO-E-1` → `main` (CLI de l'hébergeur du repo : gh / glab / az ; **TA propre MR** ; **jamais** de push direct).\n2) **Déploie `main`** sur la cible post-merge : `sdlc --project DEMO deploy-target app-repo --env integration` → applique le skill rendu, suis jusqu'au bout, **vérifie la version déployée + santé**. Pas de cible `integration` ⇒ c'est une gate humaine voulue : {ok:false, note:\"pas d'env integration\"}.\nÉcris /data/demo/DEMO-E/stories/DEMO-E-1/deploy.md (section « promote »). Dernier message = JSON {ok, version, note}.\n**Portée** : merger et redéployer, rien d'autre. La mise en production, sa CI/CD et sa recette sont un autre univers — ce n'est pas ce loop qui les pilote.",
+      "agentType": "deployer",
+      "label": "promote:DEMO-E-1",
+      "phase": "Promote"
+    },
+    {
+      "prompt": "Story SDLC **DEMO-E-1**. Recette sur l'env déployé vs les critères d'acceptation de /data/demo/DEMO-E/stories/DEMO-E-1/spec-func.md. Cible + méthode = `sdlc --project DEMO config` → `recette.app-repo` (outil, skill projet, santé) et `deploy.app-repo.environments.dev` ; vérifie d'abord que la version déployée = HEAD de `feat/DEMO-E-1`. Feature backend -> pilote l'API ; UI -> Playwright MCP ; CLI -> commandes sur la cible. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans /data/demo/DEMO-E/stories/DEMO-E-1/repro/. Écris /data/demo/DEMO-E/stories/DEMO-E-1/acceptance.md. **Transition dictée par l'orchestration — si tous les critères passent** : `sdlc --project DEMO set-status DEMO-E-1 recette_ok`. Dernier message = JSON {pass, repro, flaky, failed}.",
+      "agentType": "recetteur",
+      "label": "recette-main:DEMO-E-1",
+      "phase": "Promote"
+    }
+  ],
+  "result": {
+    "stopped_at": "promote",
+    "reason": "done",
+    "promote": {
+      "ok": true,
+      "version": "v3"
+    },
+    "recette": {
+      "pass": true
+    }
+  }
+}

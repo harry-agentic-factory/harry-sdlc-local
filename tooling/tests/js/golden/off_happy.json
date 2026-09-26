@@ -1,0 +1,35 @@
+{
+  "calls": [
+    {
+      "prompt": "Prépare la **bulle scopée** du ticket **DEMO-E-1**. Exécute en Bash :\n`sdlc --project DEMO workspace DEMO-E-1 --branch feat/DEMO-E-1`\n→ crée le worktree isolé + `.claude/settings.json` (additionalDirectories = worktrees+brain+data) + symlink des skills projet. Renvoie STRICTEMENT le JSON : worktree = `.worktrees[\"app-repo\"]`, additionalDirectories, projectSkills. Ne fais RIEN d'autre.",
+      "agentType": "general-purpose",
+      "label": "prepare:DEMO-E-1",
+      "phase": "Prepare"
+    },
+    {
+      "prompt": "Story SDLC **DEMO-E-1** (/wt/app-repo). Review le diff de la branche vs main contre les INVARIANTS du spec-tech.\nLis: /data/demo/DEMO-E/stories/DEMO-E-1/spec-tech.md (invariants = ta checklist) + /data/demo/DEMO-E/stories/DEMO-E-1/spec-func.md (critères).\nDiff: `git -C /wt/app-repo diff main...HEAD`. Vérifie CHAQUE invariant (preuve dans le diff), cherche bugs/régressions/fuites. Écris /data/demo/DEMO-E/stories/DEMO-E-1/review.md. Ne modifie PAS le code.\n**Transition dictée par l'orchestration — si (et seulement si) conforme** : `sdlc --project DEMO set-status DEMO-E-1 reviewed`. Ne décide d'aucune autre transition.\nDernier message = JSON {conform, note, violations}.",
+      "agentType": "reviewer",
+      "label": "review:DEMO-E-1",
+      "phase": "Review"
+    },
+    {
+      "prompt": "Story SDLC **DEMO-E-1**. **DÉPLOIE LA BRANCHE `feat/DEMO-E-1` sur son environnement de test pré-merge.**\nCible = `sdlc --project DEMO deploy-target app-repo --env dev` : charge le **skill** qu'elle rend et suis-le (méthode, santé, preuve que le code déployé = HEAD de `feat/DEMO-E-1`, rollback). Aucune infra en dur : Jenkins, docker local ou autre, c'est le manifest qui dit. **NE touche PAS à main ni à main, NE merge PAS** — on déploie la branche pour la recetter. **Sécurité : pas de cible `dev`, env pas prêt, cible = production, ou action ambiguë/risquée/irréversible ⇒ NE déploie PAS → {ok:false, note:\"raison\"}.** Écris /data/demo/DEMO-E/stories/DEMO-E-1/deploy.md. **Transition dictée par l'orchestration — si le déploiement branche réussit** : `sdlc --project DEMO set-status DEMO-E-1 deployed`. Dernier message = JSON {ok, version, note}.",
+      "agentType": "deployer",
+      "label": "deploy:DEMO-E-1",
+      "phase": "Deploy"
+    },
+    {
+      "prompt": "Story SDLC **DEMO-E-1**. Recette sur l'env déployé vs les critères d'acceptation de /data/demo/DEMO-E/stories/DEMO-E-1/spec-func.md. Cible + méthode = `sdlc --project DEMO config` → `recette.app-repo` (outil, skill projet, santé) et `deploy.app-repo.environments.dev` ; vérifie d'abord que la version déployée = HEAD de `feat/DEMO-E-1`. Feature backend -> pilote l'API ; UI -> Playwright MCP ; CLI -> commandes sur la cible. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans /data/demo/DEMO-E/stories/DEMO-E-1/repro/. Écris /data/demo/DEMO-E/stories/DEMO-E-1/acceptance.md. **Transition dictée par l'orchestration — si tous les critères passent** : `sdlc --project DEMO set-status DEMO-E-1 recette_ok`. Dernier message = JSON {pass, repro, flaky, failed}.",
+      "agentType": "recetteur",
+      "label": "recette:DEMO-E-1",
+      "phase": "Recette"
+    }
+  ],
+  "result": {
+    "stopped_at": "recette",
+    "reason": "await_validation",
+    "recette": {
+      "pass": true
+    }
+  }
+}

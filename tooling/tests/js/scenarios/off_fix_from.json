@@ -1,0 +1,37 @@
+{
+  "args": {
+    "ticket": "DEMO-E-1",
+    "epic": "DEMO-E",
+    "prefix": "DEMO",
+    "repoName": "app-repo",
+    "repo": "/repos/app-repo",
+    "sdlcRoot": "/data/demo",
+    "review": "auto",
+    "fixFrom": "/data/demo/repro-manual"
+  },
+  "responses": {
+    "prepare:DEMO-E-1": [
+      {
+        "worktree": "/wt/app-repo",
+        "additionalDirectories": [],
+        "projectSkills": []
+      }
+    ],
+    "fix:": [
+      {
+        "fixed": true
+      }
+    ],
+    "redeploy:": [
+      {
+        "ok": true,
+        "version": "v2"
+      }
+    ],
+    "recette:": [
+      {
+        "pass": true
+      }
+    ]
+  }
+}

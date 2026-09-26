@@ -1,0 +1,25 @@
+{
+  "args": {
+    "ticket": "DEMO-E-1",
+    "epic": "DEMO-E",
+    "prefix": "DEMO",
+    "repoName": "app-repo",
+    "repo": "/repos/app-repo",
+    "sdlcRoot": "/data/demo",
+    "review": "human"
+  },
+  "responses": {
+    "prepare:DEMO-E-1": [
+      {
+        "worktree": "/wt/app-repo",
+        "additionalDirectories": [],
+        "projectSkills": []
+      }
+    ],
+    "review:": [
+      {
+        "conform": true
+      }
+    ]
+  }
+}
