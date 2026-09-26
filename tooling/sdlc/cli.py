@@ -220,7 +220,7 @@ def run(argv: list[str] | None = None) -> dict:
 
     if args.cmd == "brain":
         return brain_cli.dispatch(args)
-    if args.cmd in ("run", "doc"):          # never resolves a workspace before the library does
+    if args.cmd in ("run", "doc", "clone"):  # never resolves a workspace before the library does
         return runws_cli.dispatch(args)
 
     if args.cmd == "migrate":

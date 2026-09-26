@@ -2,6 +2,7 @@
 
 `DocumentRepository` is what the core reads and publishes through; `RunSource` is what `run_init`
 needs beyond documents (scope lookup, brain pin, agent allow/deny rules). A backend implements both.
+`CodeHost` is what a code run needs to clone and push the repositories of its scope.
 Keys are logical storage keys (see `docs/run-workspace.md`), never paths of a data repository.
 """
 from __future__ import annotations
@@ -62,3 +63,25 @@ class RunSource(Protocol):
 
     def bubble(self, agent: str) -> dict:
         """`{"allow": [...], "deny": [...]}` rules of the project for this agent role."""
+
+
+@dataclass(frozen=True)
+class RepoSpec:
+    """A code repository of the scope of a run.
+
+    `url` is the clone and push source: it is resolved when needed and never written in the run.
+    `missing` says why it is unresolved: "path" (no declared local copy), "remote" (local copy
+    without an origin), None when resolved."""
+    name: str
+    role: str                          # "target" | "neighbour"
+    url: str | None
+    missing: str | None = None
+
+
+@runtime_checkable
+class CodeHost(Protocol):
+    def code_repos(self, scope: Scope) -> list[RepoSpec]:
+        """Targets = repositories of the story, neighbours = the other repositories ([] for a mission)."""
+
+    def default_base(self) -> str:
+        """Default base branch of the project."""

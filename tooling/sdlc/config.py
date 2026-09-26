@@ -332,6 +332,8 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "tracker": cfg["tracker"],
         "schemaVersion": cfg.get("schemaVersion", "0.1.0"),
     }
+    if "runWorkspace" in cfg:           # optional, raw value, only when present (run workspace of a code run)
+        out["runWorkspace"] = cfg["runWorkspace"]
     if with_brain_ref:
         out.update(_brain_ref_keys(out["brain"], cfg.get("brainRef")))
     return out

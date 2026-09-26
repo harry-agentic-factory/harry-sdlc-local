@@ -5,6 +5,9 @@
   `repos/<repo>/` are delegated to their own git check). Symbolic links are never followed.
 - `rw/out/`: only `docs/<type>.md` (regular file, known type) and the content of `sources/`.
 - size of each document; warnings `no_recap` and `sources_not_published`.
+- code run (`publish_sources=True`, `engine_files`): `rw/out/sources/` holds regular files only, within
+  `SOURCE_MAX_BYTES` each and `RUN_SOURCES_MAX_BYTES` in total, and is published (no warning); a file of
+  `rw/out/git/` is admitted only when the engine recorded it with exactly that sha256.
 
 The bytes read by the checks are kept in the result (`manifest_data`, `doc_data`): `finish` publishes
 exactly what was checked and never reads a document a second time.
@@ -13,6 +16,7 @@ Only `in/` and `rw/out/` are walked: the agent's other folders are never read.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -20,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .layout import META_FILES
-from .model import DOC_MAX_BYTES, DOC_TYPES, sha256
+from .model import DOC_MAX_BYTES, DOC_TYPES, RUN_SOURCES_MAX_BYTES, SOURCE_MAX_BYTES, sha256
 
 
 @dataclass
@@ -31,6 +35,7 @@ class CheckResult:
     doc_data: dict[str, bytes] = field(default_factory=dict)   # type -> checked bytes
     manifest_data: bytes | None = None                 # checked bytes of in/manifest.json
     manifest: dict | None = None                       # parsed `manifest_data` (None if not a JSON object)
+    source_data: dict[str, bytes] = field(default_factory=dict)   # rel to sources/ -> checked bytes
 
 
 def _read_regular(path: Path) -> bytes | None:
@@ -116,7 +121,49 @@ def _check_in(root: Path, manifest: dict | None, res: CheckResult) -> None:
         res.reasons.append(f"in_modified:{key}")
 
 
-def _check_out(root: Path, res: CheckResult) -> None:
+def _file_sha256(path: Path) -> str | None:
+    """sha256 of a regular file read without following a link (streamed: bundles may be large)."""
+    try:
+        if not stat.S_ISREG(os.lstat(path).st_mode):
+            return None
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        return None
+    h = hashlib.sha256()
+    with os.fdopen(fd, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _check_sources(out_dir: Path, rels: list[str], res: CheckResult) -> None:
+    """Regular files only, size caps, then the checked bytes kept for publication."""
+    sizes: dict[str, int] = {}
+    for rel in rels:
+        try:
+            st = os.lstat(out_dir / rel)
+        except OSError:
+            st = None
+        if st is None or not stat.S_ISREG(st.st_mode):
+            res.reasons.append(f"unexpected_file:{rel}")
+            continue
+        sizes[rel] = st.st_size
+    too_large = [rel for rel, n in sizes.items() if n > SOURCE_MAX_BYTES]
+    for rel in too_large:
+        res.reasons.append("source_too_large:" + rel[len("sources/"):])
+    if sum(sizes.values()) > RUN_SOURCES_MAX_BYTES:
+        res.reasons.append("sources_total_too_large")
+    if too_large or len(sizes) != len(rels) or sum(sizes.values()) > RUN_SOURCES_MAX_BYTES:
+        return
+    for rel in sorted(sizes):
+        data = _read_regular(out_dir / rel)
+        if data is None:
+            res.reasons.append(f"unexpected_file:{rel}")
+            continue
+        res.source_data[rel[len("sources/"):]] = data
+
+
+def _check_out(root: Path, res: CheckResult, engine_files: dict[str, str], publish_sources: bool) -> None:
     out_dir = root / "rw" / "out"
     try:
         st = os.lstat(out_dir)
@@ -128,6 +175,7 @@ def _check_out(root: Path, res: CheckResult) -> None:
         return
     recap_missing = False
     sources = False
+    source_rels: list[str] = []
     for rel, is_link_dir in _walk(out_dir, set()):
         path = out_dir / rel
         if is_link_dir or os.path.islink(path):
@@ -136,6 +184,11 @@ def _check_out(root: Path, res: CheckResult) -> None:
         parts = rel.split("/")
         if parts[0] == "sources" and len(parts) > 1:
             sources = True
+            source_rels.append(rel)
+            continue
+        if rel in engine_files:
+            if _file_sha256(path) != engine_files[rel]:
+                res.reasons.append(f"unexpected_file:{rel}")
             continue
         if len(parts) == 2 and parts[0] == "docs" and parts[1].endswith(".md") \
                 and parts[1][:-3] in DOC_TYPES:
@@ -164,17 +217,21 @@ def _check_out(root: Path, res: CheckResult) -> None:
         pass
     if recap_missing:
         res.warnings.append("no_recap")
-    if sources:
+    if publish_sources:
+        _check_sources(out_dir, sorted(source_rels), res)
+    elif sources:
         res.warnings.append("sources_not_published")
 
 
-def check(root: Path, manifest: dict | None = None) -> CheckResult:
+def check(root: Path, manifest: dict | None = None, *, engine_files: dict[str, str] | None = None,
+          publish_sources: bool = False) -> CheckResult:
     """Run every check of `finish` on the workspace `root`.
 
-    `manifest` defaults to the sealed `in/manifest.json` read by the checks themselves."""
+    `manifest` defaults to the sealed `in/manifest.json` read by the checks themselves. A code run
+    passes the bundles the engine recorded (`{"git/<repo>.bundle": sha256}`) and `publish_sources=True`."""
     res = CheckResult()
     _check_in(root, manifest, res)
-    _check_out(root, res)
+    _check_out(root, res, dict(engine_files or {}), publish_sources)
     res.reasons = sorted(set(res.reasons))
     res.warnings = sorted(set(res.warnings))
     res.docs = sorted(set(res.docs))

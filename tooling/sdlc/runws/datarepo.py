@@ -4,13 +4,15 @@ The only module of the package that knows the data repository layout, the projec
 brain library and git. Git is used READ ONLY on the data repository, through one helper (`_git`)
 restricted to `rev-parse`, `ls-files`, `diff` and `log`, always with `--no-optional-locks`. Nothing
 is ever committed: publication leaves the data repository modified, as an agent writing it would.
+It is also the local `CodeHost` of a code run (repositories of the manifest, `remote.origin.url` of
+their declared local copy read through `gitcode.origin_url`) and applies story transitions.
 
 Storage keys (see `layout.py`) map to the data repository as follows:
 
     features/<E>/atelier/<name>.md        <ws>/<E>/<name>.md   (every root *.md but _index.md)
     features/<E>/stories/<US>/<doc>.md    <ws>/<E>/stories/<US>/<doc>.md  (level 1, not journal.md)
     missions/<M>/brief.md, sources/...    <ws>/missions/<M>/...
-    runs/<uid>/...                        <ws>/runs/<uid>/...
+    runs/<uid>/...                        <ws>/runs/<uid>/...  (+ out/sources/<rel>, out/git/<repo>.bundle)
     project/brain/@<commit>/<p>.md        brain notes at <commit> (sdlc.brain library)
     project/brain/@worktree/<p>.md        brain working copy (fallback when the brain is not git)
 """
@@ -32,10 +34,11 @@ from ..brain import (DEFAULT_EXCLUDES, BrainError, BrainNotGit, BrainRefUnresolv
 from ..config import load_config, resolved_manifest
 from ..service import Sdlc
 from ..workspace import Workspace
-from .layout import safe_segments
+from . import gitcode
+from .layout import repro_prefix, safe_segments
 from .model import (FINAL_STATES, ROUND_HEADER_BYTES_RE, RUN_UID_RE, RunError, iso, sha256, utc_now,
                     validate_run_uid, validate_scope_id)
-from .port import BrainPin, Entry, Scope
+from .port import BrainPin, Entry, RepoSpec, Scope
 
 GIT_READ_SUBCOMMANDS = frozenset({"rev-parse", "ls-files", "diff", "log"})
 _SCRUBBED_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX")
@@ -108,6 +111,8 @@ class DataRepoBackend:
         self._brain_commit: str | None = None
         self._brain_notes: list | None = None
         self._brain_excludes: tuple[str, ...] = tuple(DEFAULT_EXCLUDES)
+        # raw value of the optional `runWorkspace` key of the project (None when absent)
+        self.run_workspace = manifest.get("runWorkspace")
 
     @classmethod
     def from_project(cls, project: str | None = None) -> "DataRepoBackend":
@@ -333,6 +338,56 @@ class DataRepoBackend:
         role = ((perms.get("agents") or {}).get(agent) or {})
         return {"allow": list(role.get("allow") or []), "deny": list(perms.get("deny") or [])}
 
+    # --- CodeHost, story state (code run) ---
+
+    def code_repos(self, scope: Scope) -> list[RepoSpec]:
+        if scope.story is None:
+            return []
+        declared: dict = self.manifest.get("repos") or {}
+        mine = list(Workspace(self.ws).load(scope.story).repos or [])
+        out: list[RepoSpec] = []
+        for name in sorted(set(mine) | set(declared)):
+            role = "target" if name in mine else "neighbour"
+            path = declared.get(name)
+            if not path or not _is_dir(Path(path)):
+                out.append(RepoSpec(name, role, None, "path"))
+                continue
+            url = gitcode.origin_url(path)
+            out.append(RepoSpec(name, role, url, None if url else "remote"))
+        return out
+
+    def default_base(self) -> str:
+        return self.manifest.get("refBranch") or "main"
+
+    def story_branch(self, story: str) -> str | None:
+        return Workspace(self.ws).load(validate_scope_id(story)).branch
+
+    def story_status(self, story: str) -> str:
+        return Workspace(self.ws).load(validate_scope_id(story)).status
+
+    def transition(self, story: str, target: str) -> None:
+        Sdlc(Workspace(self.ws)).set_status(validate_scope_id(story), target)
+
+    def _repro_list(self, uid: str) -> list[Entry]:
+        """Regular `*.md` published by the run `uid` under `out/sources/repro/` (immutable trace)."""
+        prefix = repro_prefix(uid)
+        base = self.ws / prefix
+        out: list[Entry] = []
+        if not _is_dir(base):
+            return out
+        for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
+            dirnames[:] = sorted(d for d in dirnames if not os.path.islink(os.path.join(dirpath, d)))
+            for n in sorted(filenames):
+                if not n.endswith(".md"):
+                    continue
+                rel = (Path(dirpath) / n).relative_to(self.ws).as_posix()
+                data = _read_regular(self.ws / rel)
+                if data is None or not safe_segments(rel):
+                    continue
+                self._cache[rel] = (data, uid)
+                out.append(Entry(key=rel, version=uid, sha256=sha256(data), size=len(data), origin=rel))
+        return sorted(out, key=lambda e: e["key"])
+
     # --- DocumentRepository ---
 
     def list(self, prefix: str) -> list[Entry]:
@@ -350,6 +405,9 @@ class DataRepoBackend:
         elif parts[0] == "missions" and len(parts) >= 2 and parts[1]:
             m = validate_scope_id(parts[1])
             entries = self._entries(self._mission_keys(m), f"missions/{m}")
+        elif parts[0] == "runs" and len(parts) >= 6 and parts[2:5] == ["out", "sources", "repro"] \
+                and RUN_UID_RE.fullmatch(parts[1]):
+            entries = self._repro_list(parts[1])
         elif parts[0] == "runs":
             entries = self._entries(self._trace_keys(), None)
         else:
@@ -408,6 +466,10 @@ class DataRepoBackend:
         doc_type = None
         if len(parts) == 5 and parts[2:4] == ["out", "docs"] and parts[4].endswith(".md"):
             doc_type = parts[4][:-3]
+        elif len(parts) >= 5 and parts[2:4] == ["out", "sources"]:
+            pass                                    # a source of a code run
+        elif len(parts) == 5 and parts[2:4] == ["out", "git"] and parts[4].endswith(".bundle"):
+            pass                                    # an engine bundle of a code run
         elif rel not in ("run.json", "manifest.json"):
             raise RunError("put_invalid_key", key)
         uid = parts[1]
