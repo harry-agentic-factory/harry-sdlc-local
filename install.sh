@@ -120,12 +120,29 @@ ACTIVE="$HSH/current"
 # ---- 5. managed links -----------------------------------------------------------------------------------
 mkdir -p "$CLA/agents" "$CLA/commands" "$CLA/workflows" "$CLA/skills" "$CLA/sdlc"
 
+# engine_sdlc_link <link path>: 0 when the link value is <root>/bin/sdlc and <root> (resolved from the link's
+# folder when the value is relative) is an engine copy, with VERSION and claude/. A link of a package manager
+# (Homebrew: ../Cellar/<formula>/<v>/bin/sdlc) has the same suffix but no such root: it is never managed.
+engine_sdlc_link() {
+  local value root
+  [ -L "$1" ] || return 1
+  value="$(readlink "$1")"
+  case "$value" in */bin/sdlc) ;; *) return 1 ;; esac
+  root="${value%/bin/sdlc}"
+  case "$root" in /*) ;; *) root="$(dirname "$1")/$root" ;; esac
+  [ -f "$root/VERSION" ] && [ -d "$root/claude" ]
+}
+
 # manage_link <link path> <value> <old-mode suffix>
 manage_link() {
   local dst=$1 value=$2 suffix=$3 existing
   if [ -L "$dst" ]; then
     existing="$(readlink "$dst")"
     [ "$existing" = "$value" ] && return 0
+    if [ "$suffix" = bin/sdlc ] && ! engine_sdlc_link "$dst"; then
+      warn "skipped (not managed, not an engine copy): $dst -> $existing"
+      return 0
+    fi
     case "$existing" in
       *"/$suffix")
         ln -sfn "$value" "$dst"
@@ -179,12 +196,14 @@ bin_candidates="/usr/local/bin /opt/homebrew/bin $HOME/.local/bin"
 bin_dir=""
 for d in $bin_candidates; do  # a directory of the PATH already holding a managed sdlc link
   in_path "$d" || continue
-  if [ -L "$d/sdlc" ]; then
-    case "$(readlink "$d/sdlc")" in */bin/sdlc) bin_dir=$d; break ;; esac
-  fi
+  if engine_sdlc_link "$d/sdlc"; then bin_dir=$d; break; fi
 done
-if [ -z "$bin_dir" ]; then  # else the first writable directory of the PATH
+if [ -z "$bin_dir" ]; then  # else the first writable directory of the PATH without a foreign sdlc
   for d in $bin_candidates; do
+    if [ -e "$d/sdlc" ] || [ -L "$d/sdlc" ]; then
+      in_path "$d" && warn "skipped (not managed, not an engine copy): $d/sdlc"
+      continue
+    fi
     if in_path "$d" && [ -d "$d" ] && [ -w "$d" ]; then bin_dir=$d; break; fi
   done
 fi
