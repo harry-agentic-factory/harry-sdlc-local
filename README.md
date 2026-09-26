@@ -8,8 +8,8 @@ qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de d
 
 ## Quickstart
 ```bash
-git clone --depth 1 --branch v0.7.0 https://github.com/harry-agentic-factory/harry-sdlc-local \
-  && ./harry-sdlc-local/install.sh v0.7.0   # version publiée ; `sdlc --version` = 0.7.0 (release)
+git clone --depth 1 --branch v0.7.1 https://github.com/harry-agentic-factory/harry-sdlc-local \
+  && ./harry-sdlc-local/install.sh v0.7.1   # version publiée ; `sdlc --version` = 0.7.1 (release)
 # développeur du moteur : dans un clone, `make install` (= install.sh --dev .) puis `make test`
 
 # 1 projet = 1 repo data
@@ -173,12 +173,12 @@ docs/PRD.md
 L'installation se fait **sur un tag** (`vX.Y.Z`) ou, explicitement, sur une **copie de travail** (`--dev`) :
 ```bash
 # amorçage (première installation) : un clone jetable au tag, qui s'installe lui-même
-git clone --depth 1 --branch v0.7.0 https://github.com/harry-agentic-factory/harry-sdlc-local \
-  && ./harry-sdlc-local/install.sh v0.7.0
+git clone --depth 1 --branch v0.7.1 https://github.com/harry-agentic-factory/harry-sdlc-local \
+  && ./harry-sdlc-local/install.sh v0.7.1
 ~/.local/share/harry-sdlc/current/install.sh v0.7.1   # montée de version (clone détaché au tag)
 ~/.local/share/harry-sdlc/current/install.sh v0.7.0   # retour arrière : bascule seule, aucun clone
 ./install.sh --dev "$PWD"                             # mode dev : `current` = cette copie (= make install)
-sdlc --version        # 0.7.0 (release)  |  0.7.0-dev+<sha>[.dirty] (dev: <chemin>)
+sdlc --version        # 0.7.1 (release)  |  0.7.1-dev+<sha>[.dirty] (dev: <chemin>)
 make test             # pytest du cœur déterministe
 ```
 ```
@@ -321,7 +321,7 @@ make install        # mode dev : install.sh --dev <cette copie>
 ### 1. Voir le lien symlink ↔ plateforme (le point clé)
 ```bash
 readlink ~/.claude/agents/reviewer.md      # -> ~/.local/share/harry-sdlc/current/claude/agents/reviewer.md
-readlink ~/.local/share/harry-sdlc/current # -> v0.7.0 (release) ou le chemin de ta copie (--dev)
+readlink ~/.local/share/harry-sdlc/current # -> v0.7.1 (release) ou le chemin de ta copie (--dev)
 ```
 → chaque fichier de `~/.claude` est une **flèche** vers l'engine. **La source de vérité du comportement =
 l'engine** ; `~/.claude` n'est que le *point de montage* regardé par Claude Code. Tu modifies l'engine →
@@ -412,8 +412,8 @@ The engine is also the Python package **`harry-sdlc`** (import name `sdlc`, no d
 from `tooling/` with hatchling. Pin it on a tag:
 
 ```bash
-uv add "harry-sdlc @ git+https://github.com/harry-agentic-factory/harry-sdlc-local@v0.7.0#subdirectory=tooling"
-uv run sdlc --version        # 0.7.0 (release)
+uv add "harry-sdlc @ git+https://github.com/harry-agentic-factory/harry-sdlc-local@v0.7.1#subdirectory=tooling"
+uv run sdlc --version        # 0.7.1 (release)
 ```
 
 `uv.lock` records the commit sha of the tag. The wheel only ships the `sdlc` package (with `sdlc.brain`,

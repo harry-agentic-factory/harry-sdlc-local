@@ -7,6 +7,8 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-26
+
 ### Added
 
 - Persona rule « Écrire un document vivant » (`claude/sdlc/harry.md`): optimistic locking for sessions and
