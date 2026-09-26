@@ -252,6 +252,23 @@ sdlc brain history   --repo <brain> <note> [--ref HEAD]
   avec `--strict`) ; **2** usage/refus/ref inconnue/dépôt absent ou hors git (stderr `{"error", "code"}`).
 - Bibliothèque Python `sdlc.brain` (stdlib seule) : même algorithme pour la CLI et les appelants.
 
+### Run workspace (`sdlc run`, `sdlc doc`) — l'espace jetable d'un agent autonome
+Un **run** = une exécution d'agent sur une story (ou une mission). `run init` fabrique un workspace isolé
+(`in/` en lecture : Markdown de l'épic + Brain au commit résolu + `manifest.json` + bulle `settings.json` ;
+`rw/` : `code/`, `scratch/`, `out/`), l'agent lit par **clé logique** et **ajoute** ses documents, puis
+`run finish` contrôle (in/ intact, rien d'inattendu dans `rw/out/`, taille), publie la trace
+`<data>/runs/<run_uid>/` et le tour **en tête** de l'artefact de la story, puis supprime le workspace.
+Référence (contrat, schémas, API de lib) : [`docs/run-workspace.md`](docs/run-workspace.md).
+```bash
+sdlc --project P run init <STORY> --agent reviewer      # ou : run init --mission <id> --agent investigator
+export SDLC_RUN=<root>                                  # côté agent : aucun chemin du repo data
+sdlc doc read spec-tech ; sdlc doc list ; printf '## Recap\nOK\n' | sdlc doc add review -
+sdlc --project P run finish <run_uid> [--keep]          # tout ou rien ; rejet ⇒ exit 1, state "rejected"
+sdlc --project P run list [<STORY>] ; sdlc --project P run clean <run_uid>
+```
+Bibliothèque `sdlc.runws` (stdlib seule, port `DocumentRepository`) : `run_init(..., root=, backend=)` pour
+brancher un autre stockage. Aucun commit git : le repo data reste modifié, comme quand un agent l'écrit.
+
 **Identité (`credentials.source`)** : `host` (défaut) = creds **ambiantes de l'opérateur** —
 `curl -s -n`/`~/.netrc`, `~/.kube/config`, keyring `gh`/`glab` — **utilisées sans jamais être lues ni
 affichées**. `service` (futur) = creds de service scopées injectées dans la bulle de l'agent (l'étape
