@@ -121,7 +121,11 @@ Lint codes: `missing_category`, `invalid_category`, `frontmatter_unreadable`.
 ```
 
 - `kind`: `md-link` (`[x](path.md)` and `[ref]: path.md`), `external` (`http(s)://`, `mailto:`;
-  `resolved` = `null`), `path-mention` (a `*.md` path written in text, inline code or a code block).
+  `resolved` = `null`), `path-mention` (a `*.md` path written in text or inline code).
+- Fenced code blocks are skipped: no link of any kind is extracted inside a ```` ``` ```` or `~~~`
+  block (CommonMark: opening fence indented by at most 3 spaces, at least 3 characters; closing fence
+  of the same character and at least as long; an unclosed block runs to the end of the file). Inline
+  code is still scanned, 4-space indented blocks are not skipped, line numbers are unchanged.
 - Ignored: anchor-only targets (`#...`), targets not ending with `.md` once `#...`/`?...` are removed
   (images, scripts), image links. Targets are URL-decoded before resolution.
 - `target` = the target as written; `line` = 1-based line in the full file (front matter included);

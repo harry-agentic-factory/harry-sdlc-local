@@ -673,6 +673,52 @@ def test_path_mention_falls_back_to_root():
     assert [(link["to"], link["resolved"]) for link in links] == [("README.md", True), ("per-repo/y.md", True)]
 
 
+def _mentions(text: str) -> list[tuple[str, str, int]]:
+    notes = {"a.md", "b.md", "c.md", "d.md"}
+    return [(link["kind"], link["to"], link["line"])
+            for link in note_links("n.md", text.encode(), notes, frozenset())]
+
+
+def test_links_ignored_in_backtick_fence():
+    text = "see a.md\n```bash\ncat b.md [x](c.md) https://h.org\n```\nthen d.md\n"
+    assert _mentions(text) == [("path-mention", "a.md", 1), ("path-mention", "d.md", 5)]
+
+
+def test_links_ignored_in_tilde_fence():
+    text = "~~~\nb.md\n[r]: c.md\n~~~\n  ~~~~ yaml\nc.md\n~~~~~\na.md\n"
+    assert _mentions(text) == [("path-mention", "a.md", 8)]
+
+
+def test_inline_code_still_extracted():
+    assert _mentions("run `cat a.md` then ``b.md``\n") == [
+        ("path-mention", "a.md", 1), ("path-mention", "b.md", 1)]
+
+
+def test_unclosed_fence_runs_to_end_of_file():
+    text = "a.md\n```\nb.md\n~~~\nc.md\n"
+    assert _mentions(text) == [("path-mention", "a.md", 1)]
+
+
+def test_longer_fence_contains_shorter_one():
+    text = "````md\n```\nb.md\n```\nc.md\n````\nd.md\n"
+    assert _mentions(text) == [("path-mention", "d.md", 7)]
+
+
+def test_fence_edge_cases_are_not_fences():
+    # 4-space indent, backtick in a backtick info string, closing fence with trailing text
+    text = ("    ```\na.md\n``` x`y\nb.md\n```\nc.md\n``` not-a-close\nd.md\n```\n"
+            "a.md\n")
+    assert _mentions(text) == [("path-mention", "a.md", 2), ("path-mention", "b.md", 4),
+                               ("path-mention", "a.md", 10)]
+
+
+def test_line_numbers_after_fence_unchanged():
+    text = "# t\n\n```\nx\ny\n```\n\n[l](a.md) and b.md\n"
+    plain = text.replace("```", "   ")
+    assert _mentions(text) == [("md-link", "a.md", 8), ("path-mention", "b.md", 8)]
+    assert [line for *_, line in _mentions(plain)] == [8, 8]
+
+
 # --- AC9: diff with and without git ---
 
 def _statuses(res) -> dict[str, int]:
