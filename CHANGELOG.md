@@ -32,3 +32,5 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 - `engine_version()` reports the exact version once packaged (it silently returned `0.1.0` outside a
   working copy).
 - `run-ticket` deploys through the project manifest (PR #53).
+- Brain links: nothing is extracted inside fenced code blocks (```` ``` ```` / `~~~`) any more; inline code
+  is still scanned (AISDLC-RUNWS-10).
