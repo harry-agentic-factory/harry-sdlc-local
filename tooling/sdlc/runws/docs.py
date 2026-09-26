@@ -1,7 +1,7 @@
 """Agent side of a run: `doc read`, `doc list`, `doc add`.
 
 Only `<run>/in/manifest.json`, `<run>/in/` and `<run>/rw/out/` are used: no project, no registry,
-no storage backend. This works in a container where only the run workspace is mounted.
+no storage backend. This works in a container where only the run folder is mounted.
 A key is resolved only among the file entries of the manifest (never a free path).
 """
 from __future__ import annotations

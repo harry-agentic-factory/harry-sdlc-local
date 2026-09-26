@@ -1,7 +1,7 @@
 """The storage port of the run workspace (no I/O here).
 
 `DocumentRepository` is what the core reads and publishes through; `RunSource` is what `run_init`
-needs beyond documents (scope lookup, brain pin, agent permissions). A backend implements both.
+needs beyond documents (scope lookup, brain pin, agent allow/deny rules). A backend implements both.
 Keys are logical storage keys (see `docs/run-workspace.md`), never paths of a data repository.
 """
 from __future__ import annotations
@@ -61,4 +61,4 @@ class RunSource(Protocol):
         """Brain pin of the run (commit resolved without fetch)."""
 
     def bubble(self, agent: str) -> dict:
-        """`{"allow": [...], "deny": [...]}` permissions of the project for this agent role."""
+        """`{"allow": [...], "deny": [...]}` rules of the project for this agent role."""
