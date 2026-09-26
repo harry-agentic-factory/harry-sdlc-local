@@ -288,6 +288,176 @@ document = `{category: "artifact", kind, run_uid, agent, phase, feature, story, 
 `manifest.json` / `run.json` = `{category: "run_meta", run_uid}`. `list("runs/")` returns the
 `runs/<uid>/run.json` of the traces.
 
+## Code runs (`runWorkspace: true`)
+
+Opt-in per project: `runWorkspace: true` in `sdlc.config.json` (`sdlc config` shows the key only when it
+is present). Absent or `false` ⇒ every command above behaves exactly as described, `rw/code/` stays empty.
+Any other value ⇒ `run init` refuses `run_workspace_invalid`. On a project that is not activated, every
+code option of `run init` (`--branch`, `--base`, `--repro`, `--repro-dir`, `--status`) and
+`run finish --status` are refused with `run_workspace_disabled:<option>` (never a silent fallback).
+
+```bash
+sdlc [--project P] run init <STORY> --agent <role> [--phase <p>] [--branch <b>] [--base <base>]
+                            [--repro <run_uid> | --repro-dir <abs dir>] [--status <target>]
+sdlc [--project P] run finish <run_uid|root> [--keep] [--status <target>]
+sdlc [--project P] clone --run <root> [--branch <b>] [--base <base>]   # clone the code of an open run
+```
+
+### `run init` of a code run
+
+Every validation and every read (remote listing, repro, transition check) happens before the first
+write; a refusal creates nothing (exit 1). Then the `-1` build in `.<uid>.partial/`, the clones, and the
+transition just before the rename.
+
+- **Targets** = `repos` of the story → `rw/code/<repo>/` (writable) on the story branch (`--branch`, else
+  the `branch` of the story, else `branch_required`). The remote branch is checked out when it exists
+  (`created: false`), else created from the base (`--base`, else `refBranch`; absent from the remote ⇒
+  `base_unknown:<repo>:<base>`). The base is a **local** branch (`git diff <base>...HEAD` works without
+  remote). A branch equal to the base or to `refBranch` ⇒ `branch_protected:<branch>`. Branch names are
+  checked against `BRANCH_RE` (`branch_invalid:<name>`) before any git call.
+- **Neighbours** = the other `repos` of the manifest → `in/repos/<repo>/` (read only), shallow clone
+  (`--depth 1`) of the base, else `refBranch`, else the remote `HEAD` (warning
+  `neighbour_base_fallback:<repo>`). Manifest entry `{key: "repos/<repo>", commit, role: "neighbour"}`.
+- **Source** = `remote.origin.url` of the declared local repository: no declared copy ⇒ target refused
+  `repo_unresolved:<repo>`, neighbour ignored with the same warning; a copy without `origin` ⇒
+  `no_remote:<repo>` (any role); a remote that cannot be listed or cloned ⇒ `clone_failed:<repo>`.
+- **No remote, no credential in the workspace**: clones use the host git configuration
+  (`credentials.source: host`); afterwards `git remote` is empty, `git config --local` has no
+  `remote.*`, `credential.*`, `http.*`, `url.*` key, reflogs are removed. No URL is written in any engine
+  file of the run.
+- **Bubble**: `in/settings.json` also denies `Bash(git push:*)` and `Bash(git remote:*)`. The local bubble
+  is **indicative**: the Workflow runtime does not apply it to local agents; real isolation is the
+  container of a platform worker.
+- **Repro** (fixer): `--repro <run_uid>` copies the `*.md` published by that run under
+  `runs/<uid>/out/sources/repro/` into `in/repro/` (unknown or not published ⇒ `repro_unknown:<uid>`;
+  none ⇒ warning `repro_empty`); `--repro-dir <abs dir>` copies the regular `*.md` of a folder
+  (`origin` = absolute path, `version: null`; none or invalid ⇒ `repro_dir_invalid`). Exclusive
+  (`repro_conflict`). Common manifest entries, checked by the `in/` check, never listed in `dirty`.
+- **`--status <target>`**: validated against the state machine without writing (`status_invalid:<from>-><to>`),
+  applied just before the run becomes visible; `from == to` is a no-op (`applied: false`).
+- **Mission**: `code.json` with `repos: {}`, no clone, no neighbour; every code option ⇒
+  `mission_scope_unsupported:<option>`.
+
+JSON: the `-1` fields + `repos: {<repo>: {role, path, branch, base, head, created}}` (neighbour:
+`branch: null`, `created: false`, `base` = branch cloned or `null` for the remote HEAD) + `status: {from,
+to, applied}` when `--status` is given; warnings `repo_unresolved:<repo>`, `neighbour_base_fallback:<repo>`,
+`repro_empty`.
+
+`<root>/code.json` (engine file next to `run.json` and `seal.json`, outside `in/` and `rw/`, never
+published) marks a code run and holds no URL nor identifier:
+
+```json
+{"schema_version": 1, "branch": "feat/X-1", "base": "main",
+ "repos": {"app": {"role": "target", "ref": "feat/X-1", "head": "<sha>", "created": true},
+           "lib": {"role": "neighbour", "ref": "main", "head": "<sha>", "created": false, "config_sha256": "<sha256>"}},
+ "bundles": {"app": {"sha": "<sha>", "sha256": "<sha256>", "size": 1234}}}
+```
+
+It is not sealed: a platform worker keeps it outside the volume of the agent (only `in/` and `rw/` are
+mounted); locally the bubble is indicative.
+
+### `run finish` of a code run
+
+Without `code.json`: exactly the finish above. With it, in this order (all or nothing):
+
+1. `--status`: mission ⇒ `mission_scope_unsupported:--status`; else validated (reason `status_invalid`).
+2. Checks of `-1`, with `rw/out/sources/` published (regular files only, `unexpected_file:sources/<rel>`
+   otherwise; each file ≤ `SOURCE_MAX_BYTES` = 50 MiB ⇒ `source_too_large:<rel>`; total ≤
+   `RUN_SOURCES_MAX_BYTES` = 200 MiB ⇒ `sources_total_too_large`) and a file of `rw/out/git/` admitted only
+   when the engine recorded it in `code.json.bundles` with exactly that sha256 (else `unexpected_file`).
+3. Git checks (read only): neighbours = real `.git` folder without `commondir`/alternates, `.git/config`
+   unchanged (checked **before** any git call), `HEAD` = manifest commit, `status --porcelain --ignored`
+   empty, else `in_modified:repos/<repo>`; targets = same structure (`code_invalid:<repo>`), story branch
+   present (`branch_deleted:<repo>`), other branches/tags ignored (warning `extra_refs_ignored:<repo>`).
+4. Bundles (engine, idempotent): `rw/out/git/<repo>.bundle` = the only `refs/heads/<branch>` with the
+   recorded `head` as prerequisite; no new commit ⇒ `"unchanged"`.
+5. Push preparation for **every** target first: fresh bare clone under `<root>/../_push/<run_uid>/`
+   (URL re-resolved through the `CodeHost`, never read in the run, hooks disabled), `bundle verify`, fetch,
+   fast-forward check (`non_fast_forward:<repo>`, also when the recorded `head` no longer exists on the
+   remote). One refusal ⇒ nothing is pushed on any repository.
+6. Push `<sha>:refs/heads/<branch>` (never forced) unless `outcome` (`failed`/`timeout`: bundles are
+   published without push, `pushed: false`). A failure ⇒ `push_failed:<repo>`, nothing published; a
+   replay is safe (a remote already at the sha is not pushed again).
+7. Publication: documents → `runs/<uid>/out/sources/<rel>` (`meta.category = "source"`) →
+   `runs/<uid>/out/git/<repo>.bundle` (`"bundle"`) → `manifest.json` → transition → `run.json` (the 14
+   keys of `-1`) → clean. The `_push/<run_uid>/` folder is removed in every case. A story moved by a third
+   party between validation and transition ⇒ `rejected`, `status_invalid:<now>-><target>`, no final
+   `run.json`.
+
+JSON: the `-1` fields + `git: {<repo>: {pushed, sha, branch} | "unchanged"}` (`pushed` = the remote branch
+is at `sha` at the end; `git: {}` for a mission) + `status` when `--status` is given.
+
+### Git on a repository the agent touched
+
+Every git call of the engine goes through `gitcode.py`: `_git_trusted` (declared repositories, fresh
+clones) or `_git_untrusted` (`rw/code/<repo>`, `in/repos/<repo>`), which only allows `rev-parse`,
+`for-each-ref`, `bundle` and `status` with `--no-optional-locks -c core.fsmonitor=false
+-c core.hooksPath=<none> -c core.untrackedCache=false`. No command reads the working copy of a target
+(filters and monitors of the agent never run); a push never uses the `.git` of the agent. The environment
+is inherited unchanged: no credential is read, written or passed.
+
+### `CodeHost` and platform workers
+
+```python
+@dataclass(frozen=True)
+class RepoSpec:
+    name: str
+    role: str                 # "target" | "neighbour"
+    url: str | None           # clone/push source; never persisted in the run
+    missing: str | None = None    # "path" | "remote" | None
+class CodeHost(Protocol):
+    def code_repos(self, scope: Scope) -> list[RepoSpec]: ...
+    def default_base(self) -> str: ...
+
+run_init(..., branch=None, base=None, repro=None, repro_dir=None, status=None, code=None, code_host=None)
+run_finish(run, *, backend=None, keep=False, outcome=None, status=None, code_host=None)
+code_clone(root, *, backend=None, code_host=None, branch=None, base=None)       # = sdlc clone --run
+# also: CodeHost, RepoSpec, SOURCE_MAX_BYTES, RUN_SOURCES_MAX_BYTES
+```
+
+`code=None` ⇒ `backend.run_workspace`; `code=True` needs a `CodeHost` (`code_host=`, else the backend;
+`code_host_required`). `status` needs `backend.story_status` / `backend.transition` (`status_unsupported`);
+`outcome` and `status` together ⇒ `outcome_status_conflict`. A worker calls `run_init(..., code=True,
+code_host=<platform>)`, runs the container, then `run_finish(...)`: the bundles are written by
+`run_finish`, never by the agent. The local backend (`DataRepoBackend`) is also a `CodeHost` (targets =
+repos of the story, neighbours = the others, `url` = `remote.origin.url` of the declared copy) and puts
+`runs/<uid>/out/sources/<rel>` and `runs/<uid>/out/git/<repo>.bundle` with the add-only write; it lists
+`runs/<uid>/out/sources/repro/` (regular `*.md`, `version = <uid>`).
+
+Other codes: `clone_exists` (`sdlc clone` on a run that already has code), `repo_invalid`.
+
+## Workflow (`run-ticket.js`, `args.runWorkspace === true`)
+
+`/run-story` reads `sdlc config` and passes `runWorkspace: true` to the Workflow only when the project has
+it; otherwise `args` are unchanged and so are prompts, labels, agent types and phases (checked byte for byte
+by the harness against goldens captured from the base of the story).
+
+In run workspace mode each role call is framed by a **Prepare** step (`general-purpose`, label
+`prepare:<key>:<TICKET>`, same phase as the role) that runs `sdlc run init <TICKET> --agent <role>
+--branch <BRANCH> --base <BASE>` and a **Finish** step (`finish:<key>:<TICKET>`) that runs
+`sdlc run finish <run_uid> [--status <target>]`. The global Prepare (`sdlc workspace`) is not played. Role
+prompts carry `RUN_UID`, `IN`, `OUT`, `CODE`, `BASE` and "every `sdlc doc` command takes `--run <root>`":
+no data repository path, no story path, no status change.
+
+| Role label | key | `run init` adds | `finish --status` when |
+|---|---|---|---|
+| `review:` | `reviewer` | — | `conform` ⇒ `reviewed` |
+| `deploy:` / `redeploy:` | `deployer` | — | `ok` ⇒ `deployed` |
+| `recette:` | `recetteur` | — | `pass` ⇒ `recette_ok` |
+| `fix:` | `fixer` | `--status implemented --repro <run_uid of the last tester Prepare>` (`fixFrom`: `--repro-dir <dir>`) | `fixed` ⇒ `reviewed` |
+| `promote:` | `promote` | `--agent deployer --phase promote` | never |
+| `recette-<BASE>:` | `recette-<BASE>` | `--agent recetteur --phase recette-main` | never |
+
+A Prepare without `run_uid`/`root` stops the workflow (`needs_human`, `prepare_failed`); a Finish that is
+neither `published` nor `already` stops it (`finish_rejected`, `reasons`); a fix not `fixed` or a redeploy
+not `ok` stops it (`fix_failed` / `redeploy_failed`). The reference orchestrator (`orchestrator.py`,
+`run_workspace=`) follows the same rules.
+
+Stub harness (no LLM, `node:*` only): `node tooling/tests/js/run_ticket_harness.mjs --script
+claude/workflows/run-ticket.js --scenario <json> [--exec]` journals every agent call `{prompt, agentType,
+label, phase}`; `--exec` runs the `sdlc` command of each Prepare/Finish for real (`SDLC_CMD`), with active
+role stubs.
+
 ## Example (throwaway project `DEMO`)
 
 ```bash

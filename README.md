@@ -268,6 +268,7 @@ sdlc --project P run list [<STORY>] ; sdlc --project P run clean <run_uid>
 ```
 Bibliothèque `sdlc.runws` (stdlib seule, port `DocumentRepository`) : `run_init(..., root=, backend=)` pour
 brancher un autre stockage. Aucun commit git : le repo data reste modifié, comme quand un agent l'écrit.
+Projet en **`runWorkspace: true`** : `run init` clone aussi le code (cibles dans `rw/code/`, voisins en lecture dans `in/repos/`, sans remote ni identifiant), `run finish [--status]` pousse la branche depuis un clone neuf puis transitionne, et `run-ticket.js` encadre chaque agent par Prepare/Finish — voir [`docs/run-workspace.md`](docs/run-workspace.md#code-runs-runworkspace-true).
 
 **Identité (`credentials.source`)** : `host` (défaut) = creds **ambiantes de l'opérateur** —
 `curl -s -n`/`~/.netrc`, `~/.kube/config`, keyring `gh`/`glab` — **utilisées sans jamais être lues ni
