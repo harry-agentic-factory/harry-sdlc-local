@@ -46,7 +46,7 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
 - Rappelle `/doc-feature` (sur **tous** les repos touchés — règle `doc-feature-multi-repo`).
 - Enchaîne sur le **tronçon autonome** (contextes isolés) : `reviewer → deployer → recette → [fix-loop] →
   e2e-author → nonreg → demo → accept`, orchestré par
-  `Workflow({scriptPath:'~/.claude/workflows/run-ticket.js', args:{ticket,epic,prefix,repoName,branch}})`.
+  `Workflow({scriptPath:'~/.claude/workflows/run-ticket.js', args:{ticket,epic,prefix,repoName,branch,base}})` (`base` = `origin/epic/<EPIC>` en trunk d'épic, défaut `main`).
   Toi (Harry) tu tiens les gates ; les agents ne font PAS avancer l'état.
 - **Le Workflow rend un `{stopped_at, reason}` — ce n'est pas la fin.** `run-ticket` plafonne sa fix-loop
   à `MAX_FIX = 2` puis rend `needs_human`. Ce retour ne vit **que** dans la conversation : consigne-le

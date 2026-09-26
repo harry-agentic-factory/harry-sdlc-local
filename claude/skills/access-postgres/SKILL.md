@@ -1,6 +1,6 @@
 ---
 name: access-postgres
-description: Interroger la base d'un service en LECTURE SEULE pour une enquête, sans jamais extraire les identifiants. Paramétré par le manifest SDLC (`sdlc config` → `infra.database`) : hôte, provenance des credentials, client et mode d'accès viennent du projet. À charger dès qu'une question porte sur ce qui est RÉELLEMENT stocké — la base tranche souvent en une requête ce que le code ne fait que suggérer.
+description: "Interroger la base d'un service en LECTURE SEULE pour une enquête, sans jamais extraire les identifiants. Paramétré par le manifest SDLC (`sdlc config` → `infra.database`) : hôte, provenance des credentials, client et mode d'accès viennent du projet. À charger dès qu'une question porte sur ce qui est RÉELLEMENT stocké — la base tranche souvent en une requête ce que le code ne fait que suggérer."
 ---
 
 # Interroger la base (paramétré par le manifest)

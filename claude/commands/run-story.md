@@ -45,9 +45,13 @@ sdlc --project <PREFIX> get <STORY>     # d'où on part
 | `spec_func_validated` | `/spec-tech` | ↓ |
 | `spec_tech` | **GATE TECHNIQUE** : `harry-archi` sur les invariants → escalades → `validate-spec --review` | ↓ |
 | `spec_validated` | `/implement` (qui ouvre la bulle scopée en premier) | ↓ |
-| `implemented` | `Workflow({scriptPath:'~/.claude/workflows/run-ticket.js', args:{ticket,epic,prefix,repoName,branch}})` | ↓ |
+| `implemented` | `Workflow({scriptPath:'~/.claude/workflows/run-ticket.js', args:{ticket,epic,prefix,repoName,branch,base}})` (`base` = `origin/epic/<EPIC>` en trunk d'épic, défaut `main`) | ↓ |
 | `reviewed` / `deployed` | reprends le workflow là où il s'est arrêté (`reviewOk:true` après une review approuvée) | ↓ |
 | `recette_ok` | **RECETTE MANUELLE** (cf. boucle externe) — KO ⇒ `pm` + `reject --to implemented` + relance ; OK ⇒ **STOP, gate humaine** | — |
+
+**Run workspace** (ligne `implemented`) : lis `sdlc --project <P> config` ; si `.runWorkspace == true`, ajoute
+`runWorkspace: true` aux `args` du Workflow (chaque agent tourne alors dans son workspace de run, transitions
+portées par `run finish --status`) ; sinon les `args` sont **inchangés** (la clé n'est pas passée).
 
 Après chaque étape : `set-status`, et **relis** l'état plutôt que de supposer où tu en es.
 

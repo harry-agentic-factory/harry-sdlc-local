@@ -1,6 +1,6 @@
 ---
 name: deploy-jenkins
-description: Déploie un module de code via un pipeline Jenkins (CI puis CD/gitops), piloté par les paramètres du manifest SDLC (`sdlc config` → `deploy.<repo>`). Couvre trigger normal ou Replay(CODE_BRANCH), crumb CSRF, polling du build, vérif santé et rollback. Générique et project-agnostic : toutes les valeurs projet viennent du manifest, rien n'est en dur. À utiliser dès qu'un agent (deployer) doit déployer une story dont le repo a un bloc `deploy` de type Jenkins.
+description: "Déploie un module de code via un pipeline Jenkins (CI puis CD/gitops), piloté par les paramètres du manifest SDLC (`sdlc config` → `deploy.<repo>`). Couvre trigger normal ou Replay(CODE_BRANCH), crumb CSRF, polling du build, vérif santé et rollback. Générique et project-agnostic : toutes les valeurs projet viennent du manifest, rien n'est en dur. À utiliser dès qu'un agent (deployer) doit déployer une story dont le repo a un bloc `deploy` de type Jenkins."
 ---
 
 # Déployer via Jenkins (paramétré par le manifest)
@@ -263,3 +263,22 @@ owner = ta story/session).
 Détails d'un pipeline précis (Jenkinsfile, shared-lib, casse des jobs, quirks Replay) : le **Brain**
 du projet (`.brain` du manifest, ex. `deployments/*.md`) et le `CLAUDE.md` du repo. Le manifest reste
 la **source des paramètres** ; le Brain, la source du **pourquoi/comment fin**.
+
+## Workspace de run
+
+Si le prompt fournit `IN`, `OUT` et `CODE` (mode run workspace, projet en `runWorkspace: true`), ces règles
+remplacent les chemins de story, les worktrees et les transitions décrits plus haut :
+- **Lire** : `sdlc doc read <clé> --run <root>` (`spec-tech`, `spec-func`, `prd`, `brain/<chemin>`… ; liste :
+  `sdlc doc list --run <root>`) ou les fichiers de `IN`, en lecture seule. Jamais le dépôt data.
+- **Écrire** : brouillons (et notes de reprise « au fil de l'eau ») dans `<root>/rw/scratch/`, jamais dans un
+  dossier temporaire système ; puis **un seul** `sdlc doc add deploy <fichier> --run <root>` en fin, avec une
+  section `## Recap`.
+- **Code** : `git -C CODE …`, commits sur la branche de la story ; **jamais** de push, de `git remote`, de
+  `sdlc link` ni de changement de statut : l'orchestration publie (`sdlc run finish`) et transitionne.
+- Commandes d'état et de config permises : `sdlc get`, `sdlc config`, `sdlc deploy-target`, `sdlc pm add`.
+- **Déploiement** : cible = `sdlc --project <P> deploy-target <repo> --env dev|integration`. L'artefact déployé
+  ne doit **pas** référencer `CODE` (détruit par `run finish`) : copie ou construis depuis `CODE`, jamais de
+  bind-mount du workspace de run. Version déployée = `git -C CODE rev-parse HEAD`.
+- **Promote** : merge par la CLI de l'hébergeur avec `--repo` = `origin` du dépôt déclaré (`sdlc --project <P>
+  config` → chemin du dépôt → `git -C <chemin> remote get-url origin`) ; ne l'écris dans aucun fichier du run.
+Sans `IN`/`OUT` : les instructions ci-dessus s'appliquent inchangées.

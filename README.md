@@ -8,9 +8,9 @@ qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de d
 
 ## Quickstart
 ```bash
-git clone <repo-url> harry-sdlc-local && cd harry-sdlc-local
-make install     # symlinke l'engine dans ~/.claude + crée la commande globale `sdlc`
-make test        # 113 tests (déterministe, offline)
+git clone --depth 1 --branch v0.7.0 https://github.com/harry-agentic-factory/harry-sdlc-local \
+  && ./harry-sdlc-local/install.sh v0.7.0   # version publiée ; `sdlc --version` = 0.7.0 (release)
+# développeur du moteur : dans un clone, `make install` (= install.sh --dev .) puis `make test`
 
 # 1 projet = 1 repo data
 sdlc init-project SAMPLE --path ../sample-proj-sdlc-local --repos app-repo,web-repo
@@ -149,8 +149,11 @@ C'est ce que veut dire « vas-y en mode auto ».
 
 ## Contenu
 ```
-VERSION                    # version d'engine (semver)
-install.sh · Makefile      # make install  → symlink dans ~/.claude
+VERSION                    # version d'engine (semver) — source unique (paquet, tag, sdlc --version)
+CHANGELOG.md               # Keep a Changelog ; section [X.Y.Z] = notes de la Release
+install.sh · Makefile      # install.sh vX.Y.Z | --dev <chemin> ; make install = --dev
+scripts/                   # check-tag-version, changelog-section, wheel-smoke, ci-local (règles de release)
+.github/workflows/         # ci.yml (PR/push) · release.yml (tag vX.Y.Z → GitHub Release)
 claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
   commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket,
@@ -159,19 +162,43 @@ claude/
   skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)
   sdlc/        harry.md (persona)
 tooling/
-  sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/
+  sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/, brain/
   cockpit/     board + Inbox HITL (FastAPI + page)
-  tests/       113 tests (déterministe, offline)
+  tests/       216 tests (déterministe, offline)
 docs/PRD.md
 ```
 
 ## Installer / tester
+
+L'installation se fait **sur un tag** (`vX.Y.Z`) ou, explicitement, sur une **copie de travail** (`--dev`) :
 ```bash
-make install         # symlink claude/* -> ~/.claude ; crée la commande globale `sdlc` (dans un dir du PATH)
-make test            # pytest du cœur déterministe
+# amorçage (première installation) : un clone jetable au tag, qui s'installe lui-même
+git clone --depth 1 --branch v0.7.0 https://github.com/harry-agentic-factory/harry-sdlc-local \
+  && ./harry-sdlc-local/install.sh v0.7.0
+~/.local/share/harry-sdlc/current/install.sh v0.7.1   # montée de version (clone détaché au tag)
+~/.local/share/harry-sdlc/current/install.sh v0.7.0   # retour arrière : bascule seule, aucun clone
+./install.sh --dev "$PWD"                             # mode dev : `current` = cette copie (= make install)
+sdlc --version        # 0.7.0 (release)  |  0.7.0-dev+<sha>[.dirty] (dev: <chemin>)
+make test             # pytest du cœur déterministe
 ```
-`make install` pose une commande **`sdlc`** appelable de partout (dans `/usr/local/bin`, `/opt/homebrew/bin`
-ou `~/.local/bin` selon ton PATH). Ensuite :
+```
+~/.local/share/harry-sdlc/         ($HARRY_SDLC_HOME)
+├── v0.7.0/  v0.7.1/               clones détachés aux tags, jamais modifiés
+└── current -> v0.7.1              version active (ou chemin d'une copie en --dev)
+~/.claude/{agents,commands,workflows,skills}/<x>, ~/.claude/sdlc/harry.md, <dossier du PATH>/sdlc
+                                   liens vers ~/.local/share/harry-sdlc/current/…
+```
+- `install.sh` **exige** un argument (`vX.Y.Z` ou `--dev <chemin>`) ; un tag ≠ `v` + `VERSION` du clone, ou une
+  branche, est **refusé** sans rien changer (même script que la Release : `scripts/check-tag-version.sh`).
+- Basculer / revenir = déplacer `current` (renommage atomique) : les liens de `~/.claude` ne changent pas.
+- Les liens de l'ancien mode (vers une copie `harry-sdlc-local`) sont **migrés** ; un fichier réel ou un lien
+  tiers n'est jamais touché (avertissement) ; `projects.json` est créé seulement s'il manque ; `profile`,
+  `locks/`, `agent_runs.log`, `settings.json` ne sont jamais lus ni écrits. Idempotent.
+- Variables : `HARRY_SDLC_HOME` (défaut `~/.local/share/harry-sdlc`), `HARRY_SDLC_REPO` (défaut : l'URL GitHub
+  publique ; ex. un dépôt nu local pour tester), `CLAUDE_HOME` (défaut `~/.claude`).
+
+La commande **`sdlc`** est posée dans le dossier du PATH qui porte déjà un lien `sdlc` du moteur, sinon le premier
+dossier inscriptible parmi `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`. Ensuite :
 ```bash
 sdlc projects                        # projets enregistrés
 sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
@@ -225,11 +252,50 @@ Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-
   "repos": { "app-repo": null, "ops-repo": "/opt/ops" },  // name→path (null ⇒ via reposRoot)
   "roles": { "app-repo": "code", "ops-repo": "gitops" },
   "brain": "sample-brain",                 // pointeur connaissance (résolu abs)
+  "brainRef": "main",                      // optionnel : branche, tag ou sha lu dans le Brain (défaut main puis master)
   "refBranch": "main",                     // cible de merge ⇒ cleanup worktree
   "deploy": { "app-repo": { "skill": "deploy-jenkins", "ci": "prod/app/ci", "gitops": "ops@prod" } },
   "escalation": { … }, "schemaVersion": "0.2.0" }
 ```
 `sdlc config` renvoie la vue **résolue** (chemins absolus) ; `sdlc config --raw` renvoie le fichier brut.
+`sdlc config` ajoute `brainRef` (la ref retenue), `brainCommit` (sha résolu, **sans fetch**) et `brainRefFrom`
+(`origin` | `local` | `tag` | `sha`) ; ref introuvable ou Brain hors git ⇒ `null` + un avertissement JSON sur stderr.
+
+### Brain (`sdlc brain`) — le dépôt de connaissance lu à un commit
+Le Brain est un dépôt git (ou un sous-dossier d'un dépôt) ; git est sa seule vérité. Une **note** = un `*.md` suivi
+au commit lu, hors `.claude/` et `hooks/` ; seul en-tête exigé : `category` (`produit`, `usage`, `archi`, `repo`,
+`config`, `cicd`, `exploit`, `observ`). Rien n'est lu dans la copie de travail. Référence : [`docs/brain.md`](docs/brain.md).
+```bash
+sdlc brain normalize --repo <brain> [--map brain-map.yaml] [--base main] [--branch b] [--dry-run] [--report r.md]
+sdlc brain lint      --repo <brain> [--ref HEAD] [--strict] [--format json|text]   # CI : exit 1 = bloquant
+sdlc brain snapshot  --repo <brain> --ref <ref> --out <dir>    # notes exactes + manifest.json + links.json
+sdlc brain diff      --repo <brain> <refA> <refB>  |  --manifests a.json b.json
+sdlc brain history   --repo <brain> <note> [--ref HEAD]
+```
+- `normalize` déduit `category` du chemin (règles de `brain-map.yaml` du Brain **puis** celles du moteur) et commite
+  sur une **branche neuve** (jamais `main`/`master`/branche par défaut, jamais de push) ; le corps des notes est
+  intact octet pour octet ; la copie de travail, l'index et la branche courante ne sont jamais touchés.
+- Codes de sortie : **0** succès (lint avec seuls avertissements compris) ; **1** lint en erreur (ou avertissements
+  avec `--strict`) ; **2** usage/refus/ref inconnue/dépôt absent ou hors git (stderr `{"error", "code"}`).
+- Bibliothèque Python `sdlc.brain` (stdlib seule) : même algorithme pour la CLI et les appelants.
+
+### Run workspace (`sdlc run`, `sdlc doc`) — l'espace jetable d'un agent autonome
+Un **run** = une exécution d'agent sur une story (ou une mission). `run init` fabrique un workspace isolé
+(`in/` en lecture : Markdown de l'épic + Brain au commit résolu + `manifest.json` + bulle `settings.json` ;
+`rw/` : `code/`, `scratch/`, `out/`), l'agent lit par **clé logique** et **ajoute** ses documents, puis
+`run finish` contrôle (in/ intact, rien d'inattendu dans `rw/out/`, taille), publie la trace
+`<data>/runs/<run_uid>/` et le tour **en tête** de l'artefact de la story, puis supprime le workspace.
+Référence (contrat, schémas, API de lib) : [`docs/run-workspace.md`](docs/run-workspace.md).
+```bash
+sdlc --project P run init <STORY> --agent reviewer      # ou : run init --mission <id> --agent investigator
+export SDLC_RUN=<root>                                  # côté agent : aucun chemin du repo data
+sdlc doc read spec-tech ; sdlc doc list ; printf '## Recap\nOK\n' | sdlc doc add review -
+sdlc --project P run finish <run_uid> [--keep]          # tout ou rien ; rejet ⇒ exit 1, state "rejected"
+sdlc --project P run list [<STORY>] ; sdlc --project P run clean <run_uid>
+```
+Bibliothèque `sdlc.runws` (stdlib seule, port `DocumentRepository`) : `run_init(..., root=, backend=)` pour
+brancher un autre stockage. Aucun commit git : le repo data reste modifié, comme quand un agent l'écrit.
+Projet en **`runWorkspace: true`** : `run init` clone aussi le code (cibles dans `rw/code/`, voisins en lecture dans `in/repos/`, sans remote ni identifiant), `run finish [--status]` pousse la branche depuis un clone neuf puis transitionne, et `run-ticket.js` encadre chaque agent par Prepare/Finish — voir [`docs/run-workspace.md`](docs/run-workspace.md#code-runs-runworkspace-true).
 
 **Identité (`credentials.source`)** : `host` (défaut) = creds **ambiantes de l'opérateur** —
 `curl -s -n`/`~/.netrc`, `~/.kube/config`, keyring `gh`/`glab` — **utilisées sans jamais être lues ni
@@ -244,18 +310,18 @@ Tour guidé pour comprendre **3 choses** : (a) **qui fait quoi** (responsabilit�
 
 ### 0. Installer, et comprendre ce que ça pose
 ```bash
-make install
+make install        # mode dev : install.sh --dev <cette copie>
 ```
-- **Symlinke** `claude/{agents,commands,workflows,sdlc}/*` → `~/.claude/…` (l'endroit que **Claude Code lit**).
-  Ce sont des **liens, pas des copies** : éditer un fichier de l'engine change *immédiatement* ce que Claude
-  utilise.
+- **Symlinke** `claude/{agents,commands,workflows,skills,sdlc}/*` → `~/.claude/…` (l'endroit que **Claude Code
+  lit**) via `~/.local/share/harry-sdlc/current`, qui pointe ici en mode dev. Ce sont des **liens, pas des
+  copies** : éditer un fichier de l'engine change *immédiatement* ce que Claude utilise.
 - Crée la **commande globale `sdlc`** (dans un dossier de ton PATH).
 - **Ne touche pas** à `~/.claude/sdlc/{profile,projects.json}` (ton **état perso** : profil courant + registre).
 
 ### 1. Voir le lien symlink ↔ plateforme (le point clé)
 ```bash
-readlink ~/.claude/agents/reviewer.md      # -> .../harry-sdlc-local/claude/agents/reviewer.md
-readlink ~/.claude/workflows/run-ticket.js # -> .../harry-sdlc-local/claude/workflows/run-ticket.js
+readlink ~/.claude/agents/reviewer.md      # -> ~/.local/share/harry-sdlc/current/claude/agents/reviewer.md
+readlink ~/.local/share/harry-sdlc/current # -> v0.7.0 (release) ou le chemin de ta copie (--dev)
 ```
 → chaque fichier de `~/.claude` est une **flèche** vers l'engine. **La source de vérité du comportement =
 l'engine** ; `~/.claude` n'est que le *point de montage* regardé par Claude Code. Tu modifies l'engine →
@@ -339,6 +405,38 @@ SDLC_WORKSPACE=$(cd ../sample-proj-sdlc-local && pwd) python3 -m cockpit.server 
 ```
 
 ---
+
+## Use as a library
+
+The engine is also the Python package **`harry-sdlc`** (import name `sdlc`, no dependency, Python ≥ 3.11), built
+from `tooling/` with hatchling. Pin it on a tag:
+
+```bash
+uv add "harry-sdlc @ git+https://github.com/harry-agentic-factory/harry-sdlc-local@v0.7.0#subdirectory=tooling"
+uv run sdlc --version        # 0.7.0 (release)
+```
+
+`uv.lock` records the commit sha of the tag. The wheel only ships the `sdlc` package (with `sdlc.brain`,
+`sdlc.runws`, `sdlc.migrations` and `py.typed`); `tooling/cockpit/` and the tests stay in the repository.
+`make dist` builds the wheel and the sdist into `tooling/dist/`.
+
+## Release
+
+The version has a single source: the `VERSION` file (one `X.Y.Z` line). `pyproject.toml` reads it at build time
+and never carries a static version; `engine_version()` / `sdlc --version` report it in every install mode.
+
+1. On the story branch: bump `VERSION` and move the `[Unreleased]` entries of `CHANGELOG.md` into a
+   `## [X.Y.Z] - YYYY-MM-DD` section (Keep a Changelog, ASCII hyphen), in one `chore(release): X.Y.Z` commit.
+2. `make release-check` (= `scripts/ci-local.sh --release vX.Y.Z`): local dry run of both workflows (tag check,
+   changelog section, tests, build, offline wheel smoke; the `gh release create` command is printed only).
+3. Promote the trunk to `main` through a pull request merged with **a merge commit** (not squash, not rebase),
+   once the `ci` workflow is green on Python 3.11 and 3.12.
+4. After `ci` is green on the merge commit of `main`, create and push an **annotated** tag on it:
+   `git tag -a vX.Y.Z -m "harry-sdlc X.Y.Z" <merge sha> && git push origin vX.Y.Z`.
+5. The `release` workflow checks the tag (`v` + `VERSION`, annotated, reachable from `main`), extracts the
+   changelog section, runs the tests, builds, smoke-tests the wheel and creates the GitHub Release with the
+   wheel and the sdist. A Release is never overwritten; a published tag is never moved (fix forward with a
+   patch version).
 
 ## Versioning & migration de la data
 L'engine est versionné (`VERSION`). Chaque repo data porte `schemaVersion` (dans `sdlc.config.json`).

@@ -1,6 +1,6 @@
 ---
 name: recette-ui
-description: Recette UI autonome via Playwright MCP — pilote un navigateur pour valider une story FRONT vs les critères d'acceptation. Même modèle que la recette API mais côté UI : l'AUTH (connexion) est l'étape contrôlée (spécifique projet, creds via ENV jamais exposés) ; UNE FOIS CONNECTÉ, navigation LIBRE dans les pages. Normalise la procédure (navigate/snapshot/assert), anti-flaky, acceptance.md newest-first. À utiliser quand `recette.<repo>.tool = ui`.
+description: "Recette UI autonome via Playwright MCP — pilote un navigateur pour valider une story FRONT vs les critères d'acceptation. Même modèle que la recette API mais côté UI : l'AUTH (connexion) est l'étape contrôlée (spécifique projet, creds via ENV jamais exposés) ; UNE FOIS CONNECTÉ, navigation LIBRE dans les pages. Normalise la procédure (navigate/snapshot/assert), anti-flaky, acceptance.md newest-first. À utiliser quand `recette.<repo>.tool = ui`."
 ---
 
 # Recette UI (Playwright MCP) — pendant de la recette API
@@ -51,3 +51,20 @@ Dernier message = JSON `{pass, repro, flaky, failed}`. **Ne change PAS le statut
 
 > 2-tiers : ce skill est **générique** ; l'appli/URL/login spécifiques viennent du **manifest** + d'un
 > **skill projet** (ex. futur `hia-recette-ui`). Même philosophie que `recette` + `hia-recette` côté API.
+
+## Workspace de run
+
+Si le prompt fournit `IN`, `OUT` et `CODE` (mode run workspace, projet en `runWorkspace: true`), ces règles
+remplacent les chemins de story, les worktrees et les transitions décrits plus haut :
+- **Lire** : `sdlc doc read <clé> --run <root>` (`spec-tech`, `spec-func`, `prd`, `brain/<chemin>`… ; liste :
+  `sdlc doc list --run <root>`) ou les fichiers de `IN`, en lecture seule. Jamais le dépôt data.
+- **Écrire** : brouillons (et notes de reprise « au fil de l'eau ») dans `<root>/rw/scratch/`, jamais dans un
+  dossier temporaire système ; puis **un seul** `sdlc doc add acceptance <fichier> --run <root>` en fin, avec une
+  section `## Recap`.
+- **Code** : `git -C CODE …`, commits sur la branche de la story ; **jamais** de push, de `git remote`, de
+  `sdlc link` ni de changement de statut : l'orchestration publie (`sdlc run finish`) et transitionne.
+- Commandes d'état et de config permises : `sdlc get`, `sdlc config`, `sdlc deploy-target`, `sdlc pm add`.
+- **Recette** : vérifie d'abord que la version déployée = `git -C CODE rev-parse HEAD`. Sur KO, le bundle repro va
+  dans `OUT/sources/repro/` (`steps.md`, `env.md`, `fixtures.md`, traces) et le verdict porte
+  `repro = "run:<RUN_UID>"` ; il sera publié avec le run et remis au fixer dans `IN/repro/`.
+Sans `IN`/`OUT` : les instructions ci-dessus s'appliquent inchangées.

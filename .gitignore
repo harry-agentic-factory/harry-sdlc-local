@@ -20,3 +20,8 @@ post-mortem.jsonl
 *.swp
 .idea/
 .vscode/
+
+# Packaging (generated at build time, never tracked)
+tooling/sdlc/_version.py
+tooling/dist/
+dist/

@@ -16,8 +16,8 @@ Pour **chaque** repo touché de la story, lis son bloc `deploy.<repo>` dans `sdl
 ## Deux modes de déploiement (l'orchestration te dit lequel — ne les confonds JAMAIS)
 Le pipeline est en **deux temps** avec une **validation humaine** au milieu :
 
-1. **DÉPLOIE LA BRANCHE en intégration** (étape 1, autonome — `escalation.deploy` en cours) :
-   - déploie **la branche courante `feat/<STORY>`** (skill deploy-jenkins : **Replay `CODE_BRANCH=<branche>`** sur le CI → CD → santé/version) ;
+1. **DÉPLOIE LA BRANCHE sur son env pré-merge** (étape 1, autonome — `escalation.deploy` en cours) :
+   - déploie **la branche courante `feat/<STORY>`** sur la cible `deploy-target <repo> --env dev`, avec le skill qu'elle rend (ex. `deploy-jenkins` : **Replay `CODE_BRANCH=<branche>`** → CD → santé/version ; ou un skill projet d'env docker local) ;
    - **PAS de merge, PAS de main, PAS de prod** — le but est de **recetter la branche déployée** ;
    - transition visée : `deployed`.
 2. **PROMOTE — merge + prod** (étape 2, **uniquement** quand l'orchestration te le demande explicitement, càd **après la validation humaine** ; `escalation.promote = human`) :
@@ -128,3 +128,22 @@ sdlc --project <PREFIX> pm add --agent deployer --kind <incident> \
      --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
 ```
 `<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.
+
+## Workspace de run
+
+Si le prompt fournit `IN`, `OUT` et `CODE` (mode run workspace, projet en `runWorkspace: true`), ces règles
+remplacent les chemins de story, les worktrees et les transitions décrits plus haut :
+- **Lire** : `sdlc doc read <clé> --run <root>` (`spec-tech`, `spec-func`, `prd`, `brain/<chemin>`… ; liste :
+  `sdlc doc list --run <root>`) ou les fichiers de `IN`, en lecture seule. Jamais le dépôt data.
+- **Écrire** : brouillons (et notes de reprise « au fil de l'eau ») dans `<root>/rw/scratch/`, jamais dans un
+  dossier temporaire système ; puis **un seul** `sdlc doc add deploy <fichier> --run <root>` en fin, avec une
+  section `## Recap`.
+- **Code** : `git -C CODE …`, commits sur la branche de la story ; **jamais** de push, de `git remote`, de
+  `sdlc link` ni de changement de statut : l'orchestration publie (`sdlc run finish`) et transitionne.
+- Commandes d'état et de config permises : `sdlc get`, `sdlc config`, `sdlc deploy-target`, `sdlc pm add`.
+- **Déploiement** : cible = `sdlc --project <P> deploy-target <repo> --env dev|integration`. L'artefact déployé
+  ne doit **pas** référencer `CODE` (détruit par `run finish`) : copie ou construis depuis `CODE`, jamais de
+  bind-mount du workspace de run. Version déployée = `git -C CODE rev-parse HEAD`.
+- **Promote** : merge par la CLI de l'hébergeur avec `--repo` = `origin` du dépôt déclaré (`sdlc --project <P>
+  config` → chemin du dépôt → `git -C <chemin> remote get-url origin`) ; ne l'écris dans aucun fichier du run.
+Sans `IN`/`OUT` : les instructions ci-dessus s'appliquent inchangées.

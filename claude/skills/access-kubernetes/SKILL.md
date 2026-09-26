@@ -1,6 +1,6 @@
 ---
 name: access-kubernetes
-description: Observer un cluster Kubernetes en LECTURE SEULE pour une enquête — pods, logs, déploiements, images, événements. Paramétré par le manifest SDLC (`sdlc config` → `infra.cluster`) : contexte, préalable d'authentification, namespaces et déploiements viennent du projet, rien n'est en dur. À charger dès qu'une question porte sur ce qui tourne, ce qui a tourné, ou ce qui est déployé.
+description: "Observer un cluster Kubernetes en LECTURE SEULE pour une enquête — pods, logs, déploiements, images, événements. Paramétré par le manifest SDLC (`sdlc config` → `infra.cluster`) : contexte, préalable d'authentification, namespaces et déploiements viennent du projet, rien n'est en dur. À charger dès qu'une question porte sur ce qui tourne, ce qui a tourné, ou ce qui est déployé."
 ---
 
 # Observer un cluster (paramétré par le manifest)

@@ -1,0 +1,24 @@
+{
+  "args": {
+    "ticket": "DEMO-E-1",
+    "epic": "DEMO-E",
+    "prefix": "DEMO",
+    "repoName": "app-repo",
+    "repo": "/repos/app-repo",
+    "sdlcRoot": "/data/demo",
+    "promote": true
+  },
+  "responses": {
+    "promote:": [
+      {
+        "ok": true,
+        "version": "v3"
+      }
+    ],
+    "recette-main:": [
+      {
+        "pass": true
+      }
+    ]
+  }
+}

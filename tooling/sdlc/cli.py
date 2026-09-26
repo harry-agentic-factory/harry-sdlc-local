@@ -20,6 +20,7 @@ from .config import current_project, load_config, resolve_deploy_target, resolve
 from .board import NullBoard
 from .service import Sdlc
 from .workspace import Workspace
+from .version import version_line
 
 
 def _csv(v: str | None) -> list[str]:
@@ -85,6 +86,15 @@ def _autocorrect(argv: list[str] | None, commands: list[str]) -> list[str]:
     return src
 
 
+class _VersionAction(argparse.Action):
+    """`--version`: computes the version line only when the option is given, then exits 0."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        sys.stdout.write(version_line() + "\n")
+        sys.stdout.flush()
+        parser.exit(0)
+
+
 def _sdlc(project: str | None) -> Sdlc:
     ws = resolve_workspace(project)
     return Sdlc(Workspace(ws), NullBoard())
@@ -99,6 +109,8 @@ def run(argv: list[str] | None = None) -> dict:
                "reviewed→deployed→recette_ok→accepted→done).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    p.add_argument("--version", action=_VersionAction, nargs=0,
+                   help="print the engine version and mode, then exit")
     p.add_argument("--project", default=None, help="préfixe projet (ex. SAMPLE) ; sinon workspace résolu par défaut")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="<commande>",
                            title="commandes", help="(voir `sdlc <commande> -h`)")
@@ -209,7 +221,19 @@ def run(argv: list[str] | None = None) -> dict:
     a = pmsub.add_parser("to-brain", help="marque l'item pour le Brain + suggère l'entrée de propale")
     a.add_argument("id", help="ID item (PM-…)")
 
+    # --- brain: read a git knowledge repo at a commit (sdlc.brain library) ---
+    from .brain import cli as brain_cli
+    brain_cli.add_parser(sub)
+    # --- run workspace of an autonomous agent (sdlc.runws library) ---
+    from .runws import cli as runws_cli
+    runws_cli.add_parsers(sub)
+
     args = p.parse_args(_autocorrect(argv, list(sub.choices)))
+
+    if args.cmd == "brain":
+        return brain_cli.dispatch(args)
+    if args.cmd in ("run", "doc", "clone"):  # never resolves a workspace before the library does
+        return runws_cli.dispatch(args)
 
     if args.cmd == "migrate":
         from .migrations import apply_migrations
@@ -231,7 +255,7 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "config":
         if args.raw:
             return load_config(resolve_workspace(args.project))
-        return resolved_manifest(args.project)
+        return resolved_manifest(args.project, with_brain_ref=True)
     if args.cmd == "skills":
         man = resolved_manifest(args.project)
         stacks = man.get("stacks", {})
@@ -348,11 +372,28 @@ def run(argv: list[str] | None = None) -> dict:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from .brain import BrainError
+    from .brain.cli import CommandResult
     try:
-        print(json.dumps(run(argv), indent=2, ensure_ascii=False))
+        res = run(argv)
+        if isinstance(res, bytes):          # `doc read`: raw document bytes, nothing added
+            sys.stdout.flush()
+            sys.stdout.buffer.write(res)
+            sys.stdout.buffer.flush()
+            return 0
+        if isinstance(res, CommandResult):
+            print(res.text if res.text is not None else json.dumps(res.payload, indent=2, ensure_ascii=False))
+            return res.exit_code
+        print(json.dumps(res, indent=2, ensure_ascii=False))
         return 0
+    except BrainError as e:  # brain library error: stable code, exit 2
+        print(json.dumps({"error": e.message, "code": e.code}, ensure_ascii=False), file=sys.stderr)
+        return 2
     except Exception as e:  # noqa: BLE001 — CLI: message propre
-        print(json.dumps({"error": str(e)}, ensure_ascii=False), file=sys.stderr)
+        err = {"error": str(e)}
+        if getattr(e, "diagnostic", None):  # e.g. the redacted stderr of a failed git call
+            err["diagnostic"] = e.diagnostic
+        print(json.dumps(err, ensure_ascii=False), file=sys.stderr)
         return 1
 
 
