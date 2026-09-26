@@ -21,6 +21,8 @@ Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
    **avec un 🔬 Must-validate par AC** + section « Tests obligatoires au build »).
 4. **Avance l'état** : `python3 -m sdlc.cli --project SAMPLE set-status <STORY> spec_func`.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 Le chemin `spec-func.md` + la liste des critères d'acceptation.
 

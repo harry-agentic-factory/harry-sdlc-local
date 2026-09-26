@@ -1,0 +1,44 @@
+{
+  "args": {
+    "ticket": "DEMO-E-1",
+    "epic": "DEMO-E",
+    "prefix": "DEMO",
+    "repoName": "app-repo",
+    "repo": "/repos/app-repo",
+    "sdlcRoot": "/data/demo",
+    "review": "auto"
+  },
+  "responses": {
+    "prepare:DEMO-E-1": [
+      {
+        "worktree": "/wt/app-repo",
+        "additionalDirectories": [],
+        "projectSkills": []
+      }
+    ],
+    "review:": [
+      {
+        "conform": true,
+        "conflict": {
+          "doc": "DEMO-E/stories/DEMO-E-1/review.md",
+          "base": "1111111111111111111111111111111111111111",
+          "latest": "2222222222222222222222222222222222222222",
+          "intermediate": "a human added the section Invariants",
+          "divergent": ["Invariants"],
+          "intended": "rewrite the section Invariants with the verdict"
+        }
+      }
+    ],
+    "status:": [
+      {
+        "status": "implemented"
+      }
+    ],
+    "deploy:": [
+      {
+        "ok": true,
+        "version": "v1"
+      }
+    ]
+  }
+}

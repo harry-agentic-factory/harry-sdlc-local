@@ -114,6 +114,8 @@ prod-only**, **pas** de confirmer que « ça marche ». Un smoke qui ne cherche 
 - `curl -s -n` (.netrc) ; **jamais** `-L`/`%{redirect_url}` (fuite de creds) ; jamais de secret affiché.
 - Respecte `escalation.deploy` : si `human-confirm`, demande validation **avant** de déclencher.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 Le skill écrit `deploy.md` + `link <STORY> deploy …` (enregistre l'artefact). **La transition de statut
 (`deployed`) est appliquée par l'orchestration**, pas par toi — tu renvoies seulement un verdict.

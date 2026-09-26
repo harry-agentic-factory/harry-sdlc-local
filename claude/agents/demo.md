@@ -17,6 +17,8 @@ Tu es l'agent **demo** du SDLC. Tu fais la **démo de la feature** comme en agil
    + critère × montré. Le `## Recap` est ce que lit `sdlc status`.
 4. `sdlc.cli link <STORY> demo <chemin>`. **N'accepte pas toi-même** : c'est la gate humaine finale.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie (dernier message = JSON)
 `{"demo": "<chemin demo.md>", "criteria_shown": ["..."], "ready_for_accept": true}`
 

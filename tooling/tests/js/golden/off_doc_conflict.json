@@ -11,13 +11,28 @@
       "agentType": "reviewer",
       "label": "review:DEMO-E-1",
       "phase": "Review"
+    },
+    {
+      "prompt": "Lis l'état du ticket **DEMO-E-1** sans rien modifier. Exécute en Bash exactement une fois :\n`sdlc --project DEMO get DEMO-E-1`\nRenvoie STRICTEMENT {\"status\": <champ status de sa sortie>} ; si le code de sortie est ≠ 0, renvoie {\"error\": \"<stderr>\"}. Ne fais RIEN d'autre.",
+      "agentType": "general-purpose",
+      "label": "status:DEMO-E-1",
+      "phase": "Review"
     }
   ],
   "result": {
     "stopped_at": "review",
-    "reason": "await_review",
-    "review": {
-      "conform": true
-    }
+    "reason": "needs_human",
+    "detail": "doc_conflict",
+    "conflict": {
+      "doc": "DEMO-E/stories/DEMO-E-1/review.md",
+      "base": "1111111111111111111111111111111111111111",
+      "latest": "2222222222222222222222222222222222222222",
+      "intermediate": "a human added the section Invariants",
+      "divergent": [
+        "Invariants"
+      ],
+      "intended": "rewrite the section Invariants with the verdict"
+    },
+    "status_now": "implemented"
   }
 }

@@ -97,6 +97,34 @@ def _write_atomic(path: Path, data: bytes) -> None:
         raise
 
 
+RENDER_ATTEMPTS = 3
+
+
+def _replace_if_unchanged(path: Path, expected: bytes | None, data: bytes) -> bool:
+    """Replace `path` by `data` only if it still holds `expected` (`None` = absent); False otherwise.
+
+    The new bytes are written to a temporary file first, the target is re-read just before the atomic
+    rename; an abandoned attempt removes its temporary file. The residual window is the rename itself.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        current = _read_regular(path) if os.path.lexists(path) else None
+        if current != expected or (expected is None and os.path.lexists(path)):
+            os.unlink(tmp)
+            return False
+        os.replace(tmp, path)
+        return True
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 class DataRepoBackend:
     """`DocumentRepository` + `RunSource` on a data repository (plus workspace discovery)."""
 
@@ -491,31 +519,39 @@ class DataRepoBackend:
         _write_atomic(path, content)
 
     def _publish_story_doc(self, uid: str, doc_type: str, content: bytes, meta: dict) -> int:
+        """Render the round in front of `<STORY>/<type>.md`, compare-and-swap against a concurrent writer.
+
+        The `flock` of `put` only serialises engines: a human or a session may edit the file with its own
+        tools meanwhile. The file is re-read just before the replacement; if it changed since it was read,
+        the rendering is redone on the latest bytes (prepending cannot diverge: both contents are kept), at
+        most `RENDER_ATTEMPTS` times, then `put_conflict` (the run is left without final state, replayable).
+        """
         story = validate_scope_id(meta["story"])
         epic = Workspace(self.ws).load(story).epic
         rel = f"{epic}/stories/{story}/{doc_type}.md"
         target = self.ws / rel
-        old = b""
-        if os.path.lexists(target):
-            data = _read_regular(target)
-            if data is None:
-                raise RunError("put_conflict", rel)
-            old = data
-        rounds = []
-        for line in old.split(b"\n"):
-            m = ROUND_HEADER_BYTES_RE.fullmatch(line.rstrip(b"\r"))
-            if m:
-                if m.group(2).decode() == uid:
-                    return int(m.group(1))            # replay after a crash: already rendered
-                rounds.append(int(m.group(1)))
-        n = max(rounds, default=0) + 1
         at = meta.get("at") or iso(utc_now())
-        header = f"<!-- round {n} · run {uid} · agent {meta.get('agent')} · {at} -->".encode("utf-8")
-        new = header + b"\n" + content + (b"" if content.endswith(b"\n") else b"\n") \
-            + (b"\n" if old else b"") + old
-        _write_atomic(target, new)
-        Sdlc(Workspace(self.ws)).link_artifact(story, doc_type, rel)
-        return n
+        for _ in range(RENDER_ATTEMPTS):
+            old: bytes | None = None
+            if os.path.lexists(target):
+                old = _read_regular(target)
+                if old is None:
+                    raise RunError("put_conflict", rel)
+            rounds = []
+            for line in (old or b"").split(b"\n"):
+                m = ROUND_HEADER_BYTES_RE.fullmatch(line.rstrip(b"\r"))
+                if m:
+                    if m.group(2).decode() == uid:
+                        return int(m.group(1))        # replay after a crash: already rendered
+                    rounds.append(int(m.group(1)))
+            n = max(rounds, default=0) + 1
+            header = f"<!-- round {n} · run {uid} · agent {meta.get('agent')} · {at} -->".encode("utf-8")
+            new = header + b"\n" + content + (b"" if content.endswith(b"\n") else b"\n") \
+                + (b"\n" if old else b"") + (old or b"")
+            if _replace_if_unchanged(target, old, new):
+                Sdlc(Workspace(self.ws)).link_artifact(story, doc_type, rel)
+                return n
+        raise RunError("put_conflict", rel)
 
     def _mission_round(self, uid: str, doc_type: str, mission: str | None) -> int:
         n = 0

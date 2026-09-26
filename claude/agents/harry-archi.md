@@ -91,6 +91,8 @@ sdlc --project <PREFIX> pm add --agent harry-archi --kind <debt|incident> \
      --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
 ```
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie (ton message = la décision ; pour un appelant programmatique, termine par ce JSON brut)
 ```json
 {"decision":"<ce que tu tranches>","rationale":"<pourquoi, court>","sources":["<chemin|doc|file:line>"],"options":["<alt écartée si pertinent>"],"escalate":false,"toHuman":"<question au référent si escalate=true, sinon null>"}
