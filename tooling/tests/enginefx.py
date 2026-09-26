@@ -4,7 +4,10 @@
   a pointer, not mounted in the test container), caches and build output.
 - ``make_engine_remote``: a local bare repository with the tags of the acceptance criteria, built from that
   copy: ``v<V>`` (VERSION = V, with an extra agent ``zz-retire.md``), ``v<V+1>`` (VERSION = V+1, agent
-  removed), ``v9.9.9`` (VERSION = V: inconsistent) and a branch named like a tag ``v<V+2>`` (no tag).
+  removed), ``v9.9.9`` (VERSION = V: inconsistent, on a commit of its own) and a branch named like a tag
+  ``v<V+2>`` (no tag). Tag and commit dates are fixed, so nothing depends on the wall clock.
+  ``same_commit=True`` puts ``v9.9.9`` on the commit of ``v<V>`` instead, tagged one second later: the case
+  where ``git describe`` prefers the other tag.
 - ``env_e``: the throwaway environment (E) of the spec: HOME, ZDOTDIR, CLAUDE_HOME, HARRY_SDLC_HOME,
   HARRY_SDLC_REPO and a reduced PATH (``$HOME/.local/bin``, a shim folder with python3 and git, /usr/bin, /bin).
 - ``build_dist``: ``uv build`` of ``tooling/`` into a given folder.
@@ -81,7 +84,16 @@ class Remote:
         return git("rev-parse", f"{ref}^{{commit}}", cwd=self.bare)
 
 
-def make_engine_remote(base: Path) -> Remote:
+def _dated(seconds: int) -> dict[str, str]:
+    """git_env() with author and committer dates fixed at FIXTURE_EPOCH + seconds."""
+    stamp = f"{FIXTURE_EPOCH + seconds} +0000"
+    return dict(git_env(), GIT_AUTHOR_DATE=stamp, GIT_COMMITTER_DATE=stamp)
+
+
+FIXTURE_EPOCH = 1_750_000_000
+
+
+def make_engine_remote(base: Path, same_commit: bool = False) -> Remote:
     v = repo_version()
     v1 = bump_patch(v, 1)
     v2 = bump_patch(v, 2)
@@ -90,17 +102,20 @@ def make_engine_remote(base: Path) -> Remote:
     (work / "VERSION").write_text(v + "\n")
     (work / "claude" / "agents" / "zz-retire.md").write_text("# retired agent (fixture)\n")
     git("add", "-A", cwd=work)
-    git("commit", "-q", "-m", "C1", cwd=work)
-    git("tag", "-a", "v" + v, "-m", "v" + v, cwd=work)
-    git("tag", "-a", "v9.9.9", "-m", "inconsistent", cwd=work)
+    git("commit", "-q", "-m", "C1", cwd=work, env=_dated(0))
+    git("tag", "-a", "v" + v, "-m", "v" + v, cwd=work, env=_dated(0))
+    if not same_commit:
+        # v9.9.9 gets a commit of its own (same VERSION): no commit carries two release tags.
+        git("commit", "-q", "--allow-empty", "-m", "C1bis", cwd=work, env=_dated(10))
+    git("tag", "-a", "v9.9.9", "-m", "inconsistent", cwd=work, env=_dated(1 if same_commit else 10))
     (work / "VERSION").write_text(v1 + "\n")
     (work / "claude" / "agents" / "zz-retire.md").unlink()
     git("add", "-A", cwd=work)
-    git("commit", "-q", "-m", "C2", cwd=work)
-    git("tag", "-a", "v" + v1, "-m", "v" + v1, cwd=work)
+    git("commit", "-q", "-m", "C2", cwd=work, env=_dated(20))
+    git("tag", "-a", "v" + v1, "-m", "v" + v1, cwd=work, env=_dated(20))
     git("checkout", "-q", "-b", "v" + v2, cwd=work)
     (work / "VERSION").write_text(v2 + "\n")
-    git("commit", "-q", "-am", "branch named like a tag", cwd=work)
+    git("commit", "-q", "-am", "branch named like a tag", cwd=work, env=_dated(30))
     git("checkout", "-q", "main", cwd=work)
     bare = base / "engine.git"
     git("clone", "-q", "--bare", str(work), str(bare))

@@ -97,6 +97,10 @@ def test_ac6_install_detached_clone_and_current(env, remote):
     ok(env, remote.tag)
     _, _, hsh, _ = paths(env)
     clone = hsh / remote.tag
+    assert fx.git("rev-parse", "HEAD", cwd=clone) == remote.commit_of(remote.tag)
+    assert fx.git("rev-parse", "-q", "--verify", f"refs/tags/{remote.tag}", cwd=clone)
+    # the fixture never puts a second release tag on that commit (describe is then deterministic)
+    assert fx.git("tag", "--points-at", remote.tag, cwd=remote.bare).split() == [remote.tag]
     assert fx.git("describe", "--exact-match", "--tags", cwd=clone) == remote.tag
     assert subprocess.run(["git", "-C", str(clone), "symbolic-ref", "-q", "HEAD"],
                           env=fx.git_env(), capture_output=True).returncode != 0
@@ -294,7 +298,9 @@ def test_ac10_user_state_and_third_party_preserved(env, remote, tmp_path):
 
 def test_ac10_old_mode_links_migrated(env, remote, tmp_path):
     home, cla, hsh, local_bin = paths(env)
-    old = tmp_path / "old" / "harry-sdlc-local"  # never created: every old-mode link is broken
+    old = tmp_path / "old" / "harry-sdlc-local"  # an engine root (VERSION, claude/) whose entries are all missing
+    (old / "claude").mkdir(parents=True)
+    (old / "VERSION").write_text(remote.v + "\n")
     for kind in ("commands", "skills"):
         (cla / kind).mkdir(parents=True, exist_ok=True)
     local_bin.mkdir(parents=True)
@@ -323,6 +329,63 @@ def test_real_file_with_engine_name_skipped_with_warning(env, remote):
     proc = ok(env, remote.tag)
     assert not real.is_symlink() and sha(real) == digest
     assert f"skipped (not managed): {real}" in proc.stderr
+
+
+def test_sdlc_link_of_a_package_manager_left_intact(env, remote):
+    """A Homebrew-like relative link ../Cellar/<f>/<v>/bin/sdlc ends with /bin/sdlc but is not an engine."""
+    home, _, _, local_bin = paths(env)
+    cellar_bin = home / ".local" / "Cellar" / "sdlc" / "1.0.0" / "bin"
+    cellar_bin.mkdir(parents=True)
+    (cellar_bin / "sdlc").write_text("#!/bin/sh\necho third-party\n")
+    (cellar_bin / "sdlc").chmod(0o755)
+    local_bin.mkdir(parents=True)
+    link = local_bin / "sdlc"
+    link.symlink_to("../Cellar/sdlc/1.0.0/bin/sdlc")
+    before = os.lstat(link)
+    proc = ok(env, remote.tag)
+    after = os.lstat(link)
+    assert readlink(link) == "../Cellar/sdlc/1.0.0/bin/sdlc"
+    assert (before.st_ino, before.st_mtime_ns, before.st_ctime_ns) == (after.st_ino, after.st_mtime_ns,
+                                                                       after.st_ctime_ns)
+    assert f"skipped (not managed, not an engine copy): {link}" in proc.stderr
+    assert f"migrated {link}" not in proc.stdout
+
+
+def test_sdlc_link_to_a_removed_engine_left_intact(env, remote, tmp_path):
+    """An old sdlc link whose root is gone (no VERSION, no claude/) is no longer proven an engine: kept."""
+    _, _, _, local_bin = paths(env)
+    local_bin.mkdir(parents=True)
+    gone = tmp_path / "gone" / "bin" / "sdlc"
+    (local_bin / "sdlc").symlink_to(gone)
+    proc = ok(env, remote.tag)
+    assert readlink(local_bin / "sdlc") == str(gone)
+    assert "not an engine copy" in proc.stderr
+
+
+def test_same_commit_tags_one_second_apart(tmp_path):
+    """Two annotated tags on one commit, the inconsistent one tagged 1 s later: describe picks it, install
+    must not (it checks refs/tags/<tag> and VERSION, never describe)."""
+    remote = fx.make_engine_remote(tmp_path / "remote", same_commit=True)
+    assert remote.commit_of("v9.9.9") == remote.commit_of(remote.tag)
+    probe = tmp_path / "probe"
+    fx.git("clone", "-q", "--depth", "1", "--branch", remote.tag, remote.url, str(probe))
+    assert fx.git("describe", "--exact-match", "--tags", cwd=probe) == "v9.9.9"  # the hazard, reproduced
+    env = fx.env_e(tmp_path, remote)
+    proc = ok(env, remote.tag)
+    _, _, hsh, _ = paths(env)
+    assert fx.git("rev-parse", "HEAD", cwd=hsh / remote.tag) == remote.commit_of(remote.tag)
+    assert readlink(hsh / "current") == remote.tag
+    assert proc.stdout.strip().splitlines()[-1] == f"{remote.v} (release)"
+    refused = install(env, "v9.9.9")
+    assert refused.returncode == 1 and "tag_mismatch" in refused.stderr
+
+
+def test_no_describe_in_release_code():
+    """The tag of a release is compared by name (refs/tags/<tag>, <tag>^{commit}), never guessed by describe."""
+    code = [fx.INSTALL_SH, *sorted(fx.SCRIPTS.glob("*.sh")), *sorted((fx.ENGINE_ROOT / ".github").rglob("*.yml")),
+            *sorted((fx.TOOLING / "sdlc").rglob("*.py"))]
+    for path in code:
+        assert not re.search(r'\bgit\s+(-C\s+\S+\s+)?describe\b|"describe"', path.read_text()), path
 
 
 # ---- AC11 ------------------------------------------------------------------------------------------------
