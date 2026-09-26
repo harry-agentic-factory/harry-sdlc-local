@@ -353,13 +353,19 @@ published) marks a code run and holds no URL nor identifier:
  "bundles": {"app": {"sha": "<sha>", "sha256": "<sha256>", "size": 1234}}}
 ```
 
-It is not sealed: a platform worker keeps it outside the volume of the agent (only `in/` and `rw/` are
-mounted); locally the bubble is indicative.
+It is also sealed: `run init` and `sdlc clone` copy it into `seal.json` (`code`) with `remotes:
+{<target>: sha256 of its URL}` (a digest, never the URL), and each bundle the engine records updates the
+seal before `code.json`. A platform worker keeps these files outside the volume of the agent (only `in/`
+and `rw/` are mounted); locally the bubble is indicative, so `run finish` trusts the sealed block only.
 
 ### `run finish` of a code run
 
 Without `code.json`: exactly the finish above. With it, in this order (all or nothing):
 
+0. Sealed code: `code.json` present without a sealed `code` block (or the reverse), or whose `schema_version`,
+   `branch`, `base` or `repos` differ from it ⇒ `run_invalid` before any write; the sealed story branch
+   must be valid and differ from the base and from `refBranch` (`run_invalid:seal.json: branch_protected:<b>`).
+   The bundle records (`bundles`) come from the seal only.
 1. `--status`: mission ⇒ `mission_scope_unsupported:--status`; else validated (reason `status_invalid`).
 2. Checks of `-1`, with `rw/out/sources/` published (regular files only, `unexpected_file:sources/<rel>`
    otherwise; each file ≤ `SOURCE_MAX_BYTES` = 50 MiB ⇒ `source_too_large:<rel>`; total ≤
@@ -372,10 +378,11 @@ Without `code.json`: exactly the finish above. With it, in this order (all or no
 4. Bundles (engine, idempotent): `rw/out/git/<repo>.bundle` = the only `refs/heads/<branch>` with the
    recorded `head` as prerequisite; no new commit ⇒ `"unchanged"`.
 5. Push preparation for **every** target first: fresh bare clone under `<root>/../_push/<run_uid>/`
-   (URL re-resolved through the `CodeHost`, never read in the run, hooks disabled), `bundle verify`, fetch,
+   (URL re-resolved through the `CodeHost`, never read in the run, its sha256 equal to the sealed one else
+   `remote_changed:<repo>`, client hooks disabled), `bundle verify`, fetch,
    fast-forward check (`non_fast_forward:<repo>`, also when the recorded `head` no longer exists on the
    remote). One refusal ⇒ nothing is pushed on any repository.
-6. Push `<sha>:refs/heads/<branch>` (never forced) unless `outcome` (`failed`/`timeout`: bundles are
+6. Push `<sha>:refs/heads/<branch>` (never forced, `--no-verify` only: the server hooks of the remote run) unless `outcome` (`failed`/`timeout`: bundles are
    published without push, `pushed: false`). A failure ⇒ `push_failed:<repo>`, nothing published; a
    replay is safe (a remote already at the sha is not pushed again).
 7. Publication: documents → `runs/<uid>/out/sources/<rel>` (`meta.category = "source"`) →
@@ -394,7 +401,9 @@ clones) or `_git_untrusted` (`rw/code/<repo>`, `in/repos/<repo>`), which only al
 `for-each-ref`, `bundle` and `status` with `--no-optional-locks -c core.fsmonitor=false
 -c core.hooksPath=<none> -c core.untrackedCache=false`. No command reads the working copy of a target
 (filters and monitors of the agent never run); a push never uses the `.git` of the agent. The environment
-is inherited unchanged: no credential is read, written or passed.
+is inherited, minus only the variables that locate a repository (`GIT_DIR`, `GIT_WORK_TREE`,
+`GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`); nothing is
+added: no credential is read, written or passed.
 
 ### `CodeHost` and platform workers
 
