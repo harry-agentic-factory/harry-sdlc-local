@@ -1,11 +1,19 @@
 """Link extraction, normalisation and resolution: the single link algorithm shared by
 `lint`, `snapshot` (`links.json`), `normalize` (`broken_links`) and library callers.
 
+Fenced code blocks are masked first: nothing inside them is extracted (decision of 2026-09-27,
+recommendation (b) of the AISDLC-RUNWS spec review). CommonMark rules: an opening fence is a line
+indented by at most 3 spaces followed by at least 3 backticks or tildes (a backtick fence's info
+string holds no backtick); the closing fence uses the same character, is at least as long and is
+followed only by spaces or tabs; an unclosed block runs to the end of the file. Blocks indented by
+4 spaces are not masked, inline code (`...`) is not masked. Masking keeps line breaks, so line
+numbers are unchanged.
+
 Passes, in order (a span taken by a pass is masked for the next ones):
 1. `md-link`: `[text](target "title")` (images `![..](..)` are masked and ignored) and reference
    definitions `[ref]: target`. A `http(s)://` / `mailto:` target is `external`.
 2. `external`: bare `http://`, `https://`, `mailto:` URLs (including `<https://...>`).
-3. `path-mention`: a `*.md` path token anywhere else (text, inline code, code blocks).
+3. `path-mention`: a `*.md` path token anywhere else (text, inline code).
 
 Normalisation of `to`: relative to the note folder (a `path-mention` falls back to the brain
 root when the first form is not a note); then a leading `../<repo-name>/` is removed when
@@ -32,6 +40,28 @@ _URL = re.compile(r"<?((?:https?://|mailto:)[^\s<>()\[\]\"'`]+)>?")
 _MENTION = re.compile(r"(?<![\w./-])(?:\.{1,2}/)*[\w.-]+(?:/[\w.-]+)*\.md(?![\w/-])")
 _EXTERNAL = ("http://", "https://", "mailto:")
 _TRAILING = ".,;:!?"
+_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}(?=[^`\n]*$)|~{3,})")
+
+
+def _mask_fences(text: str) -> str:
+    """`text` with every fenced code block (fence lines included) blanked, line breaks kept."""
+    out: list[str] = []
+    fence: str | None = None
+    for line in text.split("\n"):
+        body = line.rstrip("\r")
+        if fence is None:
+            m = _FENCE_OPEN.match(body)
+            if m:
+                fence = m.group(1)
+        else:
+            stripped = body.lstrip(" ")
+            if (len(body) - len(stripped) <= 3 and stripped.startswith(fence)
+                    and not stripped.rstrip(" \t").strip(fence[0])):
+                fence = None
+                out.append(" " * len(line))
+                continue
+        out.append(line if fence is None else " " * len(line))
+    return "\n".join(out)
 
 
 def _mask(chars: list[str], start: int, end: int) -> None:
@@ -62,7 +92,7 @@ def _normalise(base_dir: str, target: str) -> str:
 
 def note_links(path: str, data: bytes, notes: set[str], repo_names: frozenset[str]) -> list[dict]:
     """Links of one note: [{from, to, target, kind, line, resolved}] sorted by (line, column)."""
-    text = data.decode("utf-8", errors="replace")
+    text = _mask_fences(data.decode("utf-8", errors="replace"))
     line_starts = [0] + [m.end() for m in re.finditer("\n", text)]
     base_dir = posixpath.dirname(path)
     chars = list(text)
