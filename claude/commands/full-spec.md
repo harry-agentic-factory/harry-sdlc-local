@@ -46,6 +46,8 @@ Tu restes en `solo` (mono-user). **Passe la gate avant de coder** — elle accep
 Voir `claude/commands/spec-tech.md` § Gate SPECS pour le détail. **Ensuite** `/implement` (ou `/run-story`,
 qui enchaîne tout seul). Un `/harry dev` explicite est possible si tu veux repasser en profil dev pur.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 - **Arbre des docs produits** (prd, refine, et par story : spec-func éventuel + spec-tech).
 - **Tableau** stories × statut × deps × repos, + le **prochain actionnable** (`sdlc --project <PREFIX>

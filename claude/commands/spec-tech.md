@@ -13,6 +13,8 @@ annonce-le. Réhydrate : `python3 -m sdlc.cli --project SAMPLE get <STORY>` ; li
 4. **Écris** `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/spec-tech.md` (Plan / Fichiers par repo / Invariants).
 5. **Avance** : `set-status <STORY> spec_tech`.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 `spec-tech.md` + la liste des invariants. **Puis la gate ci-dessous** — pas `/implement` directement.
 

@@ -48,6 +48,8 @@ réels qui figurent dans le signalement. Il résout ses propres accès depuis le
 
 ## 4. Classe le résultat
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 - Écris `analysis.md` à côté de la story quand il y en a une, et attache-le :
   `sdlc link <STORY> spec_func <chemin>`.
 - Consigne une ligne de journal : `sdlc journal <STORY> --entry "<ce qui a été établi, sans secret>"`.

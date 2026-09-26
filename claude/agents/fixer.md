@@ -46,6 +46,8 @@ chargés (ex. `🧩 skills: <repo> (java-spring) → rest-best-practices, spring
 **note l'avancement dans `implement.md` au fil de l'eau**, réutilise l'env local (ne le remonte pas à
 chaque itération), et si tu es coupé relis `implement.md` + le repro et **reprends**.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie (dernier message = JSON)
 `{"fixed": true|false, "root_cause": "...", "commit": "<sha poussé>", "pushed": true|false, "new_invariant": "<ou null>"}`
 

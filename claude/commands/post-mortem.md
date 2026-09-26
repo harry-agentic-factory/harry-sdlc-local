@@ -58,6 +58,8 @@ Référence cette propale depuis le `post-mortem.md`.
    de référence — jamais push direct). Aucune référence à Claude/AI dans commits/MR.
 4. **Note** : ces artefacts sont **epic-level** (pas de `sdlc link`, qui est story-level) ; ils vivent dans `<EPIC>/`.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 Chemins des 2 fichiers + résumé (nb de dettes ticketisables, actions sécu, points Brain à appliquer) + la MR.
 Si l'épic a encore des stories non terminées, **liste-les** et propose de finir avant de clôturer (ou d'assumer

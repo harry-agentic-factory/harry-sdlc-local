@@ -41,6 +41,8 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
    vide/du périmé. Note le SHA poussé dans `implement.md`. (Jamais de push sur une branche protégée.)
 8. **Avance** : `set-status <STORY> implemented`.
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 - Récap : fichiers par repo, statut build/tests, invariants vérifiés (✓/✗), branche(s)/MR.
 - Rappelle `/doc-feature` (sur **tous** les repos touchés — règle `doc-feature-multi-repo`).

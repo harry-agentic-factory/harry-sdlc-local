@@ -21,6 +21,8 @@ Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
    `epic/<EPIC>` off `main` **par repo touché** (`git -C <repo> branch epic/<EPIC> origin/main && git push -u origin epic/<EPIC>`) ;
    les stories branchent off le trunk et y sont mergées ; promote `main` unique en fin d'épic (gate humaine).
 
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 `refine.md` + le tableau stories×deps×repos + le prochain actionnable. Board optionnel (Trello/Planner)
 = miroir une-voie, seulement si configuré. Enchaîne ensuite sur `/spec-func` (ou `/spec-tech` si trivial).
