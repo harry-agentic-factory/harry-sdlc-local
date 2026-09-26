@@ -170,5 +170,8 @@ def test_repository_changelog_has_the_released_section():
     assert headers[0] == "## [Unreleased]"
     r = sh(SECTION, fx.repo_version())
     assert r.returncode == 0 and r.stdout.strip(), r.stderr
+    # The content check is pinned to 0.7.0, the first packaged release, so later bumps keep passing.
+    r = sh(SECTION, "0.7.0")
+    assert r.returncode == 0 and r.stdout.strip(), r.stderr
     for needle in ("sdlc brain", "brainRef", "sdlc run", "sdlc doc", "sdlc clone", "runWorkspace", "--version"):
         assert needle in r.stdout, needle
