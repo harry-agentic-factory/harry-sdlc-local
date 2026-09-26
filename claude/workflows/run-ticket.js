@@ -55,6 +55,10 @@ const RECETTE = { type: 'object', required: ['pass'], properties: {
 const FIX = { type: 'object', required: ['fixed'], properties: {
   fixed: { type: 'boolean' }, root_cause: { type: 'string' }, commit: { type: 'string' } } }
 
+// Off mode only: a role that met a concurrent write on a living document returns `conflict` (see LIVING_DOC_RULE).
+const withConflict = (schema) => ({ ...schema, properties: { ...schema.properties, conflict: { type: 'object' } } })
+const STATUS = { type: 'object', properties: { status: { type: 'string' }, error: { type: 'string' } } }
+
 const WS = { type: 'object', required: ['worktree'], properties: {
   worktree: { type: 'string' }, additionalDirectories: { type: 'array', items: { type: 'string' } },
   projectSkills: { type: 'array', items: { type: 'string' } } } }
@@ -66,6 +70,17 @@ const FINISH = { type: 'object', properties: {
   run_uid: { type: 'string' }, state: { type: 'string' }, already: { type: 'string' },
   reasons: { type: 'array', items: { type: 'string' } }, git: { type: 'object' }, error: { type: 'string' } } }
 
+// Rule « Écrire un document vivant » of the persona (claude/sdlc/harry.md), reminded to the off-mode prompts that
+// write a living document of the story. Run workspace prompts only add rounds (add-only, exempt): unchanged.
+const LIVING_DOC_RULE = `**Écrire un document vivant** (règle de la persona) : à la lecture de chaque document de ${STORY}/ que tu vas écrire, garde une copie de base dans ton brouillon et note \`git hash-object <fichier>\` (\`none\` si absent).
+Juste avant d'écrire, recalcule l'empreinte : égale ⇒ écris avec Edit/Write seulement (jamais de redirection Bash, \`sed -i\` ni \`tee\`) ; différente, ou « modified since read » ⇒ conflit : relis, \`diff -u <copie> <fichier>\`, classe les sections.
+Sans section divergente : refais sur la dernière version en gardant ses apports, puis \`sdlc --project ${PREFIX} journal ${TICKET} --entry "doc <type> refait sur <empreinte courte> : <apport>"\`.
+Section changée des deux côtés (ou apport qui contredit ton écriture) : **ni écriture ni \`set-status\`** ; ajoute à ton JSON final \`conflict: {doc, base, latest, intermediate, divergent, intended}\` et arrête-toi.`
+
+const statusPrompt = () => `Lis l'état du ticket **${TICKET}** sans rien modifier. Exécute en Bash exactement une fois :
+\`sdlc --project ${PREFIX} get ${TICKET}\`
+Renvoie STRICTEMENT {"status": <champ status de sa sortie>} ; si le code de sortie est ≠ 0, renvoie {"error": "<stderr>"}. Ne fais RIEN d'autre.`
+
 const prepPrompt = () => `Prépare la **bulle scopée** du ticket **${TICKET}**. Exécute en Bash :
 \`sdlc --project ${PREFIX} workspace ${TICKET} --branch ${BRANCH}\`
 → crée le worktree isolé + \`.claude/settings.json\` (additionalDirectories = worktrees+brain+data) + symlink des skills projet. Renvoie STRICTEMENT le JSON : worktree = \`.worktrees["${REPO_NAME}"]\`, additionalDirectories, projectSkills. Ne fais RIEN d'autre.`
@@ -74,20 +89,25 @@ const reviewPrompt = () => `Story SDLC **${TICKET}** (${WORKREPO}). Review le di
 Lis: ${STORY}/spec-tech.md (invariants = ta checklist) + ${STORY}/spec-func.md (critères).
 Diff: \`git -C ${WORKREPO} diff ${BASE}...HEAD\`. Vérifie CHAQUE invariant (preuve dans le diff), cherche bugs/régressions/fuites. Écris ${STORY}/review.md. Ne modifie PAS le code.
 **Transition dictée par l'orchestration — si (et seulement si) conforme** : \`sdlc --project ${PREFIX} set-status ${TICKET} reviewed\`. Ne décide d'aucune autre transition.
-Dernier message = JSON {conform, note, violations}.`
+Dernier message = JSON {conform, note, violations}.
+${LIVING_DOC_RULE}`
 
 const deployPrompt = () => `Story SDLC **${TICKET}**. **DÉPLOIE LA BRANCHE \`${BRANCH}\` sur son environnement de test pré-merge.**
-Cible = \`sdlc --project ${PREFIX} deploy-target ${REPO_NAME} --env dev\` : charge le **skill** qu'elle rend et suis-le (méthode, santé, preuve que le code déployé = HEAD de \`${BRANCH}\`, rollback). Aucune infra en dur : Jenkins, docker local ou autre, c'est le manifest qui dit. **NE touche PAS à ${BASE_BRANCH} ni à main, NE merge PAS** — on déploie la branche pour la recetter. **Sécurité : pas de cible \`dev\`, env pas prêt, cible = production, ou action ambiguë/risquée/irréversible ⇒ NE déploie PAS → {ok:false, note:"raison"}.** Écris ${STORY}/deploy.md. **Transition dictée par l'orchestration — si le déploiement branche réussit** : \`sdlc --project ${PREFIX} set-status ${TICKET} deployed\`. Dernier message = JSON {ok, version, note}.`
+Cible = \`sdlc --project ${PREFIX} deploy-target ${REPO_NAME} --env dev\` : charge le **skill** qu'elle rend et suis-le (méthode, santé, preuve que le code déployé = HEAD de \`${BRANCH}\`, rollback). Aucune infra en dur : Jenkins, docker local ou autre, c'est le manifest qui dit. **NE touche PAS à ${BASE_BRANCH} ni à main, NE merge PAS** — on déploie la branche pour la recetter. **Sécurité : pas de cible \`dev\`, env pas prêt, cible = production, ou action ambiguë/risquée/irréversible ⇒ NE déploie PAS → {ok:false, note:"raison"}.** Écris ${STORY}/deploy.md. **Transition dictée par l'orchestration — si le déploiement branche réussit** : \`sdlc --project ${PREFIX} set-status ${TICKET} deployed\`. Dernier message = JSON {ok, version, note}.
+${LIVING_DOC_RULE}`
 
 const promotePrompt = () => `Story SDLC **${TICKET}** — **PROMOTE**. Recette de branche validée par l'humain.
 1) **Merge** la MR/PR de la branche \`${BRANCH}\` → \`${BASE_BRANCH}\` (CLI de l'hébergeur du repo : gh / glab / az ; **TA propre MR** ; **jamais** de push direct).
 2) **Déploie \`${BASE_BRANCH}\`** sur la cible post-merge : \`sdlc --project ${PREFIX} deploy-target ${REPO_NAME} --env integration\` → applique le skill rendu, suis jusqu'au bout, **vérifie la version déployée + santé**. Pas de cible \`integration\` ⇒ c'est une gate humaine voulue : {ok:false, note:"pas d'env integration"}.
 Écris ${STORY}/deploy.md (section « promote »). Dernier message = JSON {ok, version, note}.
-**Portée** : merger et redéployer, rien d'autre. La mise en production, sa CI/CD et sa recette sont un autre univers — ce n'est pas ce loop qui les pilote.`
+**Portée** : merger et redéployer, rien d'autre. La mise en production, sa CI/CD et sa recette sont un autre univers — ce n'est pas ce loop qui les pilote.
+${LIVING_DOC_RULE}`
 
-const recettePrompt = () => `Story SDLC **${TICKET}**. Recette sur l'env déployé vs les critères d'acceptation de ${STORY}/spec-func.md. Cible + méthode = \`sdlc --project ${PREFIX} config\` → \`recette.${REPO_NAME}\` (outil, skill projet, santé) et \`deploy.${REPO_NAME}.environments.dev\` ; vérifie d'abord que la version déployée = HEAD de \`${BRANCH}\`. Feature backend -> pilote l'API ; UI -> Playwright MCP ; CLI -> commandes sur la cible. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans ${STORY}/repro/. Écris ${STORY}/acceptance.md. **Transition dictée par l'orchestration — si tous les critères passent** : \`sdlc --project ${PREFIX} set-status ${TICKET} recette_ok\`. Dernier message = JSON {pass, repro, flaky, failed}.`
+const recettePrompt = () => `Story SDLC **${TICKET}**. Recette sur l'env déployé vs les critères d'acceptation de ${STORY}/spec-func.md. Cible + méthode = \`sdlc --project ${PREFIX} config\` → \`recette.${REPO_NAME}\` (outil, skill projet, santé) et \`deploy.${REPO_NAME}.environments.dev\` ; vérifie d'abord que la version déployée = HEAD de \`${BRANCH}\`. Feature backend -> pilote l'API ; UI -> Playwright MCP ; CLI -> commandes sur la cible. Anti-flaky: rejoue 3x. Sur KO produit un bundle repro dans ${STORY}/repro/. Écris ${STORY}/acceptance.md. **Transition dictée par l'orchestration — si tous les critères passent** : \`sdlc --project ${PREFIX} set-status ${TICKET} recette_ok\`. Dernier message = JSON {pass, repro, flaky, failed}.
+${LIVING_DOC_RULE}`
 
-const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. **Transitions dictées par l'orchestration** : au démarrage \`sdlc --project ${PREFIX} set-status ${TICKET} implemented\` (retour dev) ; après le commit \`sdlc --project ${PREFIX} set-status ${TICKET} reviewed\`. Worktree : ${WORKREPO}. Monte l’env local du projet (même cible que \`sdlc --project ${PREFIX} deploy-target ${REPO_NAME} --env dev\`), rejoue le bundle repro (${repro}), corrige le code sans casser les invariants (${STORY}/spec-tech.md), re-run en local jusqu'au vert, commit sur la branche. Dernier message = JSON {fixed, root_cause, commit}.`
+const fixPrompt = (repro) => `Story SDLC **${TICKET}**. Recette KO. **Transitions dictées par l'orchestration** : au démarrage \`sdlc --project ${PREFIX} set-status ${TICKET} implemented\` (retour dev) ; après le commit \`sdlc --project ${PREFIX} set-status ${TICKET} reviewed\`. Worktree : ${WORKREPO}. Monte l’env local du projet (même cible que \`sdlc --project ${PREFIX} deploy-target ${REPO_NAME} --env dev\`), rejoue le bundle repro (${repro}), corrige le code sans casser les invariants (${STORY}/spec-tech.md), re-run en local jusqu'au vert, commit sur la branche. Dernier message = JSON {fixed, root_cause, commit}.
+${LIVING_DOC_RULE}`
 
 // ── Run workspace mode: prompts (the role never sees the data repository, never pushes, never transitions) ──
 const codeOf = (run) => (run.repos && run.repos[REPO_NAME] && run.repos[REPO_NAME].path) || `${run.code}/${REPO_NAME}`
@@ -130,7 +150,16 @@ Rapport : \`sdlc doc add deploy <fichier> --run ${run.root}\` (section « promot
 // (thrown as {halt}, returned by the catch at the end of the script).
 const RUNS = {}          // key -> last run returned by its Prepare (truth of the orchestration)
 async function role(s, opts) {
-  if (!RW) return agent(s.off(), opts)
+  if (!RW) {
+    // Off mode: a `conflict` stops the workflow before any further step; the agent was told not to transition,
+    // the state is only read (`status_now`), never changed nor reverted.
+    const v = await agent(s.off(), { ...opts, schema: withConflict(opts.schema) })
+    if (v && v.conflict) {
+      const st = await agent(statusPrompt(), { agentType: 'general-purpose', schema: STATUS, label: `status:${TICKET}`, phase: opts.phase })
+      throw { halt: { stopped_at: s.stop, reason: 'needs_human', detail: 'doc_conflict', conflict: v.conflict, status_now: (st && st.status) || null } }
+    }
+    return v
+  }
   const run = await agent(prepareRW(s), { agentType: 'general-purpose', schema: RUN, label: `prepare:${s.key}:${TICKET}`, phase: opts.phase })
   if (!run || !run.run_uid || !run.root) throw { halt: { stopped_at: s.stop, reason: 'needs_human', detail: 'prepare_failed', prepare: run } }
   RUNS[s.key] = run
@@ -226,6 +255,6 @@ while (true) {
   if (RW && !(rd && rd.ok === true)) return { stopped_at: 'recette', reason: 'needs_human', detail: 'redeploy_failed', deploy: rd }
 }
 } catch (e) {
-  if (e && e.halt) { log(`Run workspace -> STOP (${e.halt.detail})`); return e.halt }
+  if (e && e.halt) { log(`${RW ? 'Run workspace' : 'Document vivant'} -> STOP (${e.halt.detail})`); return e.halt }
   throw e
 }
