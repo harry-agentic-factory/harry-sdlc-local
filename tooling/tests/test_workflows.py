@@ -132,6 +132,25 @@ def test_workflows_only_github_token():
     assert "GH_TOKEN: ${{ github.token }}" in RELEASE.read_text()
 
 
+def test_checkout_keeps_no_credential():
+    """persist-credentials: false on every checkout; the token only in the env of the steps that use it."""
+    for wf in (CI, RELEASE):
+        raw = wf.read_text().splitlines()
+        checkouts = [i for i, l in enumerate(raw) if "uses: actions/checkout@" in l]
+        assert checkouts, wf
+        for i in checkouts:
+            block = []
+            for l in raw[i + 1:]:
+                if re.match(r"^\s*- ", l):
+                    break
+                block.append(l.strip())
+            assert "persist-credentials: false" in block, wf
+    text = RELEASE.read_text()
+    assert text.count("GH_TOKEN: ${{ github.token }}") == 2  # the tag re-fetch and the Release
+    assert "git config" not in text.split("tag is annotated", 1)[1].split("GitHub Release", 1)[0]
+    assert "${{ github.token }}" not in CI.read_text()
+
+
 def test_actions_pinned_by_sha():
     for wf in (CI, RELEASE):
         uses = [s["uses"] for s in steps(wf) if "uses" in s]
