@@ -518,7 +518,9 @@ def test_git_argv_env_no_credentials(cdemo, cap, monkeypatch):
     for argv, env in seen:
         joined = " ".join(argv)
         assert not re.search(r"-c (credential|http|url)\.", joined), joined
-        assert env is None or env == dict(os.environ)
+        # nothing added; only the variables locating a repository are removed (D4)
+        assert env == {k: v for k, v in os.environ.items() if k not in gitcode.LOCATION_ENV}
+        assert SENTINEL in env.values()
         assert SENTINEL not in joined
 
 

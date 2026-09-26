@@ -8,8 +8,9 @@ Every git call goes through one of two helpers:
   `in/repos/<repo>`). Only `rev-parse`, `for-each-ref`, `bundle` and `status` are allowed, always with
   optional locks, the file system monitor, hooks and the untracked cache disabled.
 
-No credential is ever read, written or passed: the environment is inherited as is and the host git
-configuration authenticates clones and pushes. Clones of the agent are left without any remote. A push
+No credential is ever read, written or passed: the environment is inherited, minus the git variables
+that locate a repository (`LOCATION_ENV`, which would redirect every call to another repository), and
+the host git configuration authenticates clones and pushes. Clones of the agent are left without any remote. A push
 is only made from a fresh bare clone, with a plain `<sha>:refs/heads/<branch>` refspec, never forced.
 """
 from __future__ import annotations
@@ -26,11 +27,18 @@ UNTRUSTED_SUBCOMMANDS = frozenset({"rev-parse", "for-each-ref", "bundle", "statu
 FORBIDDEN_CONFIG_PREFIXES = ("remote.", "credential.", "http.", "url.")
 # hooksPath of untrusted calls: a path under which no hook can exist (nothing is written for it).
 NO_HOOKS = os.devnull
+# the only variables removed from the inherited environment (nothing is ever added)
+LOCATION_ENV = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                          "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR"})
+
+
+def _env() -> dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k not in LOCATION_ENV}
 
 
 def _git_trusted(*args: str, cwd=None) -> subprocess.CompletedProcess:
     argv = ["git", *(["-C", str(cwd)] if cwd is not None else []), *args]
-    return subprocess.run(argv, capture_output=True, check=False)
+    return subprocess.run(argv, capture_output=True, env=_env(), check=False)
 
 
 def _git_untrusted(repo, *args: str, hooks: str = NO_HOOKS) -> subprocess.CompletedProcess:
@@ -38,7 +46,7 @@ def _git_untrusted(repo, *args: str, hooks: str = NO_HOOKS) -> subprocess.Comple
         raise RunError("git_refused", f"git sub-command not allowed on an agent repository: {args[:1]}")
     argv = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", f"core.hooksPath={hooks}",
             "-c", "core.untrackedCache=false", "-C", str(repo), *args]
-    return subprocess.run(argv, capture_output=True, check=False)
+    return subprocess.run(argv, capture_output=True, env=_env(), check=False)
 
 
 def _out(p: subprocess.CompletedProcess) -> str:
@@ -232,7 +240,8 @@ def prepare_push(name: str, url: str, clone: Path, bundle: Path, *, branch: str,
     return "refused", f"non_fast_forward:{name}"
 
 
-def push(clone: Path, url: str, *, sha: str, branch: str, hooks: Path) -> bool:
-    p = _git_trusted("-c", f"core.hooksPath={hooks}", "push", "--no-verify", "--porcelain", "--", url,
-                     f"{sha}:refs/heads/{branch}", cwd=clone)
+def push(clone: Path, url: str, *, sha: str, branch: str) -> bool:
+    # `--no-verify` skips the client hooks; no `-c core.hooksPath`: it would reach the receive-pack of a
+    # local remote (GIT_CONFIG_PARAMETERS) and disable its server hooks
+    p = _git_trusted("push", "--no-verify", "--porcelain", "--", url, f"{sha}:refs/heads/{branch}", cwd=clone)
     return p.returncode == 0

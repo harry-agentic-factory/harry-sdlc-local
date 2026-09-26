@@ -248,9 +248,11 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
         manifest_bytes = manifest_bytes_of(neighbours)
         _write(partial / "in" / "manifest.json", manifest_bytes)
         _write(partial / "in" / "settings.json", settings_bytes)
-        _write(partial / "seal.json", dump_json({"manifest_sha256": sha256(manifest_bytes),
-                                                 "settings_sha256": sha256(settings_bytes),
-                                                 "run": _identity(run)}))
+        seal = {"manifest_sha256": sha256(manifest_bytes), "settings_sha256": sha256(settings_bytes),
+                "run": _identity(run)}
+        if is_code:
+            seal.update(code=code_json, remotes=codemod.remote_digests(plan))
+        _write(partial / "seal.json", dump_json(seal))
         _write(partial / "run.json", dump_json(run))
         if status_res is not None and status_res["applied"]:
             try:
@@ -361,6 +363,9 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
     seal = _read_json(root / "seal.json")
     sealed = _check_identity(uid, current, seal) if seal is not None else None
     code = codemod.load(root)
+    if seal is not None:
+        # the sealed code block is the reference: code.json is writable by the agent (run_invalid, no write)
+        code = codemod.sealed_code(seal, code)
     if code is None and status is not None:
         raise RunError("run_workspace_disabled", "--status")
     host = None
@@ -397,14 +402,25 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
     # code: bundles, then every push prepared before the first one (never with an outcome)
     git: dict | None = None
     if code is not None:
-        heads, more = codemod.bundle_code(root, code)
+        if host is not None:
+            codemod.sealed_code(seal, code, protected=(host.default_base(),))     # never push refBranch
+
+        def persist(c: dict) -> None:
+            _write_atomic(root / "seal.json", dump_json(dict(seal, code=c)))     # seal first: it is trusted
+            codemod.save(root, c)
+
+        heads, more = codemod.bundle_code(root, code, persist)
         if more:
             return _reject(root, current, uid, more, warnings)
         if outcome is not None:
             git = codemod.unpushed(code, heads)
         else:
             scope = Scope(sealed["feature"], sealed["story"], sealed["mission"])
-            urls = {s.name: s.url for s in host.code_repos(scope)} if any(v != "unchanged" for v in heads.values()) else {}
+            changed = [r for r, v in heads.items() if v != "unchanged"]
+            urls = {s.name: s.url for s in host.code_repos(scope)} if changed else {}
+            more = codemod.check_remotes(seal, urls, changed)
+            if more:
+                return _reject(root, current, uid, more, warnings)
             git, more = codemod.push_code(root, uid, code, heads, urls)
             if more:
                 return _reject(root, current, uid, more, warnings)
@@ -518,7 +534,8 @@ def code_clone(root, *, backend=None, code_host=None, branch: str | None = None,
         deny = settings.setdefault("permissions", {}).setdefault("deny", [])
         deny += [d for d in layout.GIT_DENY if d not in deny]
         new_set = dump_json(settings)
-        new_seal = dict(seal, manifest_sha256=sha256(new_man), settings_sha256=sha256(new_set))
+        new_seal = dict(seal, manifest_sha256=sha256(new_man), settings_sha256=sha256(new_set), code=code_json,
+                        remotes=codemod.remote_digests(plan))
         codemod.save(root, code_json)
         _write_atomic(man_path, new_man)
         _write_atomic(set_path, new_set)

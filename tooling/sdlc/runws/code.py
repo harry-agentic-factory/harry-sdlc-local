@@ -7,6 +7,11 @@ marks a code run. It never holds a URL nor an identifier:
     {schema_version: 1, branch, base,
      repos: {<repo>: {role: "target"|"neighbour", ref, head, created, config_sha256?}},
      bundles: {<repo>: {sha, sha256, size}}}
+
+The same block is sealed in `seal.json` (`code`, with `remotes: {<target>: sha256 of its URL}`) at
+`run init` / `sdlc clone` and kept in step with every bundle the engine records. `run finish` trusts
+the sealed block only: a `code.json` whose identity (`schema_version`, `branch`, `base`, `repos`) differs
+from it is refused before any write.
 """
 from __future__ import annotations
 
@@ -19,11 +24,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import gitcode, layout
-from .model import RunError, dump_json
+from .model import RunError, dump_json, sha256, validate_branch
 from .port import RepoSpec
 
 CODE_JSON = "code.json"
 CODE_SCHEMA_VERSION = 1
+# keys of code.json compared with the sealed block at finish (`bundles` is taken from the seal only)
+CODE_IDENTITY_KEYS = ("schema_version", "branch", "base", "repos")
 
 
 @dataclass
@@ -153,6 +160,50 @@ def save(root: Path, code: dict) -> None:
         raise
 
 
+def remote_digests(p: CodePlan) -> dict[str, str]:
+    """`{target: sha256 of its URL}` sealed at init/clone (never the URL itself)."""
+    return {r.name: sha256(r.url.encode("utf-8")) for r in p.targets}
+
+
+def sealed_code(seal: dict, code: dict | None, *, protected: tuple[str | None, ...] = ()) -> dict | None:
+    """Trusted code block of a run: the one sealed in `seal.json`, once `code.json` is checked against it.
+
+    None for a run without code (neither side). RunError `run_invalid` when only one side exists, when the
+    identity of `code.json` differs from the seal, or when the sealed story branch is invalid or is the base
+    or one of `protected` (never pushed)."""
+    sealed = seal.get("code")
+    if code is None and sealed is None:
+        return None
+    if code is None or not isinstance(sealed, dict) or not isinstance(sealed.get("repos"), dict) \
+            or not isinstance(sealed.get("bundles", {}), dict):
+        raise RunError("run_invalid", f"{CODE_JSON} differs from seal.json: code")
+    diff = sorted(k for k in CODE_IDENTITY_KEYS if code.get(k) != sealed.get(k))
+    if diff:
+        raise RunError("run_invalid", f"{CODE_JSON} differs from seal.json: " + ",".join(diff))
+    trusted = json.loads(json.dumps(sealed))
+    trusted.setdefault("bundles", {})
+    if targets(trusted):
+        branch = trusted.get("branch")
+        try:
+            validate_branch(branch)
+            validate_branch(trusted.get("base"))
+        except RunError as e:
+            raise RunError("run_invalid", f"seal.json: {e}") from e
+        if branch in (trusted.get("base"), *protected):
+            raise RunError("run_invalid", f"seal.json: branch_protected:{branch}")
+        for repo in targets(trusted):
+            if trusted["repos"][repo].get("ref") != branch:
+                raise RunError("run_invalid", f"seal.json: ref of {repo} differs from the story branch")
+    return trusted
+
+
+def check_remotes(seal: dict, urls: dict[str, str | None], repos) -> list[str]:
+    """`remote_changed:<repo>` for every repo to push whose URL is not the one sealed at init/clone."""
+    sealed = seal.get("remotes") if isinstance(seal.get("remotes"), dict) else {}
+    return sorted(f"remote_changed:{r}" for r in repos
+                  if urls.get(r) and sealed.get(r) != sha256(urls[r].encode("utf-8")))
+
+
 def engine_files(code: dict) -> dict[str, str]:
     """`{"git/<repo>.bundle": sha256}` of the bundles recorded by the engine."""
     out = {}
@@ -216,10 +267,14 @@ def _file_sha256(path: Path) -> tuple[str, int] | None:
     return h.hexdigest(), size
 
 
-def bundle_code(root: Path, code: dict) -> tuple[dict, list[str]]:
+def bundle_code(root: Path, code: dict, persist=None) -> tuple[dict, list[str]]:
     """Write `rw/out/git/<repo>.bundle` for every target with new commits (idempotent).
 
-    Returns ({repo: sha | "unchanged"}, reasons); records each bundle in code.json."""
+    Returns ({repo: sha | "unchanged"}, reasons); records each bundle through `persist(code)` (default:
+    code.json only; `run finish` also updates the seal)."""
+    if persist is None:
+        def persist(c):
+            save(root, c)
     heads: dict[str, str] = {}
     reasons: list[str] = []
     branch = code["branch"]
@@ -250,7 +305,7 @@ def bundle_code(root: Path, code: dict) -> tuple[dict, list[str]]:
         final.parent.mkdir(parents=True, exist_ok=True)
         os.replace(tmp, final)
         code["bundles"][repo] = {"sha": sha, "sha256": digest[0], "size": digest[1]}
-        save(root, code)
+        persist(code)
     return heads, sorted(reasons)
 
 
@@ -291,7 +346,7 @@ def push_code(root: Path, uid: str, code: dict, heads: dict, urls: dict[str, str
         if reasons:
             return result, sorted(reasons)
         for repo, clone, url, sha in todo:
-            if not gitcode.push(clone, url, sha=sha, branch=branch, hooks=hooks):
+            if not gitcode.push(clone, url, sha=sha, branch=branch):
                 reasons.append(f"push_failed:{repo}")
         return result, sorted(reasons)
     finally:
