@@ -162,3 +162,13 @@ def test_wheel_smoke_accepts_built_wheel_without_pythonpath_leak(built_wheel):
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip().endswith(f"sdlc {fx.repo_version()} (release)")
     assert "unset PYTHONPATH" in SMOKE.read_text()
+
+
+def test_repository_changelog_has_the_released_section():
+    text = (fx.ENGINE_ROOT / "CHANGELOG.md").read_text()
+    headers = [l for l in text.splitlines() if l.startswith("## [")]
+    assert headers[0] == "## [Unreleased]"
+    r = sh(SECTION, fx.repo_version())
+    assert r.returncode == 0 and r.stdout.strip(), r.stderr
+    for needle in ("sdlc brain", "brainRef", "sdlc run", "sdlc doc", "sdlc clone", "runWorkspace", "--version"):
+        assert needle in r.stdout, needle
