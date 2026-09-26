@@ -985,3 +985,165 @@ def test_off_run_zero_gitcode_calls(tmp_path, monkeypatch, cap):
     assert calls == []
     mb = DataRepoBackend.from_project("DEMO")
     assert mb.run_workspace is None
+
+
+# --- post-review corrections: sealed code identity (D1), push hooks (D3), inherited env (D4) ---
+
+def _tamper_code(root: Path, *, seal: bool = False, drop: bool = False, **fields) -> None:
+    """Agent edits the engine files of its workspace (writable locally, the bubble is indicative)."""
+    path = root / "code.json"
+    if drop:
+        path.unlink()
+        return
+    code = json.loads(path.read_text())
+    code.update(fields)
+    path.write_text(json.dumps(code))
+    if seal:
+        s = json.loads((root / "seal.json").read_text())
+        s["code"].update(fields)
+        (root / "seal.json").write_text(json.dumps(s))
+
+
+def _nothing_written(cd: CodeDemo, root: Path, before: dict) -> None:
+    assert (cd.rsha("main"), cd.rsha(), porcelain(cd.data)) == (before["main"], before["branch"], before["data"])
+    assert json.loads((root / "run.json").read_text())["state"] == "open"      # refused before any write
+
+
+def _snapshot(cd: CodeDemo) -> dict:
+    return {"main": cd.rsha("main"), "branch": cd.rsha(), "data": porcelain(cd.data)}
+
+
+def test_d1_code_json_branch_to_base_refused(cdemo, cap, monkeypatch):
+    """Reviewer probe P1: code.json rewritten to `branch: main` + commit on the local base."""
+    res = rinit(cap)
+    app, root = code_of(res), Path(res["root"])
+    git(app, "checkout", "-q", "main")
+    agent_commit(app, "evil-on-main")
+    _tamper_code(root, branch="main")
+    review(cap, monkeypatch, res)
+    before = _snapshot(cdemo)
+    err = refused(cap, "run", "finish", res["run_uid"])
+    assert err.startswith("run_invalid:") and "branch" in err
+    _nothing_written(cdemo, root, before)
+
+
+@pytest.mark.parametrize("field", ["base", "head", "role", "drop"])
+def test_d1_code_json_identity_tamper_refused(cdemo, cap, monkeypatch, field):
+    res = rinit(cap)
+    app, root = code_of(res), Path(res["root"])
+    agent_commit(app, "c1")
+    code = json.loads((root / "code.json").read_text())
+    if field == "base":
+        _tamper_code(root, base="feat/other")
+    elif field == "head":
+        code["repos"]["app-repo"]["head"] = git(app, "rev-parse", "HEAD")     # empty bundle, "unchanged"
+        _tamper_code(root, repos=code["repos"])
+    elif field == "role":
+        code["repos"]["web-repo"]["role"] = "target"                           # push a neighbour
+        _tamper_code(root, repos=code["repos"])
+    else:
+        _tamper_code(root, drop=True)                                          # disguised as a run without code
+    before = _snapshot(cdemo)
+    assert refused(cap, "run", "finish", res["run_uid"]).startswith("run_invalid:")
+    _nothing_written(cdemo, root, before)
+
+
+def test_d1_sealed_branch_protected_refused(cdemo, cap, monkeypatch):
+    """code.json and seal.json both rewritten: the sealed story branch is still revalidated."""
+    res = rinit(cap)
+    app, root = code_of(res), Path(res["root"])
+    git(app, "checkout", "-q", "main")
+    agent_commit(app, "evil-on-main")
+    code = json.loads((root / "code.json").read_text())
+    code["repos"]["app-repo"]["ref"] = "main"
+    _tamper_code(root, seal=True, branch="main", repos=code["repos"])
+    before = _snapshot(cdemo)
+    assert refused(cap, "run", "finish", res["run_uid"]) == "run_invalid:seal.json: branch_protected:main"
+    _nothing_written(cdemo, root, before)
+
+
+def test_d1_forged_bundle_record_in_code_json_ignored(cdemo, cap):
+    """A bundle entry added to code.json only is not an engine file: the sealed record is the reference."""
+    res = rinit(cap)
+    root = Path(res["root"])
+    agent_commit(code_of(res), "c1")
+    forged = write(Path(res["out"]), "git/app-repo.bundle", b"forged")
+    import hashlib
+    code = json.loads((root / "code.json").read_text())
+    code["bundles"] = {"app-repo": {"sha": "0" * 40, "sha256": hashlib.sha256(b"forged").hexdigest(), "size": 6}}
+    (root / "code.json").write_text(json.dumps(code))
+    rc, fin = finish(cap, res["run_uid"])
+    assert rc == 1 and fin["reasons"] == ["unexpected_file:git/app-repo.bundle"] and cdemo.rsha() is None
+    forged.unlink()
+    rc, fin = finish(cap, res["run_uid"])
+    assert rc == 0 and cdemo.rsha() == fin["git"]["app-repo"]["sha"]
+
+
+def test_d1_seal_holds_code_and_remote_digests(cdemo, cap):
+    res = rinit(cap)
+    root = Path(res["root"])
+    seal = json.loads((root / "seal.json").read_text())
+    code = json.loads((root / "code.json").read_text())
+    assert seal["code"] == code and set(seal["remotes"]) == {"app-repo"}
+    assert str(cdemo.remote()) not in (root / "seal.json").read_text()        # a digest, never the URL
+
+
+def test_d1_remote_changed_refused(cdemo, cap):
+    res = rinit(cap)
+    agent_commit(code_of(res), "c1")
+    other = cdemo.tmp / "remotes" / "other.git"
+    git(cdemo.tmp, "clone", "-q", "--bare", str(cdemo.remote()), str(other))
+    git(cdemo.local(), "remote", "set-url", "origin", str(other))
+    rc, fin = finish(cap, res["run_uid"])
+    assert rc == 1 and fin["reasons"] == ["remote_changed:app-repo"]
+    assert cdemo.rsha() is None and subprocess.run(
+        ["git", "-C", str(other), "rev-parse", "--verify", "-q", BRANCH], capture_output=True).returncode != 0
+
+
+def test_d1_clone_command_seals_code(tmp_path, monkeypatch, cap):
+    cd = make_code_demo(tmp_path, monkeypatch, activate=False)
+    res = ok(cap, "run", "init", "DEMO-E-1", "--agent", "reviewer")
+    cd.config(runWorkspace=True)
+    ok(cap, "clone", "--run", res["root"], "--branch", BRANCH)
+    root = Path(res["root"])
+    seal = json.loads((root / "seal.json").read_text())
+    assert seal["code"] == json.loads((root / "code.json").read_text()) and set(seal["remotes"]) == {"app-repo"}
+    _tamper_code(root, branch="main")
+    assert refused(cap, "run", "finish", res["run_uid"]).startswith("run_invalid:")
+
+
+def test_d3_push_keeps_server_hooks_of_a_local_remote(cdemo, cap, monkeypatch):
+    witness = cdemo.tmp / "pre-receive-ran"
+    hook = cdemo.remote() / "hooks" / "pre-receive"
+    hook.write_bytes(f"#!/bin/sh\necho ran > {witness}\n".encode())
+    hook.chmod(0o755)
+    calls = spy_git(monkeypatch)
+    res = rinit(cap)
+    c1 = agent_commit(code_of(res), "c1")
+    rc, fin = finish(cap, res["run_uid"])
+    assert rc == 0 and cdemo.rsha() == c1 and witness.is_file()
+    pushes = [a for h, a, _ in calls if "push" in a]
+    assert len(pushes) == 1 and "--no-verify" in pushes[0] and not any("hooksPath" in x for x in pushes[0])
+
+
+def test_d4_exported_git_location_env_ignored(cdemo, cap, monkeypatch):
+    decoy = cdemo.tmp / "decoy"
+    git(cdemo.tmp, "init", "-q", str(decoy))
+    for k in ("GIT_DIR", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY"):
+        monkeypatch.setenv(k, str(decoy / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(decoy / ".git" / "index"))
+    monkeypatch.setenv("GIT_ALTERNATE_OBJECT_DIRECTORIES", str(decoy / ".git" / "objects"))
+    res = rinit(cap)
+    app = code_of(res)
+    names = [k for k in os.environ if k in gitcode.LOCATION_ENV]
+    for k in names:
+        monkeypatch.delenv(k)
+    c1 = agent_commit(app, "c1")
+    for k in names:
+        monkeypatch.setenv(k, str(decoy / ".git"))
+    rc, fin = finish(cap, res["run_uid"])
+    assert rc == 0 and fin["git"]["app-repo"]["sha"] == c1
+    for k in names:
+        monkeypatch.delenv(k)
+    assert cdemo.rsha() == c1 and git(decoy, "for-each-ref") == ""
