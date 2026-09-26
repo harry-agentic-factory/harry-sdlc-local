@@ -83,9 +83,7 @@ def plan(specs: list[RepoSpec], *, branch: str | None, base: str | None, default
                 raise RunError("repo_unresolved", s.name)
             p.warnings.append(f"repo_unresolved:{s.name}")
             continue
-        heads = gitcode.ls_remote(s.url)
-        if heads is None or not heads:
-            raise RunError("clone_failed", s.name)
+        heads = gitcode.ls_remote(s.name, s.url)
         if target:
             if f"refs/heads/{base}" not in heads:
                 raise RunError("base_unknown", f"{s.name}:{base}")

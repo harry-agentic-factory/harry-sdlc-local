@@ -48,9 +48,11 @@ BRANCH_RE = re.compile(
 class RunError(Exception):
     """Refusal of the run workspace library. `str(e)` is `"<code>:<detail>"` (or `"<code>"`)."""
 
-    def __init__(self, code: str, detail: str = ""):
+    def __init__(self, code: str, detail: str = "", *, diagnostic: str | None = None):
         self.code = code
         self.detail = detail
+        # free text for the operator (e.g. the redacted stderr of a failed git call), never part of `str(e)`
+        self.diagnostic = diagnostic
         super().__init__(f"{code}:{detail}" if detail else code)
 
 

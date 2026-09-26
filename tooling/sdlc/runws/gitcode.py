@@ -16,6 +16,7 @@ is only made from a fresh bare clone, with a plain `<sha>:refs/heads/<branch>` r
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -32,13 +33,23 @@ LOCATION_ENV = frozenset({"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJ
                           "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR"})
 
 
+# working directory of the trusted calls that name no repository (`clone`, `ls-remote`): git discovers
+# a repository from its working directory even for these, and dies on an unreadable one (e.g. a
+# worktree whose `.git` file points to a path absent from the container that runs the engine).
+NEUTRAL_CWD = os.path.abspath(os.sep)
+# userinfo of a URL (`scheme://user:secret@host`), redacted from any diagnostic
+_URL_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/@\s]+@")
+DIAGNOSTIC_MAX = 2000
+
+
 def _env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k not in LOCATION_ENV}
 
 
 def _git_trusted(*args: str, cwd=None) -> subprocess.CompletedProcess:
     argv = ["git", *(["-C", str(cwd)] if cwd is not None else []), *args]
-    return subprocess.run(argv, capture_output=True, env=_env(), check=False)
+    return subprocess.run(argv, capture_output=True, env=_env(), check=False,
+                          cwd=NEUTRAL_CWD if cwd is None else None)
 
 
 def _git_untrusted(repo, *args: str, hooks: str = NO_HOOKS) -> subprocess.CompletedProcess:
@@ -47,6 +58,27 @@ def _git_untrusted(repo, *args: str, hooks: str = NO_HOOKS) -> subprocess.Comple
     argv = ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-c", f"core.hooksPath={hooks}",
             "-c", "core.untrackedCache=false", "-C", str(repo), *args]
     return subprocess.run(argv, capture_output=True, env=_env(), check=False)
+
+
+def diagnostic(p: subprocess.CompletedProcess) -> str:
+    """Redacted, bounded stderr of a failed git call, for the operator."""
+    err = (p.stderr or b"").decode("utf-8", "replace").strip()
+    args, sub = list(p.args[1:]) if isinstance(p.args, list) else [], "?"
+    while args:
+        a = args.pop(0)
+        if a in ("-C", "-c"):
+            args = args[1:]
+        elif not a.startswith("-"):
+            sub = a
+            break
+    text = _URL_USERINFO.sub(r"\1***@", f"git {sub} (rc={p.returncode}): {err}")
+    return text[:DIAGNOSTIC_MAX]
+
+
+def _check(p: subprocess.CompletedProcess, name: str) -> subprocess.CompletedProcess:
+    if p.returncode != 0:
+        raise RunError("clone_failed", name, diagnostic=diagnostic(p))
+    return p
 
 
 def _out(p: subprocess.CompletedProcess) -> str:
@@ -62,16 +94,17 @@ def origin_url(local: str | os.PathLike) -> str | None:
     return url if p.returncode == 0 and url else None
 
 
-def ls_remote(url: str) -> dict[str, str] | None:
-    """`{"HEAD": sha, "refs/heads/<b>": sha, ...}` of a remote, None when it cannot be listed."""
-    p = _git_trusted("ls-remote", "--", url)
-    if p.returncode != 0:
-        return None
+def ls_remote(name: str, url: str) -> dict[str, str]:
+    """`{"HEAD": sha, "refs/heads/<b>": sha, ...}` of a remote (RunError `clone_failed` when it cannot
+    be listed or has no ref)."""
+    p = _check(_git_trusted("ls-remote", "--", url), name)
     refs: dict[str, str] = {}
     for line in _out(p).splitlines():
         sha, _, ref = line.partition("\t")
         if ref == "HEAD" or ref.startswith("refs/heads/"):
             refs[ref] = sha
+    if not refs:
+        raise RunError("clone_failed", name, diagnostic=f"remote of {name} has no branch")
     return refs
 
 
@@ -113,18 +146,15 @@ def clone_target(name: str, url: str, dest: Path, *, branch: str, base: str, cre
         (("update-ref", f"refs/heads/{base}", f"refs/remotes/origin/{base}"), dest),
     ]
     for args, cwd in steps:
-        if _git_trusted(*args, cwd=cwd).returncode != 0:
-            raise RunError("clone_failed", name)
+        _check(_git_trusted(*args, cwd=cwd), name)
     for ref in _local_heads(dest):
         if ref not in (f"refs/heads/{branch}", f"refs/heads/{base}"):
-            if _git_trusted("update-ref", "-d", ref, cwd=dest).returncode != 0:
-                raise RunError("clone_failed", name)
-    if _git_trusted("remote", "remove", "origin", cwd=dest).returncode != 0:
-        raise RunError("clone_failed", name)
+            _check(_git_trusted("update-ref", "-d", ref, cwd=dest), name)
+    _check(_git_trusted("remote", "remove", "origin", cwd=dest), name)
     _drop_logs(dest)
-    head = _git_trusted("rev-parse", "--verify", "-q", "HEAD", cwd=dest)
-    if head.returncode != 0 or not _clean_config(dest):
-        raise RunError("clone_failed", name)
+    head = _check(_git_trusted("rev-parse", "--verify", "-q", "HEAD", cwd=dest), name)
+    if not _clean_config(dest):
+        raise RunError("clone_failed", name, diagnostic="local configuration of the clone not clean")
     return _out(head)
 
 
@@ -134,15 +164,13 @@ def clone_neighbour(name: str, url: str, dest: Path, *, ref: str | None) -> tupl
     args = ["clone", "-q", "--depth", "1", "--single-branch", "--no-tags", "--origin", "origin"]
     if ref is not None:
         args += ["--branch", ref]
-    if _git_trusted(*args, "--", _clone_url(url), str(dest)).returncode != 0:
-        raise RunError("clone_failed", name)
-    if _git_trusted("remote", "remove", "origin", cwd=dest).returncode != 0:
-        raise RunError("clone_failed", name)
+    _check(_git_trusted(*args, "--", _clone_url(url), str(dest)), name)
+    _check(_git_trusted("remote", "remove", "origin", cwd=dest), name)
     _drop_logs(dest)
-    head = _git_trusted("rev-parse", "--verify", "-q", "HEAD", cwd=dest)
+    head = _check(_git_trusted("rev-parse", "--verify", "-q", "HEAD", cwd=dest), name)
     config = _read_regular(dest / ".git" / "config")
-    if head.returncode != 0 or config is None or not _clean_config(dest):
-        raise RunError("clone_failed", name)
+    if config is None or not _clean_config(dest):
+        raise RunError("clone_failed", name, diagnostic="local configuration of the clone not clean")
     return _out(head), sha256(config)
 
 
