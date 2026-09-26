@@ -96,3 +96,20 @@ sdlc --project <PREFIX> pm add --agent recetteur --kind <incident|security> \
      --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
 ```
 `<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.
+
+## Workspace de run
+
+Si le prompt fournit `IN`, `OUT` et `CODE` (mode run workspace, projet en `runWorkspace: true`), ces règles
+remplacent les chemins de story, les worktrees et les transitions décrits plus haut :
+- **Lire** : `sdlc doc read <clé> --run <root>` (`spec-tech`, `spec-func`, `prd`, `brain/<chemin>`… ; liste :
+  `sdlc doc list --run <root>`) ou les fichiers de `IN`, en lecture seule. Jamais le dépôt data.
+- **Écrire** : brouillons (et notes de reprise « au fil de l'eau ») dans `<root>/rw/scratch/`, jamais dans un
+  dossier temporaire système ; puis **un seul** `sdlc doc add acceptance <fichier> --run <root>` en fin, avec une
+  section `## Recap`.
+- **Code** : `git -C CODE …`, commits sur la branche de la story ; **jamais** de push, de `git remote`, de
+  `sdlc link` ni de changement de statut : l'orchestration publie (`sdlc run finish`) et transitionne.
+- Commandes d'état et de config permises : `sdlc get`, `sdlc config`, `sdlc deploy-target`, `sdlc pm add`.
+- **Recette** : vérifie d'abord que la version déployée = `git -C CODE rev-parse HEAD`. Sur KO, le bundle repro va
+  dans `OUT/sources/repro/` (`steps.md`, `env.md`, `fixtures.md`, traces) et le verdict porte
+  `repro = "run:<RUN_UID>"` ; il sera publié avec le run et remis au fixer dans `IN/repro/`.
+Sans `IN`/`OUT` : les instructions ci-dessus s'appliquent inchangées.

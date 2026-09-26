@@ -220,7 +220,7 @@ def run(argv: list[str] | None = None) -> dict:
 
     if args.cmd == "brain":
         return brain_cli.dispatch(args)
-    if args.cmd in ("run", "doc"):          # never resolves a workspace before the library does
+    if args.cmd in ("run", "doc", "clone"):  # never resolves a workspace before the library does
         return runws_cli.dispatch(args)
 
     if args.cmd == "migrate":
@@ -378,7 +378,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"error": e.message, "code": e.code}, ensure_ascii=False), file=sys.stderr)
         return 2
     except Exception as e:  # noqa: BLE001 — CLI: message propre
-        print(json.dumps({"error": str(e)}, ensure_ascii=False), file=sys.stderr)
+        err = {"error": str(e)}
+        if getattr(e, "diagnostic", None):  # e.g. the redacted stderr of a failed git call
+            err["diagnostic"] = e.diagnostic
+        print(json.dumps(err, ensure_ascii=False), file=sys.stderr)
         return 1
 
 

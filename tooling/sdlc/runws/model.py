@@ -23,6 +23,10 @@ RUN_JSON_KEYS: tuple[str, ...] = tuple(sorted((
 )))
 DOC_MAX_BYTES = 1_048_576
 ENGINE_NAME = "harry-sdlc"
+# Caps of rw/out/sources/ (published into the trace of a code run): per file and per run.
+SOURCE_MAX_BYTES = 50 * 1024 * 1024
+RUN_SOURCES_MAX_BYTES = 200 * 1024 * 1024
+CODE_OPTIONS: tuple[str, ...] = ("branch", "base", "repro", "repro_dir", "status")
 
 RUN_UID_RE = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{6}$")
 ROUND_HEADER_RE = re.compile(
@@ -33,14 +37,22 @@ ROUND_HEADER_BYTES_RE = re.compile(ROUND_HEADER_RE.pattern.encode("utf-8"))
 SCOPE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 AGENT_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 PHASE_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+# Branch names accepted by the run workspace (a strict subset of git check-ref-format): no leading
+# `-` or `/`, no `..`, `//`, `@{`, whitespace, control or `~^:?*[\` character, no component starting
+# with `.`, no trailing `/`, `.` or `.lock`, not `@`.
+BRANCH_RE = re.compile(
+    r"^(?![-/])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!(?:.*/)?\.)(?!.*(?:/|\.|\.lock)$)(?!@$)"
+    r"[^\s~^:?*\[\\\x00-\x1f\x7f]+$")
 
 
 class RunError(Exception):
     """Refusal of the run workspace library. `str(e)` is `"<code>:<detail>"` (or `"<code>"`)."""
 
-    def __init__(self, code: str, detail: str = ""):
+    def __init__(self, code: str, detail: str = "", *, diagnostic: str | None = None):
         self.code = code
         self.detail = detail
+        # free text for the operator (e.g. the redacted stderr of a failed git call), never part of `str(e)`
+        self.diagnostic = diagnostic
         super().__init__(f"{code}:{detail}" if detail else code)
 
 
@@ -77,6 +89,12 @@ def validate_type(value: str | None) -> str:
 def validate_run_uid(value: str | None) -> str:
     if not isinstance(value, str) or not RUN_UID_RE.fullmatch(value):
         raise RunError("run_uid_invalid", str(value))
+    return value
+
+
+def validate_branch(value: str | None) -> str:
+    if not isinstance(value, str) or not BRANCH_RE.fullmatch(value):
+        raise RunError("branch_invalid", str(value))
     return value
 
 

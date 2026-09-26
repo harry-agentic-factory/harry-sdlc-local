@@ -1,0 +1,23 @@
+{
+  "calls": [
+    {
+      "prompt": "Prépare la **bulle scopée** du ticket **DEMO-E-1**. Exécute en Bash :\n`sdlc --project DEMO workspace DEMO-E-1 --branch feat/DEMO-E-1`\n→ crée le worktree isolé + `.claude/settings.json` (additionalDirectories = worktrees+brain+data) + symlink des skills projet. Renvoie STRICTEMENT le JSON : worktree = `.worktrees[\"app-repo\"]`, additionalDirectories, projectSkills. Ne fais RIEN d'autre.",
+      "agentType": "general-purpose",
+      "label": "prepare:DEMO-E-1",
+      "phase": "Prepare"
+    },
+    {
+      "prompt": "Story SDLC **DEMO-E-1** (/wt/app-repo). Review le diff de la branche vs main contre les INVARIANTS du spec-tech.\nLis: /data/demo/DEMO-E/stories/DEMO-E-1/spec-tech.md (invariants = ta checklist) + /data/demo/DEMO-E/stories/DEMO-E-1/spec-func.md (critères).\nDiff: `git -C /wt/app-repo diff main...HEAD`. Vérifie CHAQUE invariant (preuve dans le diff), cherche bugs/régressions/fuites. Écris /data/demo/DEMO-E/stories/DEMO-E-1/review.md. Ne modifie PAS le code.\n**Transition dictée par l'orchestration — si (et seulement si) conforme** : `sdlc --project DEMO set-status DEMO-E-1 reviewed`. Ne décide d'aucune autre transition.\nDernier message = JSON {conform, note, violations}.",
+      "agentType": "reviewer",
+      "label": "review:DEMO-E-1",
+      "phase": "Review"
+    }
+  ],
+  "result": {
+    "stopped_at": "review",
+    "reason": "await_review",
+    "review": {
+      "conform": true
+    }
+  }
+}

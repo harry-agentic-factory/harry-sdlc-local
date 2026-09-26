@@ -1,7 +1,7 @@
-"""`sdlc run <sub>` and `sdlc doc <sub>`: thin CLI wrappers over the run workspace library.
+"""`sdlc run <sub>`, `sdlc doc <sub>` and `sdlc clone`: thin CLI wrappers over the run workspace library.
 
-`run` commands use the data repository backend of the project; `doc` commands only need the run
-workspace (`--run <root>` or `SDLC_RUN`) and never resolve a project.
+`run` and `clone` commands use the data repository backend of the project; `doc` commands only need
+the run workspace (`--run <root>` or `SDLC_RUN`) and never resolve a project.
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from .docs import doc_add, doc_list, doc_read
-from .lifecycle import run_clean, run_finish, run_init, run_list
+from .lifecycle import code_clone, run_clean, run_finish, run_init, run_list
 from .model import DOC_TYPES
 
 
@@ -24,14 +24,31 @@ def add_parsers(sub) -> None:
     a.add_argument("--agent", default=None, help="agent role (reviewer, dev, ...); required")
     a.add_argument("--phase", default=None, help="phase recorded in run.json (default: the agent role)")
     a.add_argument("--mission", default=None, help="mission ID (exclusive with STORY)")
+    a.add_argument("--branch", default=None,
+                   help="code run: story branch of the target repositories (default: branch of the story)")
+    a.add_argument("--base", default=None, help="code run: base branch (default: refBranch of the manifest)")
+    a.add_argument("--repro", default=None, help="code run: run uid whose published repro goes to in/repro/")
+    a.add_argument("--repro-dir", dest="repro_dir", default=None,
+                   help="code run: absolute folder whose *.md go to in/repro/ (exclusive with --repro)")
+    a.add_argument("--status", default=None, help="code run: story transition applied before the run is created")
     a = rs.add_parser("finish", help="check, publish into the data repository, then remove the workspace")
     a.add_argument("run", help="run uid or workspace path")
     a.add_argument("--keep", action="store_true", help="keep the workspace after publication (debug)")
+    a.add_argument("--status", default=None,
+                   help="code run: story transition applied once the run is published")
     a = rs.add_parser("clean", help="remove a run workspace without publishing anything")
     a.add_argument("run", help="run uid or workspace path")
     a = rs.add_parser("list", help="open/rejected workspaces and published traces")
     a.add_argument("story", nargs="?", default=None, help="filter on the story of run.json")
     a.add_argument("--mission", default=None, help="filter on the mission of run.json")
+
+    c = sub.add_parser("clone", help="clone the code of an open run (runWorkspace projects)",
+                       description="Clone the target repositories of the story into rw/code/ and the other "
+                                   "repositories into in/repos/ (read only) of an existing run whose rw/code/ is "
+                                   "empty. See docs/run-workspace.md.")
+    c.add_argument("--run", required=True, help="run workspace root")
+    c.add_argument("--branch", default=None, help="story branch (default: branch of the story)")
+    c.add_argument("--base", default=None, help="base branch (default: refBranch of the manifest)")
 
     d = sub.add_parser("doc", help="agent side of a run: read, list, add documents",
                        description="Read the documents of the current run by logical key, add produced "
@@ -65,13 +82,16 @@ def dispatch(args: argparse.Namespace):
     if args.cmd == "run":
         if args.runcmd == "init":
             return run_init(args.project, agent=args.agent, story=args.story, mission=args.mission,
-                            phase=args.phase)
+                            phase=args.phase, branch=args.branch, base=args.base, repro=args.repro,
+                            repro_dir=args.repro_dir, status=args.status)
         if args.runcmd == "finish":
             from ..brain.cli import CommandResult
-            res = run_finish(args.run, backend=_backend(args.project), keep=args.keep)
+            res = run_finish(args.run, backend=_backend(args.project), keep=args.keep, status=args.status)
             return CommandResult(res, 1) if res.get("state") == "rejected" else res
         if args.runcmd == "clean":
             return run_clean(args.run, backend=_backend(args.project))
         if args.runcmd == "list":
             return run_list(args.project, story=args.story, mission=args.mission)
+    if args.cmd == "clone":
+        return code_clone(args.run, backend=_backend(args.project), branch=args.branch, base=args.base)
     raise SystemExit(2)

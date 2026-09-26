@@ -11,6 +11,11 @@ of level 1, `journal.md` and `_index.md` excluded): same filtering whatever the 
     missions/<M>/sources/<p>.md                   mission/sources/<p>.md
     project/brain/@<commit>/<p>.md                brain/<p>.md
     runs/<uid>/{run.json,manifest.json,out/docs/<type>.md}   (publication only)
+    runs/<uid>/out/sources/<rel>, runs/<uid>/out/git/<repo>.bundle   (code run publication)
+    runs/<uid>/out/sources/repro/<p>.md           repro/<p>.md  (code run, `--repro <uid>`)
+
+A code run also has `rw/code/<repo>/` (targets, writable) and `in/repos/<repo>/` (neighbours, read only,
+manifest entry `{key: "repos/<repo>", commit, role: "neighbour"}`).
 """
 from __future__ import annotations
 
@@ -45,6 +50,33 @@ def doc_key(uid: str, doc_type: str) -> str:
 def doc_rel(doc_type: str) -> str:
     """Path of a published document relative to `rw/out/`."""
     return f"docs/{doc_type}.md"
+
+
+def source_key(uid: str, rel: str) -> str:
+    """Trace key of a file of `rw/out/sources/` (`rel` relative to that folder)."""
+    return run_key(uid, f"out/sources/{rel}")
+
+
+def bundle_key(uid: str, repo: str) -> str:
+    return run_key(uid, f"out/git/{repo}.bundle")
+
+
+def bundle_rel(repo: str) -> str:
+    """Path of the engine bundle of `repo` relative to `rw/out/`."""
+    return f"git/{repo}.bundle"
+
+
+def repro_prefix(uid: str) -> str:
+    return run_key(uid, "out/sources/repro/")
+
+
+def repro_in_key(rel: str) -> str:
+    """Path under `in/` of a repro file (`rel` relative to the repro folder)."""
+    return f"repro/{rel}"
+
+
+def neighbour_key(repo: str) -> str:
+    return f"repos/{repo}"
 
 
 def trace_uid(key: str) -> str | None:
@@ -141,8 +173,13 @@ def canonical_key(in_key: str) -> str:
 
 # --- bubble ---
 
-def settings(agent_root: str, bubble: dict) -> dict:
+GIT_DENY = ("Bash(git push:*)", "Bash(git remote:*)")
+
+
+def settings(agent_root: str, bubble: dict, *, code: bool = False) -> dict:
     """`in/settings.json`: only `<A>/in` and `<A>/rw`, `in/**` denied to Edit/Write.
+
+    A code run (`code=True`) also denies `git push` and `git remote` to the agent.
 
     `"Edit(/" + A + "/in/**)"` with `A` absolute gives `Edit(//abs/in/**)`: in the Claude Code rule
     syntax a leading `//` is an absolute path (`/x` would be relative to the settings file).
@@ -153,6 +190,8 @@ def settings(agent_root: str, bubble: dict) -> dict:
     if allow:
         perms["allow"] = allow
     perms["deny"] = list(bubble.get("deny") or []) + [f"Edit(/{a}/in/**)", f"Write(/{a}/in/**)"]
+    if code:
+        perms["deny"] += [d for d in GIT_DENY if d not in perms["deny"]]
     return {"permissions": perms}
 
 

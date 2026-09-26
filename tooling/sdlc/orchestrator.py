@@ -43,7 +43,10 @@ def _esc(escalation: dict | None) -> dict:
     return {**DEFAULT_ESCALATION, **(escalation or {})}
 
 
-def run_ticket_upstream(sdlc, story, agents, escalation=None, max_fix=2, bubble=None) -> Outcome:
+def run_ticket_upstream(sdlc, story, agents, escalation=None, max_fix=2, bubble=None,
+                        run_workspace=None) -> Outcome:
+    if run_workspace is not None:
+        return _upstream_rw(sdlc, story, agents, run_workspace, escalation, max_fix)
     esc = _esc(escalation)
     log: list = []
 
@@ -83,7 +86,9 @@ def run_ticket_upstream(sdlc, story, agents, escalation=None, max_fix=2, bubble=
         sdlc.set_status(story, "deployed")                        # re-deploy
 
 
-def run_ticket_downstream(sdlc, story, agents, escalation=None, bubble=None) -> Outcome:
+def run_ticket_downstream(sdlc, story, agents, escalation=None, bubble=None, run_workspace=None) -> Outcome:
+    if run_workspace is not None:
+        return _downstream_rw(sdlc, story, agents, run_workspace)
     esc = _esc(escalation)
     log: list = []
 
@@ -97,6 +102,93 @@ def run_ticket_downstream(sdlc, story, agents, escalation=None, bubble=None) -> 
         # régression : le deployer sait rollback (hors scope logique ici) → escalade
         return Outcome(story, "nonreg", "needs_human", "régression non-reg", log)
     demo = agents["demo"](ctx()); log.append(("demo", demo))
+    return Outcome(story, "demo", "await_validation", "démo prête — accept humain", log)
+
+
+# --- run workspace mode (code runs): one run per agent call, transitions carried by `finish` ---
+#
+# `run_workspace` exposes `init(story, role, **opts) -> dict` (JSON of `sdlc run init`) and
+# `finish(run_uid, status=None) -> dict` (JSON of `sdlc run finish`). Each agent sees the ticket without
+# its data paths (`artifacts`) plus `run`; the status that followed an agent becomes the `status` of its
+# finish. The only direct transition left is `deployed` after a fix (no redeploy agent here).
+
+class _Rejected(Exception):
+    pass
+
+
+def _published(fin: dict) -> bool:
+    return bool(fin) and (fin.get("state") == "published" or "already" in fin)
+
+
+_STEP = {"reviewer": "review", "deployer": "deploy", "recetteur": "recette", "fixer": "recette",
+         "e2e-author": "e2e_author", "nonreg-runner": "nonreg", "demo": "demo"}
+
+
+def _rw_step(sdlc, story, rw, role, agent, verdict_status, init_opts=None):
+    """init -> agent -> finish (with the status the verdict earns). Returns (verdict, run)."""
+    run = rw.init(story, role, **(init_opts or {}))
+    t = {k: v for k, v in sdlc.get_ticket(story).items() if k != "artifacts"}
+    verdict = agent({**t, "run": run})
+    fin = rw.finish(run["run_uid"], status=verdict_status(verdict))
+    if not _published(fin):
+        raise _Rejected(_STEP[role])
+    return verdict, run
+
+
+def _upstream_rw(sdlc, story, agents, rw, escalation, max_fix) -> Outcome:
+    esc = _esc(escalation)
+    log: list = []
+    try:
+        if esc["review"] == "human-confirm":
+            return Outcome(story, "review", "needs_human", "confirm review", log)
+        rev, _ = _rw_step(sdlc, story, rw, "reviewer", agents["reviewer"],
+                          lambda v: "reviewed" if v.get("conform") else None)
+        log.append(("review", rev))
+        if not rev.get("conform"):
+            return Outcome(story, "review", "needs_human", rev.get("note", "non conforme"), log)
+
+        if esc["deploy"] == "human-confirm":
+            return Outcome(story, "deploy", "needs_human", "confirm deploy", log)
+        dep, _ = _rw_step(sdlc, story, rw, "deployer", agents["deployer"],
+                          lambda v: "deployed" if v.get("ok") else None)
+        log.append(("deploy", dep))
+        if not dep.get("ok"):
+            return Outcome(story, "deploy", "needs_human", "deploy failed", log)
+
+        tries = 0
+        while True:
+            rec, rec_run = _rw_step(sdlc, story, rw, "recetteur", agents["recetteur"],
+                                    lambda v: "recette_ok" if v.get("pass") else None)
+            log.append(("recette", rec))
+            if rec.get("pass"):
+                return Outcome(story, "recette", "await_validation", "recette OK — validation humaine", log)
+            if rec.get("flaky") or tries >= max_fix:
+                return Outcome(story, "recette", "needs_human", "recette KO (flaky/retries épuisés)", log)
+            tries += 1
+            fx, _ = _rw_step(sdlc, story, rw, "fixer", agents["fixer"],
+                             lambda v: "reviewed" if v.get("fixed") else None,
+                             {"status": "implemented", "repro": rec_run["run_uid"]})
+            log.append(("fix", fx))
+            if not fx.get("fixed"):
+                return Outcome(story, "recette", "needs_human", "fix failed", log)
+            sdlc.set_status(story, "deployed")                    # re-deploy (no agent in this reference)
+    except _Rejected as e:
+        return Outcome(story, str(e), "needs_human", "finish_rejected", log)
+
+
+def _downstream_rw(sdlc, story, agents, rw) -> Outcome:
+    log: list = []
+    try:
+        ea, _ = _rw_step(sdlc, story, rw, "e2e-author", agents["e2e_author"], lambda v: None)
+        log.append(("e2e_author", ea))
+        nr, _ = _rw_step(sdlc, story, rw, "nonreg-runner", agents["nonreg"], lambda v: None)
+        log.append(("nonreg", nr))
+        if not nr.get("pass"):
+            return Outcome(story, "nonreg", "needs_human", "régression non-reg", log)
+        demo, _ = _rw_step(sdlc, story, rw, "demo", agents["demo"], lambda v: None)
+        log.append(("demo", demo))
+    except _Rejected as e:
+        return Outcome(story, str(e), "needs_human", "finish_rejected", log)
     return Outcome(story, "demo", "await_validation", "démo prête — accept humain", log)
 
 
