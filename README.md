@@ -8,9 +8,9 @@ qui stockent les tickets (`.md` + `status.json`). Un moteur, plusieurs jeux de d
 
 ## Quickstart
 ```bash
-git clone <repo-url> harry-sdlc-local && cd harry-sdlc-local
-make install     # symlinke l'engine dans ~/.claude + crée la commande globale `sdlc`
-make test        # 216 tests (déterministe, offline)
+git clone --depth 1 --branch v0.7.0 https://github.com/harry-agentic-factory/harry-sdlc-local \
+  && ./harry-sdlc-local/install.sh v0.7.0   # version publiée ; `sdlc --version` = 0.7.0 (release)
+# développeur du moteur : dans un clone, `make install` (= install.sh --dev .) puis `make test`
 
 # 1 projet = 1 repo data
 sdlc init-project SAMPLE --path ../sample-proj-sdlc-local --repos app-repo,web-repo
@@ -149,8 +149,11 @@ C'est ce que veut dire « vas-y en mode auto ».
 
 ## Contenu
 ```
-VERSION                    # version d'engine (semver)
-install.sh · Makefile      # make install  → symlink dans ~/.claude
+VERSION                    # version d'engine (semver) — source unique (paquet, tag, sdlc --version)
+CHANGELOG.md               # Keep a Changelog ; section [X.Y.Z] = notes de la Release
+install.sh · Makefile      # install.sh vX.Y.Z | --dev <chemin> ; make install = --dev
+scripts/                   # check-tag-version, changelog-section, wheel-smoke, ci-local (règles de release)
+.github/workflows/         # ci.yml (PR/push) · release.yml (tag vX.Y.Z → GitHub Release)
 claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
   commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket,
@@ -166,12 +169,36 @@ docs/PRD.md
 ```
 
 ## Installer / tester
+
+L'installation se fait **sur un tag** (`vX.Y.Z`) ou, explicitement, sur une **copie de travail** (`--dev`) :
 ```bash
-make install         # symlink claude/* -> ~/.claude ; crée la commande globale `sdlc` (dans un dir du PATH)
-make test            # pytest du cœur déterministe
+# amorçage (première installation) : un clone jetable au tag, qui s'installe lui-même
+git clone --depth 1 --branch v0.7.0 https://github.com/harry-agentic-factory/harry-sdlc-local \
+  && ./harry-sdlc-local/install.sh v0.7.0
+~/.local/share/harry-sdlc/current/install.sh v0.7.1   # montée de version (clone détaché au tag)
+~/.local/share/harry-sdlc/current/install.sh v0.7.0   # retour arrière : bascule seule, aucun clone
+./install.sh --dev "$PWD"                             # mode dev : `current` = cette copie (= make install)
+sdlc --version        # 0.7.0 (release)  |  0.7.0-dev+<sha>[.dirty] (dev: <chemin>)
+make test             # pytest du cœur déterministe
 ```
-`make install` pose une commande **`sdlc`** appelable de partout (dans `/usr/local/bin`, `/opt/homebrew/bin`
-ou `~/.local/bin` selon ton PATH). Ensuite :
+```
+~/.local/share/harry-sdlc/         ($HARRY_SDLC_HOME)
+├── v0.7.0/  v0.7.1/               clones détachés aux tags, jamais modifiés
+└── current -> v0.7.1              version active (ou chemin d'une copie en --dev)
+~/.claude/{agents,commands,workflows,skills}/<x>, ~/.claude/sdlc/harry.md, <dossier du PATH>/sdlc
+                                   liens vers ~/.local/share/harry-sdlc/current/…
+```
+- `install.sh` **exige** un argument (`vX.Y.Z` ou `--dev <chemin>`) ; un tag ≠ `v` + `VERSION` du clone, ou une
+  branche, est **refusé** sans rien changer (même script que la Release : `scripts/check-tag-version.sh`).
+- Basculer / revenir = déplacer `current` (renommage atomique) : les liens de `~/.claude` ne changent pas.
+- Les liens de l'ancien mode (vers une copie `harry-sdlc-local`) sont **migrés** ; un fichier réel ou un lien
+  tiers n'est jamais touché (avertissement) ; `projects.json` est créé seulement s'il manque ; `profile`,
+  `locks/`, `agent_runs.log`, `settings.json` ne sont jamais lus ni écrits. Idempotent.
+- Variables : `HARRY_SDLC_HOME` (défaut `~/.local/share/harry-sdlc`), `HARRY_SDLC_REPO` (défaut : l'URL GitHub
+  publique ; ex. un dépôt nu local pour tester), `CLAUDE_HOME` (défaut `~/.claude`).
+
+La commande **`sdlc`** est posée dans le dossier du PATH qui porte déjà un lien `sdlc` du moteur, sinon le premier
+dossier inscriptible parmi `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`. Ensuite :
 ```bash
 sdlc projects                        # projets enregistrés
 sdlc --project SAMPLE get SAMPLE-APPS-1     # réhydrate un ticket
@@ -283,18 +310,18 @@ Tour guidé pour comprendre **3 choses** : (a) **qui fait quoi** (responsabilit�
 
 ### 0. Installer, et comprendre ce que ça pose
 ```bash
-make install
+make install        # mode dev : install.sh --dev <cette copie>
 ```
-- **Symlinke** `claude/{agents,commands,workflows,sdlc}/*` → `~/.claude/…` (l'endroit que **Claude Code lit**).
-  Ce sont des **liens, pas des copies** : éditer un fichier de l'engine change *immédiatement* ce que Claude
-  utilise.
+- **Symlinke** `claude/{agents,commands,workflows,skills,sdlc}/*` → `~/.claude/…` (l'endroit que **Claude Code
+  lit**) via `~/.local/share/harry-sdlc/current`, qui pointe ici en mode dev. Ce sont des **liens, pas des
+  copies** : éditer un fichier de l'engine change *immédiatement* ce que Claude utilise.
 - Crée la **commande globale `sdlc`** (dans un dossier de ton PATH).
 - **Ne touche pas** à `~/.claude/sdlc/{profile,projects.json}` (ton **état perso** : profil courant + registre).
 
 ### 1. Voir le lien symlink ↔ plateforme (le point clé)
 ```bash
-readlink ~/.claude/agents/reviewer.md      # -> .../harry-sdlc-local/claude/agents/reviewer.md
-readlink ~/.claude/workflows/run-ticket.js # -> .../harry-sdlc-local/claude/workflows/run-ticket.js
+readlink ~/.claude/agents/reviewer.md      # -> ~/.local/share/harry-sdlc/current/claude/agents/reviewer.md
+readlink ~/.local/share/harry-sdlc/current # -> v0.7.0 (release) ou le chemin de ta copie (--dev)
 ```
 → chaque fichier de `~/.claude` est une **flèche** vers l'engine. **La source de vérité du comportement =
 l'engine** ; `~/.claude` n'est que le *point de montage* regardé par Claude Code. Tu modifies l'engine →
@@ -378,6 +405,38 @@ SDLC_WORKSPACE=$(cd ../sample-proj-sdlc-local && pwd) python3 -m cockpit.server 
 ```
 
 ---
+
+## Use as a library
+
+The engine is also the Python package **`harry-sdlc`** (import name `sdlc`, no dependency, Python ≥ 3.11), built
+from `tooling/` with hatchling. Pin it on a tag:
+
+```bash
+uv add "harry-sdlc @ git+https://github.com/harry-agentic-factory/harry-sdlc-local@v0.7.0#subdirectory=tooling"
+uv run sdlc --version        # 0.7.0 (release)
+```
+
+`uv.lock` records the commit sha of the tag. The wheel only ships the `sdlc` package (with `sdlc.brain`,
+`sdlc.runws`, `sdlc.migrations` and `py.typed`); `tooling/cockpit/` and the tests stay in the repository.
+`make dist` builds the wheel and the sdist into `tooling/dist/`.
+
+## Release
+
+The version has a single source: the `VERSION` file (one `X.Y.Z` line). `pyproject.toml` reads it at build time
+and never carries a static version; `engine_version()` / `sdlc --version` report it in every install mode.
+
+1. On the story branch: bump `VERSION` and move the `[Unreleased]` entries of `CHANGELOG.md` into a
+   `## [X.Y.Z] - YYYY-MM-DD` section (Keep a Changelog, ASCII hyphen), in one `chore(release): X.Y.Z` commit.
+2. `make release-check` (= `scripts/ci-local.sh --release vX.Y.Z`): local dry run of both workflows (tag check,
+   changelog section, tests, build, offline wheel smoke; the `gh release create` command is printed only).
+3. Promote the trunk to `main` through a pull request merged with **a merge commit** (not squash, not rebase),
+   once the `ci` workflow is green on Python 3.11 and 3.12.
+4. After `ci` is green on the merge commit of `main`, create and push an **annotated** tag on it:
+   `git tag -a vX.Y.Z -m "harry-sdlc X.Y.Z" <merge sha> && git push origin vX.Y.Z`.
+5. The `release` workflow checks the tag (`v` + `VERSION`, annotated, reachable from `main`), extracts the
+   changelog section, runs the tests, builds, smoke-tests the wheel and creates the GitHub Release with the
+   wheel and the sdist. A Release is never overwritten; a published tag is never moved (fix forward with a
+   patch version).
 
 ## Versioning & migration de la data
 L'engine est versionné (`VERSION`). Chaque repo data porte `schemaVersion` (dans `sdlc.config.json`).
