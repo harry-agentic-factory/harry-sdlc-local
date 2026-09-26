@@ -212,11 +212,16 @@ def run(argv: list[str] | None = None) -> dict:
     # --- brain: read a git knowledge repo at a commit (sdlc.brain library) ---
     from .brain import cli as brain_cli
     brain_cli.add_parser(sub)
+    # --- run workspace of an autonomous agent (sdlc.runws library) ---
+    from .runws import cli as runws_cli
+    runws_cli.add_parsers(sub)
 
     args = p.parse_args(_autocorrect(argv, list(sub.choices)))
 
     if args.cmd == "brain":
         return brain_cli.dispatch(args)
+    if args.cmd in ("run", "doc"):          # never resolves a workspace before the library does
+        return runws_cli.dispatch(args)
 
     if args.cmd == "migrate":
         from .migrations import apply_migrations
@@ -359,6 +364,11 @@ def main(argv: list[str] | None = None) -> int:
     from .brain.cli import CommandResult
     try:
         res = run(argv)
+        if isinstance(res, bytes):          # `doc read`: raw document bytes, nothing added
+            sys.stdout.flush()
+            sys.stdout.buffer.write(res)
+            sys.stdout.buffer.flush()
+            return 0
         if isinstance(res, CommandResult):
             print(res.text if res.text is not None else json.dumps(res.payload, indent=2, ensure_ascii=False))
             return res.exit_code
