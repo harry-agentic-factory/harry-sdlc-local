@@ -141,7 +141,7 @@ def test_engine_version_sources(monkeypatch, tmp_path):
 
 def _cli_env(home: Path) -> dict[str, str]:
     env = {k: v for k, v in os.environ.items() if not k.startswith(("HARRY_SDLC_", "SDLC_", "GIT_"))}
-    env.update(HOME=str(home), PYTHONPATH=str(fx.TOOLING), PYTHONDONTWRITEBYTECODE="1")
+    env.update(HOME=str(home), PYTHONPATH=str(fx.TOOLING), PYTHONDONTWRITEBYTECODE="1", COLUMNS="120")
     return env
 
 

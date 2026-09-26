@@ -50,11 +50,16 @@ def metadata(wheel: Path) -> str:
 
 
 def clean_env(home: Path) -> dict[str, str]:
-    env = {k: v for k, v in os.environ.items()
+    """No PYTHONPATH (G2: the test image sets it to the source tree), fixed git identity, throwaway HOME."""
+    env = {k: v for k, v in fx.git_env(home).items()
            if k not in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV") and not k.startswith(("SDLC_", "HARRY_SDLC_"))}
-    env.update(HOME=str(home), PYTHONDONTWRITEBYTECODE="1")
-    env.update(fx.git_env(home))
+    env.update(PYTHONDONTWRITEBYTECODE="1")
     return env
+
+
+def test_clean_env_drops_pythonpath(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYTHONPATH", str(fx.TOOLING))
+    assert "PYTHONPATH" not in clean_env(tmp_path)
 
 
 @pytest.fixture(scope="module")
