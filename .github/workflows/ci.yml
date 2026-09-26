@@ -1,0 +1,48 @@
+# CI of the engine: tests, package build and an offline smoke of the built wheel.
+# Thin on purpose: the rules live in scripts/ (same scripts as release.yml, install.sh and scripts/ci-local.sh).
+name: ci
+
+on:
+  pull_request:
+    branches: [main, "epic/**"]
+  push:
+    branches: [main, "epic/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      SDLC_REQUIRE_NODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.21"
+          enable-cache: false
+      - name: git identity of the runner (same as the local test image)
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@localhost
+          git config --global init.defaultBranch main
+      - name: install the test dependency
+        run: python -m pip install pytest
+      - name: tests
+        run: python -m pytest -q -p no:cacheprovider tooling/tests
+      - name: build
+        working-directory: tooling
+        run: uv build --out-dir dist
+      - name: wheel smoke
+        run: scripts/wheel-smoke.sh tooling/dist/harry_sdlc-*-py3-none-any.whl
