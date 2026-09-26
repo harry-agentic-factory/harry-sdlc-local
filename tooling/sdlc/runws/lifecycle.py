@@ -428,12 +428,14 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
     backend.put(layout.run_key(uid, "manifest.json"), res.manifest_data,
                 {"category": "run_meta", "run_uid": uid})
     if status_res is not None:
-        again = _check_status(backend, sealed["story"], status) if status_res["applied"] else status_res
-        if again["applied"]:
-            try:
+        # validated at step 1; the story may have moved since (third party): refused, run.json not final
+        now = status_res["from"]
+        try:
+            now = backend.story_status(sealed["story"])
+            if now != status:
                 backend.transition(sealed["story"], status)
-            except Exception:
-                return _reject(root, current, uid, [f"status_invalid:{again['from']}->{status}"], warnings)
+        except Exception:
+            return _reject(root, current, uid, [f"status_invalid:{now}->{status}"], warnings)
     final = dict(current)
     final.update({"state": outcome or "published", "finished_at": at, "reasons": [], "published": published})
     final_bytes = dump_json(final)
