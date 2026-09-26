@@ -886,12 +886,14 @@ def test_push_failed_replay_safe(cdemo, cap, monkeypatch):
     res = rinit(cap)
     c1 = agent_commit(code_of(res), "c1")
     review(cap, monkeypatch, res)
-    refs = cdemo.remote() / "refs" / "heads"
-    refs.chmod(0o555)
+    # a rejecting server hook (a read-only refs directory does not stop root, e.g. in the engine container)
+    hook = cdemo.remote() / "hooks" / "pre-receive"
+    hook.write_bytes(b"#!/bin/sh\nexit 1\n")
+    hook.chmod(0o755)
     try:
         rc, fin = finish(cap, res["run_uid"], "--status", "reviewed")
     finally:
-        refs.chmod(0o755)
+        hook.unlink()
     assert rc == 1 and fin["reasons"] == ["push_failed:app-repo"]
     assert cdemo.rsha() is None and cdemo.status() == "implemented"
     assert not (cdemo.data / "runs" / res["run_uid"]).exists()
@@ -1147,3 +1149,25 @@ def test_d4_exported_git_location_env_ignored(cdemo, cap, monkeypatch):
     for k in names:
         monkeypatch.delenv(k)
     assert cdemo.rsha() == c1 and git(decoy, "for-each-ref") == ""
+
+
+# --- deployment in the engine container: a working directory that is an unreadable repository ---
+
+def test_clone_from_a_cwd_that_is_a_broken_worktree(cdemo, cap, monkeypatch):
+    # the engine container mounts a worktree whose `.git` file names a path of the host
+    broken = cdemo.tmp / "broken-worktree"
+    broken.mkdir()
+    (broken / ".git").write_bytes(b"gitdir: /nonexistent/.git/worktrees/x\n")
+    monkeypatch.chdir(broken)
+    res = rinit(cap)
+    assert (Path(res["root"]) / "rw" / "code" / "app-repo" / ".git").is_dir()
+
+
+def test_clone_failed_reports_redacted_git_diagnostic(cdemo, cap):
+    local = cdemo.tmp / "app-repo"
+    git(local, "remote", "set-url", "origin", "file://user:s3cret@" + str(cdemo.tmp / "missing.git"))
+    rc, out, err = call(cap, "run", "init", "DEMO-E-1", "--agent", "reviewer", "--branch", BRANCH)
+    body = json.loads(err)
+    assert rc != 0 and body["error"] == "clone_failed:app-repo"
+    assert body["diagnostic"].startswith("git ls-remote (rc=") and "s3cret" not in body["diagnostic"]
+    assert agentws(cdemo) == []
