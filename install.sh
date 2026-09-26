@@ -194,6 +194,7 @@ done
 in_path() { case ":${PATH:-}:" in *":$1:"*) return 0 ;; esac; return 1; }
 bin_candidates="/usr/local/bin /opt/homebrew/bin $HOME/.local/bin"
 bin_dir=""
+foreign=" "
 for d in $bin_candidates; do  # a directory of the PATH already holding a managed sdlc link
   in_path "$d" || continue
   if engine_sdlc_link "$d/sdlc"; then bin_dir=$d; break; fi
@@ -201,7 +202,10 @@ done
 if [ -z "$bin_dir" ]; then  # else the first writable directory of the PATH without a foreign sdlc
   for d in $bin_candidates; do
     if [ -e "$d/sdlc" ] || [ -L "$d/sdlc" ]; then
-      in_path "$d" && warn "skipped (not managed, not an engine copy): $d/sdlc"
+      if in_path "$d"; then
+        warn "skipped (not managed, not an engine copy): $d/sdlc"
+        foreign="$foreign $d "
+      fi
       continue
     fi
     if in_path "$d" && [ -d "$d" ] && [ -w "$d" ]; then bin_dir=$d; break; fi
@@ -218,7 +222,10 @@ if [ -z "$bin_dir" ]; then  # else ~/.local/bin, added to the PATH of zsh once
     fi
   fi
 fi
-manage_link "$bin_dir/sdlc" "$ACTIVE/bin/sdlc" "bin/sdlc"
+case "$foreign" in
+  *" $bin_dir "*) ;;  # foreign sdlc already reported, left intact
+  *) manage_link "$bin_dir/sdlc" "$ACTIVE/bin/sdlc" "bin/sdlc" ;;
+esac
 
 # ---- 7. orphans: links through current whose target no longer exists (links only, never recursive) -------
 for kind in agents commands workflows skills sdlc; do

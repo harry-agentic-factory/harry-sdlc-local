@@ -347,7 +347,7 @@ def test_sdlc_link_of_a_package_manager_left_intact(env, remote):
     assert readlink(link) == "../Cellar/sdlc/1.0.0/bin/sdlc"
     assert (before.st_ino, before.st_mtime_ns, before.st_ctime_ns) == (after.st_ino, after.st_mtime_ns,
                                                                        after.st_ctime_ns)
-    assert f"skipped (not managed, not an engine copy): {link}" in proc.stderr
+    assert proc.stderr.count(f"skipped (not managed, not an engine copy): {link}") == 1
     assert f"migrated {link}" not in proc.stdout
 
 
