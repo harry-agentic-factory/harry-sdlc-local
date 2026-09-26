@@ -942,3 +942,108 @@ def test_scratch_and_code_never_walked(demo, cap, monkeypatch):
     fin = ok(cap, "run", "finish", res["run_uid"])
     assert fin["state"] == "published" and fin["warnings"] == []
     assert not Path(res["root"]).exists()
+
+
+# --- run identity sealed (post-review PM-027) and checked bytes published (PM-028) ---
+
+def _tamper_run_json(res: dict, **fields) -> None:
+    rj = Path(res["root"]) / "run.json"
+    run = json.loads(rj.read_text())
+    run.update(fields)
+    rj.write_text(json.dumps(run))
+
+
+def _assert_refused_nothing_published(demo, res, rc, out, err, *fields):
+    assert rc == 1 and out == b""
+    error = json.loads(err)["error"]
+    assert error.startswith("run_invalid:") and all(f in error for f in fields), error
+    assert not (demo.data / "runs").exists()
+    assert not (demo.story("DEMO-E-1") / "review.md").exists()
+    assert not (demo.story("DEMO-E-2") / "review.md").exists()
+    assert Path(res["root"]).is_dir()
+
+
+def test_seal_holds_run_identity(demo, cap):
+    res = init(cap)
+    seal = json.loads((Path(res["root"]) / "seal.json").read_text())
+    run = json.loads((Path(res["root"]) / "run.json").read_text())
+    assert set(seal) == {"manifest_sha256", "settings_sha256", "run"}
+    assert seal["run"] == {k: run[k] for k in ("run_uid", "agent", "phase", "feature", "story", "mission",
+                                               "ticket")}
+
+
+def test_run_json_agent_header_injection_refused(demo, cap, monkeypatch):
+    res = init(cap)
+    add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
+    _tamper_run_json(res, agent="x · 2026 -->\n<!-- round 99 · run 20260101-000000-abcdef · agent evil · z -->")
+    rc, out, err = call(cap, "run", "finish", res["run_uid"])
+    _assert_refused_nothing_published(demo, res, rc, out, err, "agent")
+
+
+def test_run_json_story_redirect_refused(demo, cap, monkeypatch):
+    res = init(cap)
+    add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
+    _tamper_run_json(res, story="DEMO-E-2")
+    rc, out, err = call(cap, "run", "finish", res["run_uid"])
+    _assert_refused_nothing_published(demo, res, rc, out, err, "story")
+
+
+@pytest.mark.parametrize("fields", [{"agent": "dev"}, {"phase": "implement"}, {"feature": "DEMO-X"},
+                                    {"story": None, "mission": "inc-1"}, {"ticket": "T-1"}])
+def test_run_json_identity_tampering_refused(demo, cap, monkeypatch, fields):
+    res = init(cap)
+    add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
+    _tamper_run_json(res, **fields)
+    rc, out, err = call(cap, "run", "finish", res["run_uid"])
+    _assert_refused_nothing_published(demo, res, rc, out, err, *fields)
+    _tamper_run_json(res, **{k: v for k, v in json.loads((Path(res["root"]) / "seal.json").read_text())
+                             ["run"].items()})
+    assert ok(cap, "run", "finish", res["run_uid"])["state"] == "published"
+
+
+def test_seal_identity_forged_with_run_json_refused_by_manifest_scope(demo, cap, monkeypatch):
+    res = init(cap)
+    add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
+    seal_path = Path(res["root"]) / "seal.json"
+    seal = json.loads(seal_path.read_text())
+    seal["run"]["story"] = "DEMO-E-2"
+    seal_path.write_text(json.dumps(seal))
+    _tamper_run_json(res, story="DEMO-E-2")
+    rc, out, err = call(cap, "run", "finish", res["run_uid"])
+    _assert_refused_nothing_published(demo, res, rc, out, err, "scope")
+
+
+def test_seal_without_identity_refused(demo, cap, monkeypatch):
+    res = init(cap)
+    add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
+    seal_path = Path(res["root"]) / "seal.json"
+    seal = json.loads(seal_path.read_text())
+    del seal["run"]
+    seal_path.write_text(json.dumps(seal))
+    rc, out, err = call(cap, "run", "finish", res["run_uid"])
+    _assert_refused_nothing_published(demo, res, rc, out, err, "seal.json")
+
+
+def test_finish_publishes_checked_bytes_not_a_later_swap(demo, cap, monkeypatch):
+    from sdlc.runws import controls
+    res = init(cap)
+    add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
+    secret = write(demo.tmp, "outside/secret.md", b"## Recap\nsecret outside the workspace\n")
+    doc = Path(res["out"]) / "docs" / "review.md"
+    manifest = Path(res["manifest"])
+    manifest_bytes = manifest.read_bytes()
+    real_check = controls.check
+
+    def check_then_swap(*a, **kw):
+        result = real_check(*a, **kw)
+        doc.unlink()
+        os.symlink(secret, doc)                # swapped after the checks, before publication
+        manifest.write_bytes(b'{"forged": true}\n')
+        return result
+
+    monkeypatch.setattr(controls, "check", check_then_swap)
+    fin = ok(cap, "run", "finish", res["run_uid"])
+    assert fin["state"] == "published"
+    published = (demo.story("DEMO-E-1") / "review.md").read_bytes()
+    assert published.endswith(RECAP_DOC) and b"secret" not in published
+    assert (demo.data / "runs" / res["run_uid"] / "manifest.json").read_bytes() == manifest_bytes

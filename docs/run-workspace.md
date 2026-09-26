@@ -45,7 +45,7 @@ Default location: `<reposRoot or parent of the data repository>/_agentws/<PREFIX
 ```
 <root>/
 ├── run.json                  state of the run (schema below)
-├── seal.json                 sha256 of in/manifest.json and in/settings.json (never published)
+├── seal.json                 sha256 of in/manifest.json and in/settings.json + run identity (never published)
 ├── in/                       read only for the agent
 │   ├── manifest.json         what the run received
 │   ├── settings.json         agent bubble (permissions)
@@ -171,6 +171,14 @@ lists them). Returns `{added, path, sha256}`. `implement` added here is the outp
 ## `sdlc run finish`
 
 All or nothing: **every check runs before the first publication write**.
+
+The workspace `run.json` is writable by the agent, so `finish` never trusts it for the identity of the run:
+`seal.json` holds `run` = `{run_uid, agent, phase, feature, story, mission, ticket}` written at init. Any
+difference between `run.json` and that sealed identity, a sealed identity missing or invalid, or a sealed
+scope differing from the `scope` of the sealed `in/manifest.json` is refused **before any write** with
+`run_invalid:<detail>` (stderr, exit 1, workspace kept as is, nothing published). Publication metadata (the
+`agent` of the round header, the target story or mission) comes from the sealed identity only, and the
+documents and the manifest are published from the bytes read by the checks (never read a second time).
 
 | Check | Reason (sorted, workspace kept, `state: rejected`) |
 |---|---|
