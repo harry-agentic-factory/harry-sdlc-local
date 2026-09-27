@@ -7,6 +7,38 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-27
+
+### Added
+
+- Gate model « the agent recommends, the human decides » (AISDLC-POASSIST-2): slash commands
+  `/validate-spec-func`, `/validate-spec-tech`, `/validate-feature` and `/process-review`. A gate is an agent review
+  (`review-spec-func.md`, `review-spec-tech.md`, `review-feature.md`: numbered `B`/`M`/`m`/`S` findings with
+  evidence, recommendation and consensus; a targeted re-review is a new version) and a human verdict
+  (`review-<gate>-verdict.md`, `draft` until the human signs it, outcome `validated | validated_with_reserves |
+  returned | bypassed`), processed point by point and resumable by `/process-review`.
+- `harry-archi` review document mode.
+- `sdlc validate-feature <EPIC>` and the `feature_validated` status between `spec_validated` and `implemented`
+  (skippable, like the other gates): one verdict per role (`po`, `techlead`), the stories move only when both are
+  signed.
+- `sdlc validate-spec-func|validate-spec-tech|validate-feature --verdict <path>`: the verdict is checked (signed,
+  human signer, every finding decided, matching gate, target and review version), then the gate writes a journal
+  entry with `git hash-object` refs of the review and the verdict, links them (`review_spec_func`,
+  `review_spec_func_verdict`, …) and turns `reserve`/`bypassed` decisions into idempotent `pm` debt items, only when
+  the stories move. Optional `gates.signers` allow-list in `sdlc.config.json`. Refusals carry a stable `code`.
+- `sdlc status`: `awaiting` hints for the spec gates and a `gates` field with the linked gate documents.
+- Routed returns `spec_validated | feature_validated → spec_tech | spec_func` (`sdlc reject`).
+
+### Changed
+
+- **BREAKING** — `validate-func` and `validate-spec` are renamed `validate-spec-func` and `validate-spec-tech`;
+  the old names (plus `validate-tech`, `validate-epic`) stay as aliases but, like the new names, **refuse** the
+  transition without `--verdict` pointing to a verdict signed by a human (`--review` alone is no longer enough). The
+  output `gate` is now `spec_func | spec_tech | feature` (the `validated` key is kept, equal to `advanced`).
+- `/spec-func`, `/spec-tech`, `/full-spec`, `/run-story`, the persona, the `loop-engineering` skill and doc and the
+  README describe the new gates; `/run-story` runs unattended from `feature_validated` and stops at each gate
+  signature.
+
 ## [0.7.1] - 2026-09-26
 
 ### Added
