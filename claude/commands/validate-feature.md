@@ -22,7 +22,7 @@ ambigu demande) ; toutes les commandes sont `sdlc --project <PREFIX> …`. Cible
    sdlc --project <PREFIX> validate-feature <EPIC> --verdict <EPIC>/review-feature-verdict-po.md
    sdlc --project <PREFIX> validate-feature <EPIC> --verdict <EPIC>/review-feature-verdict-techlead.md
    ```
-   Le premier est **enregistré** (journal, lien du rôle, dette) et la sortie dit `waiting: [<rôle manquant>]` ; le
+   Le premier est **enregistré** (journal, lien du rôle ; la dette n'est créée qu'à la transition) et la sortie dit `waiting: [<rôle manquant>]` ; le
    second déclenche la transition si les deux issues avancent (le verdict déjà lié est revérifié). Les deux en une
    fois : `--verdict <po> --verdict <techlead>`. Une issue `returned` bloque la transition.
 

@@ -100,6 +100,10 @@ def test_front_matter_parsing():
     assert gates.front_matter("---\na: 1\nb: 'x y'\n---\nbody") == {"a": "1", "b": "x y"}
     assert gates.front_matter("no front matter") == {}
     assert gates.front_matter("---\na: 1\n") == {}          # unterminated
+    # inline comments of the /process-review template are not part of the value
+    assert gates.front_matter("---\nstatus: signed    # -> signed\nrole: po # feature only\noutcome:   # a | b\n"
+                              "signed_by: \"A # B\" # quoted\nref: x#1\n---\n") == {
+        "status": "signed", "role": "po", "outcome": "", "signed_by": "A # B", "ref": "x#1"}
 
 
 def test_review_findings_and_verdict_decisions():

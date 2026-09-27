@@ -79,6 +79,7 @@ _AGENT_IDENTITIES = ENGINE_AGENTS | {"harry", "claude", "agent", "ai", "bot", "a
 
 _FINDING_ROW = re.compile(r"^\|\s*([BMmS]\d+)\s*\|", re.M)
 _DECISION_ROW = re.compile(r"^\|\s*([BMmS]\d+|H\d+)\s*\|([^|\n]*)\|([^|\n]*)\|?")
+_INLINE_COMMENT = re.compile(r"\s+#")
 _DECISIONS_HEADING = re.compile(r"^##\s+D[ée]cisions?\b", re.I)
 
 
@@ -97,8 +98,11 @@ def front_matter(text: str) -> dict[str, str]:
             continue
         key, value = line.split(":", 1)
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
-            value = value[1:-1]
+        if value[:1] in ("\"", "'") and value.find(value[0], 1) > 0:
+            value = value[1:value.find(value[0], 1)]  # quoted: anything after the closing quote is ignored
+        else:
+            # YAML inline comment (`status: signed  # ...`, as in the /process-review template)
+            value = _INLINE_COMMENT.split(value, 1)[0].strip() if not value.startswith("#") else ""
         out[key.strip()] = value
     return {}  # unterminated block: not a front matter
 
