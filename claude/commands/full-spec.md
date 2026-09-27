@@ -40,11 +40,15 @@ cross-repo) + **Invariants OBLIGATOIRES** (garde-fous anti-régression, **assert
 diff** = la checklist du reviewer). Écris `<EPIC>/stories/<STORY>/spec-tech.md`, `link <STORY> spec_tech
 <chemin>`, puis `set-status <STORY> spec_tech`.
 
-### 4. Gate SPECS, puis suite
-Tu restes en `solo` (mono-user). **Passe la gate avant de coder** — elle accepte l'épic entier en batch :
-`harry-archi` sur `<EPIC>` → escalades à l'humain → `validate-spec <EPIC> --review <EPIC>/spec-review.md`.
-Voir `claude/commands/spec-tech.md` § Gate SPECS pour le détail. **Ensuite** `/implement` (ou `/run-story`,
-qui enchaîne tout seul). Un `/harry dev` explicite est possible si tu veux repasser en profil dev pur.
+### 4. Gates, puis suite
+Tu restes en `solo` (mono-user). **Passe les gates avant de coder** — l'agent recommande, l'humain décide, et
+chacune accepte l'épic entier en batch :
+`/validate-spec-func <EPIC>` (après les spec-func), `/validate-spec-tech <EPIC>` (après les spec-tech), puis
+`/validate-feature <EPIC>` (PO + tech lead). Chaque gate = revue `harry-archi` en mode document →
+`/process-review` → verdict **signé par l'humain** → `sdlc validate-… --verdict …` (la CLI refuse sans signature).
+**Tu ne signes jamais** : ici, « one-shot » s'arrête à la signature — présente les revues, fais décider, et
+reprends après. Voir `claude/commands/spec-tech.md` § Gate SPECS pour le détail. **Ensuite** `/implement` (ou
+`/run-story`, qui enchaîne tout seul). Un `/harry dev` explicite est possible si tu veux repasser en profil dev pur.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

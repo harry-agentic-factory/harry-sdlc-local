@@ -15,6 +15,8 @@ class Status(str, Enum):
     SPEC_FUNC_VALIDATED = "spec_func_validated"  # gate FONCTIONNELLE : PRD + spec-func validés (épic ou story)
     SPEC_TECH = "spec_tech"    # /spec-tech
     SPEC_VALIDATED = "spec_validated"  # gate: specs validées par harry-archi (+ escalade humaine) AVANT implem
+    # Feature gate: the whole epic reviewed and signed by the PO and the tech lead, before the factory handoff.
+    FEATURE_VALIDATED = "feature_validated"
     IMPLEMENTED = "implemented"  # /implement
     REVIEWED = "reviewed"      # agent reviewer (MR approuvée)
     DEPLOYED = "deployed"      # agent deployer
@@ -25,7 +27,7 @@ class Status(str, Enum):
 
 PIPELINE: list[Status] = [
     Status.DRAFT, Status.SPEC_FUNC, Status.SPEC_FUNC_VALIDATED, Status.SPEC_TECH,
-    Status.SPEC_VALIDATED, Status.IMPLEMENTED,
+    Status.SPEC_VALIDATED, Status.FEATURE_VALIDATED, Status.IMPLEMENTED,
     Status.REVIEWED, Status.DEPLOYED, Status.RECETTE_OK, Status.ACCEPTED, Status.DONE,
 ]
 
@@ -46,6 +48,13 @@ def _build_allowed() -> dict[Status, set[Status]]:
     # La gate "dure" (review harry-archi + escalade) est portée par l'ORCHESTRATION (`validate-spec` passe par
     # SPEC_VALIDATED) ; la state-machine tolère le skip pour ne pas casser les flux existants.
     allowed[Status.SPEC_TECH].add(Status.IMPLEMENTED)
+    # Feature gate skippable as well (backward compatibility): SPEC_VALIDATED -> IMPLEMENTED stays allowed.
+    # The hard version is `validate-feature` (two human-signed verdicts, PO and tech lead).
+    allowed[Status.SPEC_VALIDATED].add(Status.IMPLEMENTED)
+    # Routed return after a gate: a validated spec or feature can go back to the design or the functional spec
+    # (`sdlc reject --to spec_tech|spec_func`), e.g. after a `returned` verdict of the feature gate.
+    for s in (Status.SPEC_VALIDATED, Status.FEATURE_VALIDATED):
+        allowed[s].update({Status.SPEC_TECH, Status.SPEC_FUNC})
     # rejet routé : une review/recette KO peut repartir vers le dev (implemented), la conception
     # (spec_tech, ré-analyse) ou le fonctionnel (spec_func) — c'est la gate humaine qui choisit.
     for s in (Status.REVIEWED, Status.DEPLOYED, Status.RECETTE_OK):

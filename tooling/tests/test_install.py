@@ -431,3 +431,13 @@ def test_install_script_guards():
     for script in [fx.INSTALL_SH, *sorted(fx.SCRIPTS.glob("*.sh"))]:
         assert not bash32.search(script.read_text()), script
         assert subprocess.run(["bash", "-n", str(script)]).returncode == 0, script
+
+
+def test_gate_commands_are_installed(env, remote):
+    """AISDLC-POASSIST-2 AC8: the four gate commands are linked through `current`, like every engine command."""
+    ok(env, remote.tag)
+    _, cla, hsh, _ = paths(env)
+    for name in ("validate-spec-func", "validate-spec-tech", "validate-feature", "process-review"):
+        link = cla / "commands" / f"{name}.md"
+        assert readlink(link) == f"{hsh}/current/claude/commands/{name}.md", name
+        assert link.read_text().splitlines()[0].endswith(": $ARGUMENTS"), name

@@ -19,6 +19,13 @@ from .workspace import STORY_MD, Workspace
 _RECAP_MAX = 500
 # indice de gate humaine attendue selon le statut courant
 _AWAITING = {
+    "spec_func": "attend la gate fonctionnelle : /validate-spec-func (revue harry-archi) → /process-review "
+                 "(verdict signé par un humain) → sdlc validate-spec-func --verdict",
+    "spec_tech": "attend la gate technique : /validate-spec-tech (revue harry-archi) → /process-review "
+                 "(verdict signé par un humain) → sdlc validate-spec-tech --verdict",
+    "spec_validated": "attend la gate feature de l'épic : /validate-feature (verdicts PO + tech lead signés) "
+                      "→ sdlc validate-feature --verdict",
+    "feature_validated": "prête pour l'usine : /implement",
     "recette_ok": "attend l'accept humain (→ accepted)",
     "reviewed": "attend le déploiement",
     "deployed": "attend la recette",
@@ -100,6 +107,8 @@ def build_status(workspace: str | Path, target: str | None = None) -> dict:
             "awaiting": _AWAITING.get(t.status),
             "lastDecision": _last_decision(sd),
             "artifacts": _artifacts(sd),
+            # gate documents (agent reviews and human verdicts) linked by `sdlc validate-*`
+            "gates": {k: v for k, v in sorted(t.artifacts.items()) if k.startswith("review_")},
         })
 
     total = len(out_tickets)

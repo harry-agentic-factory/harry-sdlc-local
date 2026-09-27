@@ -8,15 +8,18 @@ demande). Toutes les commandes sont `sdlc --project <PREFIX> …`.
 
 ## Deux sens de « auto » — sache lequel tu obtiens
 
-**En amont de `spec_validated`, « auto » veut dire « je n'attends pas ton feu vert à chaque étape ».**
+**En amont de `feature_validated`, « auto » veut dire « je n'attends pas ton feu vert à chaque étape ».**
 Pas « je ne te parle pas » : `/scope`, `/refine`, `/spec-func` reposent sur des décisions de PO, et une
 question **bloquante** doit remonter. Tu enchaînes les étapes sans qu'on te les demande, tu ne devines
-pas un arbitrage produit.
+pas un arbitrage produit. Et les **trois gates de spec** (fonctionnelle, technique, feature) sont des gates
+**humaines** : tu produis la revue `harry-archi`, puis tu **t'arrêtes** pour que l'humain la traite
+(`/process-review`) et signe le verdict. Tu ne signes jamais.
 
-**À partir de `spec_validated`, « auto » veut dire « sans l'humain, jusqu'à la gate ».** Tout y est
+**À partir de `feature_validated`, « auto » veut dire « sans l'humain, jusqu'à la gate ».** Tout y est
 mécanique : coder contre des invariants figés, reviewer, déployer, recetter, corriger, relancer.
 
-Deux motifs d'arrêt, et deux seulement : une **question produit** en amont, la **gate humaine** en bout.
+Trois motifs d'arrêt, et trois seulement : une **question produit** en amont, une **signature de gate de spec**
+(verdict à signer par l'humain), la **gate humaine** en bout.
 `recette_ok` + recette manuelle verte est le plancher dur — n'essaie pas d'aller au-delà.
 
 **Ce qu'il y a après la gate, et que tu ne déclenches jamais seul** : sur un « tu peux promouvoir », on
@@ -25,8 +28,9 @@ relance le Workflow avec `{promote:true}`. Il merge la branche sur main (deploye
 tient une fois mergé. C'est tout : la mise en production, sa CI/CD et sa recette classique sont un
 autre univers, ce loop ne les pilote pas.
 
-**Donc, pour un run vraiment sans surveillance** : amène d'abord la story à `spec_validated` — c'est ce
-que fait `/full-spec` en une passe, gates comprises — *puis* lance `/run-story`. Lancé sur un `draft`, il
+**Donc, pour un run vraiment sans surveillance** : amène d'abord la feature à `feature_validated` — `/full-spec`
+en une passe, puis les gates signées par l'humain — *puis* lance `/run-story`. Tu ne sautes pas la gate feature
+même si la state-machine tolère `spec_validated → implemented`. Lancé sur un `draft`, il
 fera des allers-retours, et c'est normal : c'est là que vit le jugement.
 
 ## Le principe
@@ -41,10 +45,11 @@ sdlc --project <PREFIX> get <STORY>     # d'où on part
 | État lu | Ce que tu fais | Puis |
 |---------|----------------|------|
 | `draft` | `/scope` puis `/refine` (ou `/full-spec` si le besoin est déjà clair) | ↓ |
-| `spec_func` | **GATE FONCTIONNELLE** : `harry-archi` sur le PRD + les spec-func (de préférence l'**épic** en batch) → escalades → `validate-func --review` | ↓ |
+| `spec_func` | **GATE FONCTIONNELLE** : `/validate-spec-func` (de préférence l'**épic** en batch) — revue `harry-archi` → **STOP** : l'humain traite (`/process-review`) et signe → `sdlc validate-spec-func --verdict` | ↓ |
 | `spec_func_validated` | `/spec-tech` | ↓ |
-| `spec_tech` | **GATE TECHNIQUE** : `harry-archi` sur les invariants → escalades → `validate-spec --review` | ↓ |
-| `spec_validated` | `/implement` (qui ouvre la bulle scopée en premier) | ↓ |
+| `spec_tech` | **GATE TECHNIQUE** : `/validate-spec-tech` — revue `harry-archi` → **STOP** signature humaine → `sdlc validate-spec-tech --verdict` | ↓ |
+| `spec_validated` | **GATE FEATURE** (toutes les stories de l'épic en `spec_validated`) : `/validate-feature <EPIC>` — revue `harry-archi` → **STOP** : verdicts PO et tech lead signés → `sdlc validate-feature --verdict` | ↓ |
+| `feature_validated` | `/implement` (qui ouvre la bulle scopée en premier) | ↓ |
 | `implemented` | `Workflow({scriptPath:'~/.claude/workflows/run-ticket.js', args:{ticket,epic,prefix,repoName,branch,base}})` (`base` = `origin/epic/<EPIC>` en trunk d'épic, défaut `main`) | ↓ |
 | `reviewed` / `deployed` | reprends le workflow là où il s'est arrêté (`reviewOk:true` après une review approuvée) | ↓ |
 | `recette_ok` | **RECETTE MANUELLE** (cf. boucle externe) — KO ⇒ `pm` + `reject --to implemented` + relance ; OK ⇒ **STOP, gate humaine** | — |
@@ -115,11 +120,12 @@ sdlc journal <STORY> --entry "workflow: <stopped_at>/<reason> — <ce que dit l'
 
 ## Périmètre — ce que tu fais sans demander, ce que tu ne fais jamais
 
-**Sans demander** : les gates de spec via `harry-archi`, ouvrir la bulle, coder, pousser la branche,
+**Sans demander** : les **revues** de gate via `harry-archi`, ouvrir la bulle, coder, pousser la branche,
 ouvrir la MR, déployer une **branche** en intégration, recetter, corriger, relancer, consigner en `pm`,
 merger tes **propres** MR validées vers le **trunk d'épic**.
 
-**Jamais sans l'humain** : la **promote** (`main` / prod), l'accept final, et tout ce qu'un
+**Jamais sans l'humain** : la **signature** d'un verdict de gate de spec, la **promote** (`main` / prod),
+l'accept final, et tout ce qu'un
 `harry-archi` t'a explicitement escaladé. Le loop ne s'auto-accorde jamais une gate humaine.
 
 **En cas de doute qui n'est pas une gate** : `harry-archi`, pas l'humain. C'est son rôle — il tranche
