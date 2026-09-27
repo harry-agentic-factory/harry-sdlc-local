@@ -317,7 +317,8 @@ def run(argv: list[str] | None = None) -> dict:
         return s.reject(args.story, args.to, args.note, actor=args.by)
     if args.cmd in _GATE_CMDS:
         from .gates import run_gate
-        return run_gate(s, _GATE_CMDS[args.cmd], args.target, args.verdict, review=args.review)
+        signers = (load_config(resolve_workspace(args.project)).get("gates") or {}).get("signers")
+        return run_gate(s, _GATE_CMDS[args.cmd], args.target, args.verdict, review=args.review, signers=signers)
     if args.cmd == "deploy-target":
         return resolve_deploy_target(load_config(resolve_workspace(args.project)), args.repo, args.env)
     if args.cmd == "journal":
@@ -376,6 +377,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except Exception as e:  # noqa: BLE001 — CLI: message propre
         err = {"error": str(e)}
+        if getattr(e, "code", None) and isinstance(e.code, str):  # stable code of a refused gate
+            err["code"] = e.code
         if getattr(e, "diagnostic", None):  # e.g. the redacted stderr of a failed git call
             err["diagnostic"] = e.diagnostic
         print(json.dumps(err, ensure_ascii=False), file=sys.stderr)

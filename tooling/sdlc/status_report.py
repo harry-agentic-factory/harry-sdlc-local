@@ -107,6 +107,8 @@ def build_status(workspace: str | Path, target: str | None = None) -> dict:
             "awaiting": _AWAITING.get(t.status),
             "lastDecision": _last_decision(sd),
             "artifacts": _artifacts(sd),
+            # gate documents (agent reviews and human verdicts) linked by `sdlc validate-*`
+            "gates": {k: v for k, v in sorted(t.artifacts.items()) if k.startswith("review_")},
         })
 
     total = len(out_tickets)

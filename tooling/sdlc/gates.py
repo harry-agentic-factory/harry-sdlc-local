@@ -26,7 +26,11 @@ from .status import PIPELINE, Status
 
 
 class GateRefused(ValueError):
-    """The gate cannot be recorded; nothing was written."""
+    """The gate cannot be recorded; nothing was written. `code` is stable, the message is for humans."""
+
+    def __init__(self, message: str, code: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -141,8 +145,9 @@ def blob_ref(path: Path) -> str:
 
 
 def is_agent_identity(name: str | None) -> bool:
+    """Guard against an accidental self-signature, not against impersonation (the prompts forbid signing)."""
     n = (name or "").strip().lower()
-    return not n or n in _AGENT_IDENTITIES or "claude" in n
+    return not n or n in _AGENT_IDENTITIES or n.startswith("claude-")
 
 
 def severity_of(finding_id: str) -> str:
@@ -157,6 +162,7 @@ class Verdict:
     ref: str
     review: str
     review_ref: str
+    review_version: str
     outcome: str
     signed_by: str
     signed_at: str
@@ -173,70 +179,83 @@ def _rel(root: Path, p: str | Path) -> tuple[str, Path]:
         return str(absolute), absolute
 
 
-def check_verdict(root: str | Path, path: str, gate: str, target: str, review: str | None = None) -> Verdict:
-    """Return the verdict when it can carry the gate, raise `GateRefused` naming the cause otherwise."""
+def check_verdict(root: str | Path, path: str, gate: str, target: str, review: str | None = None,
+                  signers: list[str] | None = None) -> Verdict:
+    """Return the verdict when it can carry the gate, raise `GateRefused` naming the cause otherwise.
+
+    `signers`: optional allow-list (`gates.signers` of the project manifest); when set, `signed_by` must be in it.
+    """
     root = Path(root)
     g = GATES[gate]
     rel, vpath = _rel(root, path)
     if not vpath.is_file():
-        raise GateRefused(f"verdict not found: {rel}")
+        raise GateRefused(f"verdict not found: {rel}", "verdict_not_found")
     text = vpath.read_text(encoding="utf-8")
     fm = front_matter(text)
     if fm.get("kind", "verdict") != "verdict":
-        raise GateRefused(f"{rel}: kind is '{fm.get('kind')}', expected 'verdict'")
+        raise GateRefused(f"{rel}: kind is '{fm.get('kind')}', expected 'verdict'", "wrong_gate")
     if fm.get("gate") != gate:
-        raise GateRefused(f"{rel}: gate is '{fm.get('gate', '')}', expected '{gate}' ({g.command})")
+        raise GateRefused(f"{rel}: gate is '{fm.get('gate', '')}', expected '{gate}' ({g.command})", "wrong_gate")
     if fm.get("target") != target:
-        raise GateRefused(f"{rel}: target is '{fm.get('target', '')}', expected '{target}'")
+        raise GateRefused(f"{rel}: target is '{fm.get('target', '')}', expected '{target}'", "wrong_target")
     status = fm.get("status", "")
     if status != "signed":
         raise GateRefused(f"{rel}: verdict not signed (status: {status or 'missing'}) — a draft cannot carry the "
-                          f"gate; the human signs it in /process-review")
+                          f"gate; the human signs it in /process-review", "not_signed")
     outcome = fm.get("outcome", "")
     if outcome not in OUTCOMES:
-        raise GateRefused(f"{rel}: outcome '{outcome}' invalid, expected one of {', '.join(OUTCOMES)}")
+        raise GateRefused(f"{rel}: outcome '{outcome}' invalid, expected one of {', '.join(OUTCOMES)}",
+                          "bad_outcome")
     signed_by = fm.get("signed_by", "").strip()
     if is_agent_identity(signed_by):
         raise GateRefused(f"{rel}: the verdict must be signed by a human (signed_by: '{signed_by}'); "
-                          f"an agent never signs a gate")
+                          f"an agent never signs a gate", "agent_signer")
+    if signers and signed_by.lower() not in {s.strip().lower() for s in signers}:
+        raise GateRefused(f"{rel}: '{signed_by}' is not in the signers allowed by the project (gates.signers)",
+                          "signer_not_allowed")
     if not fm.get("signed_at", "").strip():
-        raise GateRefused(f"{rel}: signed_at missing")
+        raise GateRefused(f"{rel}: signed_at missing", "not_signed")
     role = fm.get("role") or None
     if g.roles and role not in g.roles:
         raise GateRefused(f"{rel}: role '{role or ''}' invalid for the {gate} gate, expected one of "
-                          f"{', '.join(g.roles)}")
+                          f"{', '.join(g.roles)}", "bad_role")
     declared = fm.get("review", "").strip()
     if review and declared and _rel(root, review)[0] != _rel(root, declared)[0]:
-        raise GateRefused(f"{rel}: review mismatch — --review {review} but the verdict references {declared}")
+        raise GateRefused(f"{rel}: review mismatch — --review {review} but the verdict references {declared}",
+                          "review_missing")
     chosen = review or declared
     if not chosen:
-        raise GateRefused(f"{rel}: no review referenced (front matter 'review' or --review)")
+        raise GateRefused(f"{rel}: no review referenced (front matter 'review' or --review)", "review_missing")
     rrel, rpath = _rel(root, chosen)
     if not rpath.is_file():
-        raise GateRefused(f"review not found: {rrel}")
+        raise GateRefused(f"review not found: {rrel}", "review_missing")
     rtext = rpath.read_text(encoding="utf-8")
     rfm = front_matter(rtext)
     if rfm.get("gate") and rfm["gate"] != gate:
-        raise GateRefused(f"{rrel}: review gate is '{rfm['gate']}', expected '{gate}'")
-    if rfm.get("version") and fm.get("review_version") and rfm["version"] != fm["review_version"]:
-        raise GateRefused(f"{rel}: signed on review version {fm['review_version']} but {rrel} is at version "
-                          f"{rfm['version']} — process the targeted re-review first")
+        raise GateRefused(f"{rrel}: review gate is '{rfm['gate']}', expected '{gate}'", "wrong_gate")
+    version, signed_on = rfm.get("version", "").strip(), fm.get("review_version", "").strip()
+    if not version or not signed_on or version != signed_on:
+        raise GateRefused(f"{rel}: signed on review version '{signed_on or '?'}' but {rrel} is at version "
+                          f"'{version or '?'}' — both are required and must match (process the targeted "
+                          f"re-review first)", "stale_verdict")
     findings = review_findings(rtext)
     decisions = verdict_decisions(text)
     missing = [f for f in findings if f not in decisions]
     if missing:
-        raise GateRefused(f"{rel}: findings without a decision: {', '.join(missing)}")
+        raise GateRefused(f"{rel}: findings without a decision: {', '.join(missing)}", "undecided")
     unknown = [i for i in decisions if not i.startswith("H") and i not in findings]
     if unknown:
-        raise GateRefused(f"{rel}: decisions on unknown findings: {', '.join(unknown)}")
+        raise GateRefused(f"{rel}: decisions on unknown findings: {', '.join(unknown)}", "unknown_finding")
     pending = [i for i, (d, _) in decisions.items() if d not in FINAL_DECISIONS]
     if pending:
-        raise GateRefused(f"{rel}: undecided findings (discuss or unknown decision): {', '.join(pending)}")
+        raise GateRefused(f"{rel}: undecided findings (discuss or unknown decision): {', '.join(pending)}",
+                          "undecided")
     unexplained = [i for i, (d, why) in decisions.items() if d in NEEDS_REASON and not why]
     if unexplained:
-        raise GateRefused(f"{rel}: rejected/bypassed without a reason: {', '.join(unexplained)}")
-    return Verdict(path=rel, ref=blob_ref(vpath), review=rrel, review_ref=blob_ref(rpath), outcome=outcome,
-                   signed_by=signed_by, signed_at=fm["signed_at"].strip(), role=role, decisions=decisions)
+        raise GateRefused(f"{rel}: rejected/bypassed without a reason: {', '.join(unexplained)}", "missing_reason")
+    return Verdict(path=rel, ref=blob_ref(vpath), review=rrel, review_ref=blob_ref(rpath), review_version=version,
+                   outcome=outcome, signed_by=signed_by, signed_at=fm["signed_at"].strip(), role=role,
+                   decisions=decisions)
 
 
 # --- gate run ------------------------------------------------------------------------------------------------
@@ -253,27 +272,29 @@ def _targets(sdlc, g: Gate, target: str) -> list:
     by_id = {t.id: t for t in tickets}
     if g.name == "feature":
         if target in by_id:
-            raise GateRefused(f"{g.command}: the feature gate targets an epic, '{target}' is a story")
+            raise GateRefused(f"{g.command}: the feature gate targets an epic, '{target}' is a story",
+                              "not_an_epic")
         members = [t for t in tickets if t.epic == target and not t.supersededBy]
         if not members:
-            raise GateRefused(f"{g.command}: unknown epic '{target}'")
+            raise GateRefused(f"{g.command}: unknown epic '{target}'", "not_an_epic")
         floor = _index(g.source)
         lagging = [f"{t.id} ({t.status})" for t in members if _index(t.status) < floor]
         if lagging:
             raise GateRefused(f"{g.command}: every story of {target} must be {g.source} first — "
-                              f"not yet: {', '.join(lagging)}")
+                              f"not yet: {', '.join(lagging)}", "bad_state")
         found = [t for t in members if t.status == g.source]
         if not found:
-            raise GateRefused(f"{g.command}: no story of {target} in {g.source}")
+            raise GateRefused(f"{g.command}: no story of {target} in {g.source}", "bad_state")
         return found
     if target in by_id:
         t = by_id[target]
         if t.status != g.source:
-            raise GateRefused(f"{g.command}: {target} is {t.status}, expected {g.source}")
+            raise GateRefused(f"{g.command}: {target} is {t.status}, expected {g.source}", "bad_state")
         return [t]
     found = [t for t in tickets if t.epic == target and t.status == g.source]
     if not found:
-        raise GateRefused(f"{g.command}: '{target}' is neither a story nor an epic with stories in {g.source}")
+        raise GateRefused(f"{g.command}: '{target}' is neither a story nor an epic with stories in {g.source}",
+                          "bad_state")
     return found
 
 
@@ -281,70 +302,81 @@ def _now(now: str | None) -> str:
     return now or datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def canonical_verdict(g: Gate, epic: str, role: str | None) -> str:
+    """`<EPIC>/review-<gate>-verdict[-<role>].md` — where an epic-level verdict lives."""
+    stem = g.review_file.removesuffix(".md")
+    return f"{epic}/{stem}-verdict{f'-{role}' if role else ''}.md"
+
+
+def debt_tag(gate: str, target: str, finding: str, role: str | None) -> str:
+    return f"[{gate} {target} {role} {finding}]" if role else f"[{gate} {target} {finding}]"
+
+
 def run_gate(sdlc, gate: str, target: str, verdicts: list[str] | None, review: str | None = None,
-             now: str | None = None) -> dict:
+             signers: list[str] | None = None, now: str | None = None) -> dict:
+    """Check everything, then record the gate. A `GateRefused` leaves the workspace untouched."""
     g = GATES[gate]
     root = Path(sdlc.ws.root)
     if not verdicts:
         raise GateRefused(f"{g.command}: --verdict <path> is required — the gate rests on a verdict signed by a "
-                          f"human (review by harry-archi, then /process-review)")
+                          f"human (review by harry-archi, then /process-review)", "verdict_missing")
+    if not g.roles and len(verdicts) > 1:
+        raise GateRefused(f"{g.command}: one verdict per spec gate", "duplicate_role")
     targets = _targets(sdlc, g, target)
-    checked = [check_verdict(root, v, gate, target, review) for v in verdicts]
+    checked = [check_verdict(root, v, gate, target, review, signers) for v in verdicts]
 
     # --- decide (still read-only) ---
     by_role: dict[str | None, Verdict] = {}
     for v in checked:
         if v.role in by_role:
-            raise GateRefused(f"{g.command}: two verdicts for the same role '{v.role}'" if v.role
-                              else f"{g.command}: one verdict per spec gate")
+            raise GateRefused(f"{g.command}: two verdicts for the same role '{v.role}'", "duplicate_role")
         by_role[v.role] = v
     earlier: dict[str, Verdict] = {}
     for role in g.roles:
         if role in by_role:
             continue
-        linked = targets[0].artifacts.get(g.verdict_kind_for(role))
-        if linked:
+        candidates = [canonical_verdict(g, target, role), targets[0].artifacts.get(g.verdict_kind_for(role))]
+        for candidate in dict.fromkeys(c for c in candidates if c):
             try:
-                earlier[role] = check_verdict(root, linked, gate, target)
+                earlier[role] = check_verdict(root, candidate, gate, target, None, signers)
+                break
             except GateRefused:
-                pass  # a previously linked verdict that no longer holds counts as missing
+                continue  # a verdict that no longer holds (e.g. back to draft) counts as missing
     present = {**by_role, **earlier}
     waiting = [r for r in g.roles if r not in present]
     outcome = max((v.outcome for v in present.values()), key=_OUTCOME_RANK.__getitem__)
     advance = not waiting and outcome in ADVANCING
 
-    # --- write: debt, then links + journal + transition per story ---
-    store = PostMortemStore(root)
-    story = target if len(targets) == 1 and targets[0].id == target else None
-    epic = targets[0].epic
+    # --- write: debt (only when the gate advances), then links + journal + transition per story ---
     debt: list[str] = []
-    for v in checked:
-        for fid, (decision, why) in v.decisions.items():
-            if decision not in DEBT_DECISIONS:
-                continue
-            tag = f"[{gate} {target} {fid}]"
-            known = next((i for i in store.list(kind="debt") if i.text.startswith(tag)), None)
-            if known is not None:
+    if advance:
+        store = PostMortemStore(root)
+        story = target if len(targets) == 1 and targets[0].id == target else None
+        for v in present.values():
+            for fid, (decision, why) in v.decisions.items():
+                if decision not in DEBT_DECISIONS:
+                    continue
+                tag = debt_tag(gate, target, fid, v.role)
+                known = next((i for i in store.list(kind="debt") if i.text.startswith(tag)), None)
+                if known is None:
+                    known = store.add(agent="human", kind="debt", severity=severity_of(fid), epic=targets[0].epic,
+                                      story=story, text=f"{tag} {decision}: {why or 'no reason given'} "
+                                                        f"(verdict {v.path}, signed by {v.signed_by})")
                 if known.id not in debt:
                     debt.append(known.id)
-                continue
-            item = store.add(agent="human", kind="debt", severity=severity_of(fid), epic=epic, story=story,
-                             text=f"{tag} {decision}: {why or 'no reason given'} (verdict {v.path}, signed by "
-                                  f"{v.signed_by})")
-            debt.append(item.id)
 
-    stamp = _now(now)
-    signers = ", ".join(f"{v.signed_by}" + (f" ({v.role})" if v.role else "") for v in present.values())
+    signers_txt = ", ".join(v.signed_by + (f" ({v.role})" if v.role else "") for v in present.values())
     if advance:
-        head = f"GATE {gate}  {g.source} -> {g.dest}  ({outcome}, signé par: {signers})"
+        head = f"GATE {gate}  {g.source} -> {g.dest}  ({outcome}, signé par: {signers_txt})"
     elif waiting:
         head = (f"GATE {gate}  verdict {', '.join(r for r in by_role if r)} enregistré ({outcome}, signé par: "
-                f"{signers}) — attend: {', '.join(waiting)}")
+                f"{signers_txt}) — attend: {', '.join(waiting)}")
     else:
-        head = f"GATE {gate}  {outcome} (signé par: {signers}) — pas de transition, retour en correction"
-    lines = [f"## {stamp} — {head}"]
-    for review_path, review_ref in dict.fromkeys((v.review, v.review_ref) for v in present.values()):
-        lines.append(f"review: {review_path}@{review_ref}")
+        head = f"GATE {gate}  {outcome} (signé par: {signers_txt}) — pas de transition, retour en correction"
+    lines = [f"## {_now(now)} — {head}"]
+    for review_path, review_ref, review_version in dict.fromkeys(
+            (v.review, v.review_ref, v.review_version) for v in present.values()):
+        lines.append(f"review: {review_path}@{review_ref} (v{review_version})")
     for v in present.values():
         role = f" {v.role}" if v.role else ""
         lines.append(f"verdict{role}: {v.path}@{v.ref} (signed {v.signed_at}, {v.signed_by}, {v.outcome})")
@@ -363,7 +395,9 @@ def run_gate(sdlc, gate: str, target: str, verdicts: list[str] | None, review: s
     return {
         "gate": gate, "command": g.command, "target": target, "outcome": outcome,
         "signedBy": [v.signed_by for v in present.values()],
-        "advanced": advanced, "recorded": [t.id for t in targets], "waiting": waiting,
+        "advanced": advanced,
+        "validated": advanced,  # output key of the pre-0.8.0 validate-func/validate-spec, kept for scripts
+        "recorded": [t.id for t in targets], "waiting": waiting,
         "review": checked[0].review,
         "verdicts": {(v.role or gate): f"{v.path}@{v.ref}" for v in present.values()},
         "debt": debt,

@@ -122,7 +122,7 @@ def test_blob_ref_equals_git_hash_object(tmp_path):
 def test_every_engine_agent_is_an_agent_identity():
     agents = [p.stem for p in (REPO / "claude" / "agents").glob("*.md")]
     assert agents
-    for name in agents + ["harry", "Harry-Archi", "claude", "Claude Code", ""]:
+    for name in agents + ["harry", "Harry-Archi", "claude", "Claude-Code", ""]:
         assert gates.is_agent_identity(name), name
     assert not gates.is_agent_identity("Anis Bessa")
 
@@ -157,19 +157,22 @@ def test_ac1_ambiguous_prefix_is_refused(tmp_path, run):
 
 # --- AC2: refusals, nothing written ----------------------------------------------------------------------------
 
-@pytest.mark.parametrize("case,expected", [
-    ("no_verdict", "--verdict"),
-    ("draft", "draft"),
-    ("agent", "human"),
-    ("missing_file", "not found"),
-    ("undecided", "M1"),
-    ("discuss", "B1"),
-    ("wrong_gate", "gate"),
-    ("wrong_target", "target"),
-    ("no_reason", "S1"),
-    ("stale_review_version", "version"),
+@pytest.mark.parametrize("case,code,needle", [
+    ("no_verdict", "verdict_missing", "--verdict"),
+    ("draft", "not_signed", "draft"),
+    ("agent", "agent_signer", "human"),
+    ("missing_file", "verdict_not_found", "not found"),
+    ("undecided", "undecided", "M1"),
+    ("discuss", "undecided", "B1"),
+    ("wrong_gate", "wrong_gate", "gate"),
+    ("wrong_target", "wrong_target", "target"),
+    ("no_reason", "missing_reason", "S1"),
+    ("stale_review_version", "stale_verdict", "version"),
+    ("no_review_version", "stale_verdict", "version"),
+    ("unknown_finding", "unknown_finding", "B9"),
+    ("not_allowed", "signer_not_allowed", "gates.signers"),
 ])
-def test_ac2_refused_without_any_write(tmp_path, run, case, expected):
+def test_ac2_refused_without_any_write(tmp_path, run, case, code, needle):
     ws = make_f(tmp_path, run)
     vpath = ws / "E" / "review-spec-func-verdict.md"
     decisions = dict(DECISIONS)
@@ -190,16 +193,40 @@ def test_ac2_refused_without_any_write(tmp_path, run, case, expected):
         decisions["S1"] = ("rejected", "")
     elif case == "stale_review_version":
         kwargs["review_version"] = "0"
+    elif case == "no_review_version":
+        kwargs["review_version"] = ""
+    elif case == "unknown_finding":
+        decisions["B9"] = ("applied", "")
+    elif case == "not_allowed":
+        cfg = ws / "sdlc.config.json"
+        cfg.write_text(json.dumps({"gates": {"signers": ["Someone Else"]}}))
     if case != "missing_file":
         vpath.write_text(verdict_text(decisions=decisions, **kwargs))
     before = snapshot(ws)
     argv = ["validate-spec-func", "E"] + ([] if case == "no_verdict" else ["--verdict", str(vpath.relative_to(ws))])
     rc, out, err = run(*argv)
     assert rc == 1 and out == {}
-    assert expected in json.loads(err)["error"], err
+    error = json.loads(err)
+    assert error["code"] == code and needle in error["error"], err
     assert snapshot(ws) == before
     assert status_of(run, "E-1", ws) == "spec_func"
     assert not (ws / "E" / "stories" / "E-1" / "journal.md").exists()
+
+
+def test_allowed_signer_passes(tmp_path, run):
+    ws = make_f(tmp_path, run)
+    (ws / "sdlc.config.json").write_text(json.dumps({"gates": {"signers": ["anis", "Tech Lead"]}}))
+    (ws / "E" / "review-spec-func-verdict.md").write_text(verdict_text())
+    rc, out, err = run("validate-spec-func", "E", "--verdict", "E/review-spec-func-verdict.md")
+    assert rc == 0 and out["advanced"] == ["E-1", "E-2"], err
+
+
+def test_two_verdicts_on_a_spec_gate_refused(tmp_path, run):
+    ws = make_f(tmp_path, run)
+    (ws / "E" / "review-spec-func-verdict.md").write_text(verdict_text())
+    rc, _, err = run("validate-spec-func", "E", "--verdict", "E/review-spec-func-verdict.md",
+                     "--verdict", "E/review-spec-func-verdict.md")
+    assert rc == 1 and json.loads(err)["code"] == "duplicate_role"
 
 
 def test_ac2_argparse_does_not_hide_the_message(tmp_path, run):
@@ -217,12 +244,15 @@ def test_ac3_ac4_signed_verdict_records_everything(tmp_path, run):
     rc, out, err = run("validate-spec-func", "E", "--verdict", vrel)
     assert rc == 0, err
     assert out["advanced"] == ["E-1", "E-2"] and out["outcome"] == "validated_with_reserves"
+    assert out["validated"] == out["advanced"]          # pre-0.8.0 output key kept
     assert out["signedBy"] == ["Anis"] and len(out["debt"]) == 2
     for sid in ("E-1", "E-2"):
         t = run("get", sid)[1]
         assert t["status"] == "spec_func_validated"
         assert t["artifacts"]["review_spec_func"] == "E/review-spec-func.md"
         assert t["artifacts"]["review_spec_func_verdict"] == vrel
+        assert run("status", sid)[1]["tickets"][0]["gates"] == {
+            "review_spec_func": "E/review-spec-func.md", "review_spec_func_verdict": vrel}
         journal = (ws / "E" / "stories" / sid / "journal.md").read_text()
         entry = journal.split("\n## ")[1]
         assert "spec_func -> spec_func_validated" in entry and "validated_with_reserves" in entry
@@ -241,7 +271,7 @@ def test_ac4_debt_is_idempotent(tmp_path, run):
     vrel = "E/review-spec-func-verdict.md"
     (ws / vrel).write_text(verdict_text())
     assert run("validate-spec-func", "E", "--verdict", vrel)[0] == 0
-    # put the stories back in spec_func through the raw state tool, then replay the same command
+    # same workspace: put the stories back in spec_func by a raw edit of status.json, then replay
     for sid in ("E-1", "E-2"):
         p = ws / "E" / "stories" / sid / "status.json"
         data = json.loads(p.read_text())
@@ -249,8 +279,8 @@ def test_ac4_debt_is_idempotent(tmp_path, run):
         p.write_text(json.dumps(data))
     rc, out, err = run("validate-spec-func", "E", "--verdict", vrel)
     assert rc == 0, err
-    assert len(PostMortemStore(ws).list(kind="debt")) == 2
-    assert len(out["debt"]) == 2
+    items = PostMortemStore(ws).list(kind="debt")
+    assert len(items) == 2 and out["debt"] == [i.id for i in items]
 
 
 # --- AC5: returned ---------------------------------------------------------------------------------------------
@@ -265,6 +295,7 @@ def test_ac5_returned_records_without_transition(tmp_path, run):
     assert status_of(run, "E-1", ws) == "spec_func"
     assert "returned" in (ws / "E" / "stories" / "E-1" / "journal.md").read_text()
     assert run("get", "E-1")[1]["artifacts"]["review_spec_func_verdict"] == vrel
+    assert out["debt"] == [] and PostMortemStore(ws).list(kind="debt") == []
 
 
 # --- AC6: technical gate on a story ----------------------------------------------------------------------------
@@ -314,13 +345,17 @@ def test_ac7_two_roles_then_transition(tmp_path, run):
     ws = make_f(tmp_path, run, status="spec_validated", gate="feature")
     rc, out, err = run("validate-feature", "E", "--verdict", _feature(ws, "po"))
     assert rc == 0, err
-    assert out["advanced"] == [] and out["waiting"] == ["techlead"]
+    assert out["advanced"] == [] and out["waiting"] == ["techlead"] and out["debt"] == []
     assert run("get", "E-1")[1]["artifacts"]["review_feature_verdict_po"] == "E/review-feature-verdict-po.md"
     assert status_of(run, "E-1", ws) == "spec_validated"
     rc, out, err = run("validate-epic", "E", "--verdict", _feature(ws, "techlead"))
     assert rc == 0, err
     assert out["advanced"] == ["E-1", "E-2"] and out["waiting"] == []
     assert set(out["verdicts"]) == {"po", "techlead"}
+    tags = sorted(i.text.split("]")[0] + "]" for i in PostMortemStore(ws).list(kind="debt"))
+    assert tags == ["[feature E po M1]", "[feature E po m1]", "[feature E techlead M1]", "[feature E techlead m1]"]
+    journal = (ws / "E" / "stories" / "E-1" / "journal.md").read_text().split("\n## ")[1]
+    assert "verdict po:" in journal and "verdict techlead:" in journal
     assert status_of(run, "E-2", ws) == "feature_validated"
     assert run("set-status", "E-1", "implemented")[0] == 0
 
