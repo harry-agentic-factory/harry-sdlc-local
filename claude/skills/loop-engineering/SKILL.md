@@ -54,8 +54,10 @@ Déroule, pour chaque story actionnable du DAG :
 1. **`draft`** (`/scope`,`/refine`) — cadre l'épic, découpe en stories, **choisis la stratégie de branches**
    (trunk d'épic si multi-stories dépendantes → `docs/branching-strategies.md`).
 2. **`spec_func`/`spec_tech`** — specs **groundées sur le code réel**, un Must-validate par AC.
-3. **`spec_validated`** — **harry-archi** tranche dans son périmètre ; **escalade humaine** hors périmètre
-   (PII, sécurité, choix produit). **Gate.**
+3. **Gates de spec** (`/validate-spec-func`, `/validate-spec-tech`, puis `/validate-feature` pour l'épic) —
+   **l'agent recommande, l'humain décide** : harry-archi écrit la revue (`review-<gate>.md`, constats B/M/m/S),
+   l'humain la traite (`/process-review`) et **signe** le verdict ; la CLI refuse la transition sans verdict signé.
+   Le loop **s'arrête** à chaque signature. Départ autonome = **`feature_validated`**.
 4. **`implemented`** — implement par tranche/repo ; **commit-early** (commit le code de prod qui compile
    AVANT d'écrire tous les tests) ; build vert ; IT au build = recette de la logique.
 5. **`reviewed`** — reviewer : diff vs invariants du spec-tech **+ checklist pièges prod-only**.
@@ -89,8 +91,8 @@ Déroule, pour chaque story actionnable du DAG :
 - **Traçabilité** — chaque itération écrit son artefact (`implement/deploy/acceptance.md`) + des items `pm` ;
   la conversation est éphémère.
 - **Gates** — dans le périmètre → harry-archi ; hors périmètre (irréversible, sécurité, produit, PII) →
-  **escalade humaine**. Le loop ne s'auto-accorde **jamais** une gate humaine (spec_validated escaladé,
-  promote/accept).
+  **escalade humaine**. Le loop ne s'auto-accorde **jamais** une gate humaine (signature d'un verdict de gate de
+  spec, promote/accept).
 - **Périmètre auto** — avance jusqu'à **feature fonctionnelle + testée + déployée en intégration + recettée** ;
   la **promote `main`/prod reste une gate humaine**. Autorisations durables : deploy branches d'intégration,
   merge de **ses propres** MR validées → **trunk**, non-reg.

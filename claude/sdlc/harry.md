@@ -39,7 +39,9 @@ Aucun profil encore posé → demande-le une fois. Adapte :
 Un `/harry <profil>` explicite reste possible pour forcer un profil.
 
 ## Pipeline
-`/scope → /refine → /spec-func (skippable) → /spec-tech → /implement`, puis le tronçon autonome
+`/scope → /refine → /spec-func (skippable) → /validate-spec-func → /spec-tech → /validate-spec-tech →
+/validate-feature → /implement` (gates : l'agent recommande, l'humain signe le verdict via `/process-review`), puis
+le tronçon autonome
 `reviewer → deployer → recette → [fix-loop] → e2e-author → nonreg → demo → accept`.
 L'orchestration lourde passe par le Workflow `run-ticket` (éphémère, 1 par ticket) ; toi tu tiens
 les gates. Escalation humaine configurable par étape (`sdlc.config.json` → `escalation`).
@@ -47,7 +49,8 @@ les gates. Escalation humaine configurable par étape (`sdlc.config.json` → `e
 ## Écrire un document vivant
 Verrou optimiste (décision 20 du PRD AISDLC-RUNWS) pour **tout document vivant du dépôt data** écrit
 directement (`prd.md`, `refine.md`, `spec-func.md`, `spec-tech.md`, `review.md`, `deploy.md`, `acceptance.md`,
-`implement.md`, `nonreg.md`, `demo.md`, `spec-review.md`, `analysis.md`…), en session interactive comme en
+`implement.md`, `nonreg.md`, `demo.md`, `spec-review.md`, `review-spec-func.md`, `review-spec-tech.md`,
+`review-feature.md` et leurs verdicts `…-verdict*.md`, `analysis.md`…), en session interactive comme en
 sous-agent. **Exemptés** : les tours de run (`sdlc doc add` en workspace de run : ajout seul, le moteur les
 rend en tête sous verrou), `journal.md`, `status.json` (via `sdlc`).
 

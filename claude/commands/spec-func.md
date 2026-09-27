@@ -26,13 +26,14 @@ Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
 ## Sortie
 Le chemin `spec-func.md` + la liste des critères d'acceptation.
 
-**Ensuite — la gate FONCTIONNELLE, de préférence au niveau ÉPIC.** Quand tous les `spec-func` de l'épic
-sont écrits :
+**Ensuite — la gate FONCTIONNELLE, de préférence au niveau ÉPIC** : `/validate-spec-func <EPIC>` (ou `<STORY>`),
+quand tous les `spec-func` de l'épic sont écrits. L'agent recommande, l'humain décide :
 
 ```bash
-# harry-archi relit le PRD + le refine + TOUS les spec-func → <EPIC>/spec-review.md
-sdlc --project <PREFIX> validate-func <EPIC> --review <EPIC>/spec-review.md   # batch
-sdlc --project <PREFIX> validate-func <STORY> --review …                      # ou story par story
+# 1. harry-archi (mode document de revue) relit PRD + refine + TOUS les spec-func → <EPIC>/review-spec-func.md
+# 2. /process-review <EPIC>/review-spec-func.md → <EPIC>/review-spec-func-verdict.md, signé par l'HUMAIN
+# 3. consignation (refusée sans verdict signé) :
+sdlc --project <PREFIX> validate-spec-func <EPIC> --verdict <EPIC>/review-spec-func-verdict.md
 ```
 
 Pourquoi à l'épic plutôt que par story : une erreur fonctionnelle coûte d'autant plus cher qu'on a déjà
@@ -40,5 +41,6 @@ bâti le technique par-dessus. La valider **avant** `/spec-tech`, sur tout le lo
 incohérences **entre** stories — celles qu'une relecture story par story ne voit jamais.
 
 Sur une story isolée et triviale, la gate est sautable (`spec_func → spec_tech` reste permis) : note-le.
+Ancien nom de la sous-commande : `validate-func` (alias).
 
 **Puis** `/spec-tech`.

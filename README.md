@@ -29,7 +29,8 @@ Prérequis : Python 3.11+ ; Claude Code pour les slash-commands & workflows.
 
 ## Le workflow, de bout en bout
 
-Deux segments de nature différente, deux gates, et une boucle qui se referme sur le **fixer**.
+Deux segments de nature différente, trois gates de spec (l'agent recommande, l'humain signe), et une boucle qui
+se referme sur le **fixer**.
 
 ```mermaid
 flowchart TB
@@ -39,9 +40,10 @@ flowchart TB
         SF --> GF{{"GATE<br/>FONCTIONNELLE"}}
         GF -->|validée| ST["/spec-tech"]
         ST --> GT{{"GATE<br/>TECHNIQUE"}}
-        GT -->|validée| IM["/implement"]
+        GT -->|validée| GFE{{"GATE<br/>FEATURE"}}
+        GFE -->|validée| IM["/implement"]
         FSP["/full-spec"] -.->|l'amont en 1 passe| GF
-        GF & GT -.->|escalade| HUM1(["👤 humain"])
+        GF & GT & GFE -.->|verdict signé| HUM1(["👤 humain"])
     end
 
     subgraph LOOP["2 · LA BOUCLE — 🤖 agents isolés · 🧑 la session tranche"]
@@ -67,7 +69,7 @@ flowchart TB
     classDef human fill:#f8d7da,stroke:#721c24,stroke-width:2px,color:#1b1b1b
     classDef fixer fill:#d1ecf1,stroke:#0c5460,stroke-width:2px,color:#1b1b1b
     classDef manual fill:#d4edda,stroke:#155724,stroke-width:2px,color:#1b1b1b
-    class GF,GT gate
+    class GF,GT,GFE gate
     class HUM1,HUM2 human
     class FIX fixer
     class MAN,BUGS manual
@@ -75,7 +77,7 @@ flowchart TB
 
 | Bande | Qui | Ce qui s'y joue |
 |---|---|---|
-| **1 · Spécifier** | 🧑 session | `/scope /refine /spec-func` → **gate fonctionnelle** (`validate-func` : PRD + refine + TOUS les spec-func, en batch ou story par story) → `/spec-tech` → **gate technique** (`validate-spec` : plan + invariants). `harry-archi` tranche, escalade produit / sécu / PII. `/implement` ouvre la **bulle scopée** (worktree + skills projet). |
+| **1 · Spécifier** | 🧑 session | `/scope /refine /spec-func` → **gate fonctionnelle** (`/validate-spec-func` : PRD + refine + TOUS les spec-func, en batch ou story par story) → `/spec-tech` → **gate technique** (`/validate-spec-tech` : plan + invariants) → **gate feature** (`/validate-feature` : l'épic entier, PO + tech lead). À chaque gate, `harry-archi` **recommande** (revue `review-<gate>.md`), l'humain **décide** avec `/process-review` et **signe** le verdict ; `sdlc validate-… --verdict` refuse sans signature humaine (anciens noms `validate-func`, `validate-spec` : alias). `/implement` ouvre la **bulle scopée** (worktree + skills projet). |
 | **2 · La boucle** | 🤖 + 🧑 | `Workflow(run-ticket.js)` enchaîne *Prepare → Review → Deploy → Recette*, agents à contextes isolés. La **recette manuelle** de la session tranche ; chaque bug devient un item `pm` + un bundle repro, et le tour suivant **ré-entre au fixer**. |
 | **3 · Promote** | 🤖 | Après le feu vert humain seulement : merge → `main`, redéploiement sur **l'intégration**, puis **la même recette rejouée sur main**. |
 
@@ -100,9 +102,10 @@ stateDiagram-v2
     state "1 · SPÉCIFIER — 🧑 en session" as SPEC {
         direction LR
         draft --> spec_func : /spec-func
-        spec_func --> spec_func_validated : validate-func
+        spec_func --> spec_func_validated : validate-spec-func
         spec_func_validated --> spec_tech : /spec-tech
-        spec_tech --> spec_validated : validate-spec
+        spec_tech --> spec_validated : validate-spec-tech
+        spec_validated --> feature_validated : validate-feature
         draft --> spec_tech : story triviale
         spec_func --> spec_tech : gate sautée
     }
@@ -156,7 +159,9 @@ scripts/                   # check-tag-version, changelog-section, wheel-smoke, 
 .github/workflows/         # ci.yml (PR/push) · release.yml (tag vX.Y.Z → GitHub Release)
 claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
-  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), implement, ticket,
+  commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), validate-spec-func,
+               validate-spec-tech, validate-feature, process-review (gates : revue agent → verdict humain signé),
+               implement, ticket,
                run-story (le « mode auto » : enchaîne tout depuis l'état courant), sdlc (état en session)
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
   skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)

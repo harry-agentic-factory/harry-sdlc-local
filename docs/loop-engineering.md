@@ -17,8 +17,8 @@ sort pas de la boucle. Le **fixer** corrige **en local, iso-prod, sans redéploy
 pour re-recetter. Un KO produit un **bundle repro** que le fixer rejoue → corrige → re-vérifie.
 
 ## Principe : SDLC = les rails, le loop = la locomotive
-La **SDLC** fournit la **structure** : state-machine par story (`draft → spec_func → spec_tech → spec_validated →
-implemented → reviewed → deployed → recette_ok → accepted → done`), les **artefacts** (`prd/refine/spec-*/implement/
+La **SDLC** fournit la **structure** : state-machine par story (`draft → spec_func → spec_func_validated → spec_tech → spec_validated →
+feature_validated → implemented → reviewed → deployed → recette_ok → accepted → done`), les **artefacts** (`prd/refine/spec-*/implement/
 review/deploy/acceptance/demo.md`), les **agents** (harry-archi, reviewer, deployer, recetteur, fixer, e2e-author,
 demo), le **CLI `sdlc`** (état + transitions + `pm`), le **post-mortem store**, et la **stratégie de branches**.
 
@@ -33,7 +33,7 @@ gates humaines** et en **traçant tout** dans les artefacts + le `pm` (jamais se
 |---|---|---|---|---|
 | `draft` (`/scope`,`/refine`) | cadre l'épic, découpe en stories/lots, choisit la stratégie de branches (**trunk d'épic** si multi-stories) | PO/BA | prd.md, refine.md | — |
 | `spec_func` / `spec_tech` | écrit les specs **groundées sur le code réel** (pas de spéculation) | BA / techlead | spec-func.md, spec-tech.md | — |
-| **`spec_validated`** | consulte **harry-archi** → décisions « À APPLIQUER » injectées dans le spec ; **escalade à l'humain** si hors périmètre (PII, sécurité, choix produit) | harry-archi | (décisions dans spec) | **harry-archi + humain** |
+| **gates de spec** (`spec_func_validated`, `spec_validated`, `feature_validated`) | `/validate-spec-func`, `/validate-spec-tech`, `/validate-feature` : **harry-archi recommande** (revue `review-<gate>.md`, constats B/M/m/S avec preuve, reco, consensus) ; l'**humain décide** point par point (`/process-review`) et **signe** le verdict ; `sdlc validate-… --verdict` refuse sans signature humaine, consigne journal + liens + dette | harry-archi → humain | review-<gate>.md, …-verdict.md | **humain (signature)** |
 | `implemented` | spawn **agent(s) implement par tranche/repo** ; **commit-early** (sécurise le code qui compile avant les tests) ; build vert ; **les IT au build = la recette de la logique** (déterministe, seed-direct) | general-purpose / fixer | implement.md + code | invariants |
 | `reviewed` | review du diff vs **invariants du spec-tech** | reviewer | review.md | — |
 | `deployed` | deployer → **déploie la branche en intégration** + **smokes adversariaux** (boot, migration, login/flow critique, endpoints) qui **attrapent les bugs prod-only invisibles aux tests** | deployer | deploy.md | **rollback si KO** |
@@ -57,17 +57,18 @@ gates humaines** et en **traçant tout** dans les artefacts + le `pm` (jamais se
   `port-forward` gated) — attentes **bornées non-interactives** uniquement (cf. `deploy-jenkins`, `agent-resilience`).
 - **Rollback propre** : un déploiement KO est **rollbacké** immédiatement ; l'environnement n'est **jamais** laissé cassé.
 - **Décisions** : dans le périmètre → **harry-archi** ; hors périmètre (irréversible, sécurité, produit, PII) →
-  **escalade humaine**. Le loop **ne s'auto-accorde jamais** une gate humaine (spec_validated escaladé, promote/accept).
+  **escalade humaine**. Le loop **ne s'auto-accorde jamais** une gate humaine (signature d'un verdict de gate de spec,
+  promote/accept).
 - **Périmètre auto** : avancer au max jusqu'à **feature fonctionnelle + testée + déployée en intégration + recettée** ;
   la **promote `main`/prod reste une gate humaine**. Autorisations durables d'un run auto : deploy branches
   intégration, merge de **ses propres** MR validées vers le **trunk**, non-reg. (cf. mémoire projet `feedback_en_auto_semantics`.)
 
 ## Ce que « vas-y en mode loop » déclenche concrètement
 1. Résoudre l'état courant de la/les stories (`sdlc status`).
-2. Pour chaque story actionnable (DAG), **dérouler le couplage ci-dessus** : gate spec_validated (harry-archi) →
+2. Pour chaque story actionnable (DAG), **dérouler le couplage ci-dessus** : gates de spec (revue harry-archi → verdict signé par l'humain) →
    implement → (review) → deploy+smoke → **fix-loop jusqu'au vert** → recette → **merge trunk**.
 3. Enchaîner les stories **en série sur le trunk d'épic** (chacune branchée du trunk à jour).
-4. **S'arrêter** et rendre la main à l'humain aux gates (spec_validated hors périmètre, promote/accept).
+4. **S'arrêter** et rendre la main à l'humain aux gates (signature des verdicts de gate de spec, promote/accept).
 5. À la fin de l'épic : `/post-mortem` → capitaliser + **propager les learnings généralisables au harnais** (pour que
    les futures sessions, tous projets, héritent du mode op amélioré).
 
