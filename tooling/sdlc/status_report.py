@@ -19,6 +19,13 @@ from .workspace import STORY_MD, Workspace
 _RECAP_MAX = 500
 # indice de gate humaine attendue selon le statut courant
 _AWAITING = {
+    "spec_func": "attend la gate fonctionnelle : /validate-spec-func (revue harry-archi) → /process-review "
+                 "(verdict signé par un humain) → sdlc validate-spec-func --verdict",
+    "spec_tech": "attend la gate technique : /validate-spec-tech (revue harry-archi) → /process-review "
+                 "(verdict signé par un humain) → sdlc validate-spec-tech --verdict",
+    "spec_validated": "attend la gate feature de l'épic : /validate-feature (verdicts PO + tech lead signés) "
+                      "→ sdlc validate-feature --verdict",
+    "feature_validated": "prête pour l'usine : /implement",
     "recette_ok": "attend l'accept humain (→ accepted)",
     "reviewed": "attend le déploiement",
     "deployed": "attend la recette",

@@ -86,6 +86,19 @@ def _autocorrect(argv: list[str] | None, commands: list[str]) -> list[str]:
     return src
 
 
+# Gate sub-commands: canonical name, gate, historical names kept as aliases (same handler), help.
+_GATE_PARSERS: tuple[tuple[str, str, tuple[str, ...], str], ...] = (
+    ("validate-spec-func", "spec_func", ("validate-func",),
+     "GATE fonctionnelle : spec_func→spec_func_validated (story OU épic). Exige --verdict signé par un humain."),
+    ("validate-spec-tech", "spec_tech", ("validate-spec", "validate-tech"),
+     "GATE technique : spec_tech→spec_validated (story OU épic). Exige --verdict signé par un humain."),
+    ("validate-feature", "feature", ("validate-epic",),
+     "GATE feature : spec_validated→feature_validated (épic entier, avant l'usine). Exige les verdicts signés "
+     "du PO et du tech lead."),
+)
+_GATE_CMDS: dict[str, str] = {cmd: gate for name, gate, aliases, _ in _GATE_PARSERS for cmd in (name, *aliases)}
+
+
 class _VersionAction(argparse.Action):
     """`--version`: computes the version line only when the option is given, then exits 0."""
 
@@ -105,7 +118,8 @@ def run(argv: list[str] | None = None) -> dict:
         prog="sdlc",
         description="Façade SDLC Harry — état des tickets/épics, DAG, artefacts, worktrees. Sortie JSON.",
         epilog="Astuce : `sdlc <commande> -h` pour le détail d'une commande. "
-               "Pipeline : create-epic → create-ticket → set-status (spec_func→spec_tech→implemented→"
+               "Pipeline : create-epic → create-ticket → set-status (spec_func→[validate-spec-func]→spec_tech→"
+               "[validate-spec-tech]→spec_validated→[validate-feature]→feature_validated→implemented→"
                "reviewed→deployed→recette_ok→accepted→done).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -131,10 +145,11 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("epic", help="ID épic")
     a = sub.add_parser("set-status", help="change le statut d'une story (transition d'orchestration)")
     a.add_argument("story", help="ID story")
-    a.add_argument("status", help="spec_func|spec_func_validated|spec_tech|implemented|reviewed|deployed|recette_ok|accepted|done")
+    a.add_argument("status", help="spec_func|spec_func_validated|spec_tech|spec_validated|feature_validated|"
+                   "implemented|reviewed|deployed|recette_ok|accepted|done")
     a = sub.add_parser("link", help="attache un artefact (doc) à une story")
     a.add_argument("story", help="ID story")
-    a.add_argument("kind", help="type : prd|spec_func|spec_tech|implement|review|deploy|acceptance|demo")
+    a.add_argument("kind", help="type : prd|spec_func|spec_tech|implement|review|deploy|acceptance|demo|review_spec_func|…")
     a.add_argument("path", help="chemin du .md relatif au repo data du projet")
 
     # --- projets / config / maintenance ---
@@ -171,19 +186,14 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("--to", required=True, help="étape de retour : spec_func | spec_tech | implemented")
     a.add_argument("--note", required=True, help="raison du rejet (consignée dans journal.md)")
     a.add_argument("--by", default="humain", help="auteur de la décision (défaut: humain)")
-    a = sub.add_parser("validate-spec",
-                       help="GATE specs : spec_tech→spec_validated (story OU épic entier). La review harry-archi "
-                            "+ l'escalade humaine se font en AMONT (orchestration) ; cette commande CONSIGNE la validation.")
-    a.add_argument("target", help="ID story OU épic (épic = batch toutes ses stories en spec_tech)")
-    a.add_argument("--review", help="chemin du spec-review.md (artefact de gate) à consigner sur l'épic/la story")
-
-    a = sub.add_parser("validate-func",
-                       help="GATE fonctionnelle : spec_func→spec_func_validated (story OU épic entier). "
-                            "Au niveau ÉPIC elle valide le PRD + tous les spec-func d'un coup, AVANT que le "
-                            "technique soit écrit par-dessus. Comme validate-spec, elle CONSIGNE une review "
-                            "faite en amont (harry-archi + escalade humaine).")
-    a.add_argument("target", help="ID story OU épic (épic = batch toutes ses stories en spec_func)")
-    a.add_argument("--review", help="chemin du spec-review.md (artefact de gate) à consigner sur l'épic/la story")
+    # --- spec and feature gates: the agent recommends, a human decides (verdict signed in /process-review) ---
+    for name, _gate, aliases, gate_help in _GATE_PARSERS:
+        a = sub.add_parser(name, aliases=list(aliases), help=gate_help)
+        a.add_argument("target", help="ID story OU épic" if name != "validate-feature" else "ID épic (la feature)")
+        a.add_argument("--verdict", action="append", metavar="<path>",
+                       help="verdict signé par un humain (review-<gate>-verdict.md) ; OBLIGATOIRE. "
+                            "validate-feature : un par rôle (po, techlead), répétable")
+        a.add_argument("--review", help="revue de l'agent (review-<gate>.md) ; défaut : celle du verdict")
 
     # --- worktrees / workspace agent ---
     a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
@@ -305,38 +315,13 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
     if args.cmd == "reject":
         return s.reject(args.story, args.to, args.note, actor=args.by)
-    if args.cmd == "validate-spec":
-        # GATE specs (harry-archi + escalade humaine faites en amont) → spec_tech → spec_validated.
-        # target = une story, OU un épic (batch de toutes ses stories encore en spec_tech = gate au niveau PRD).
-        all_t = s.list_backlog(None)
-        ids = {t.id for t in all_t}
-        if args.target in ids:
-            targets = [args.target]
-        else:
-            targets = [t.id for t in all_t if t.epic == args.target and t.status == "spec_tech"]
-            if not targets:
-                raise ValueError(
-                    f"validate-spec: « {args.target} » n'est ni une story ni un épic avec des stories en spec_tech")
-        validated = [s.set_status(tid, "spec_validated").id for tid in targets]
-        return {"gate": "spec_validated", "target": args.target, "validated": validated, "review": args.review}
+    if args.cmd in _GATE_CMDS:
+        from .gates import run_gate
+        return run_gate(s, _GATE_CMDS[args.cmd], args.target, args.verdict, review=args.review)
     if args.cmd == "deploy-target":
         return resolve_deploy_target(load_config(resolve_workspace(args.project)), args.repo, args.env)
     if args.cmd == "journal":
         return s.journal(args.story, args.entry, actor=args.by)
-    if args.cmd == "validate-func":
-        # GATE fonctionnelle (harry-archi + escalade humaine faites en amont) → spec_func → spec_func_validated.
-        # target = une story, OU un épic (batch de toutes ses stories encore en spec_func = gate au niveau PRD).
-        all_t = s.list_backlog(None)
-        ids = {t.id for t in all_t}
-        if args.target in ids:
-            targets = [args.target]
-        else:
-            targets = [t.id for t in all_t if t.epic == args.target and t.status == "spec_func"]
-            if not targets:
-                raise ValueError(
-                    f"validate-func: « {args.target} » n'est ni une story ni un épic avec des stories en spec_func")
-        validated = [s.set_status(tid, "spec_func_validated").id for tid in targets]
-        return {"gate": "spec_func_validated", "target": args.target, "validated": validated, "review": args.review}
     if args.cmd == "workspace":
         from .agentws import build_agent_workspace
         return build_agent_workspace(args.project, args.story, branch=args.branch, agent=args.agent)
