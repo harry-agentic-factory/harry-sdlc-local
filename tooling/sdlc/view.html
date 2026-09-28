@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDLC en direct</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5f6878; --line: #e2e5ea;
+    --accent: #304870; --bar: #e8ebf0; --done: #2f8f5b; --warn: #b7791f; --bad: #c0392b;
+    --s-spec: #6b7fa8; --s-dev: #7a5ea8; --s-ship: #2b7a9b; --s-done: #2f8f5b; --s-off: #9aa1ad;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --panel: #1b1f27; --text: #e6e9ef; --muted: #9aa3b2; --line: #2b313c;
+      --accent: #8fa8d6; --bar: #2b313c; --done: #4cc38a; --warn: #e0a84a; --bad: #ef6b5b;
+      --s-spec: #8fa1c7; --s-dev: #a88fd6; --s-ship: #5bb0d1; --s-done: #4cc38a; --s-off: #6b7280;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Open Sans", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--panel); border-bottom: 1px solid var(--line);
+           padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  h1 { font-size: 16px; margin: 0; color: var(--accent); }
+  #stamp { color: var(--muted); font-size: 12px; margin-left: auto; }
+  #stamp.err { color: var(--bad); }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tabs button { border: 1px solid var(--line); background: transparent; color: var(--text);
+                 border-radius: 999px; padding: 3px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+  .tabs button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  label.opt { font-size: 13px; color: var(--muted); display: inline-flex; gap: 4px; align-items: center; }
+  main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+  section.project { margin-bottom: 24px; }
+  section.project > h2 { font-size: 15px; margin: 0 0 8px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .muted { color: var(--muted); font-weight: normal; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+  @media (max-width: 400px) { .grid { grid-template-columns: 1fr; } }
+  .epic { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+  .epic h3 { font-size: 13px; margin: 0; overflow-wrap: anywhere; }
+  .epic .title { color: var(--muted); font-size: 12px; margin: 2px 0 8px; overflow-wrap: anywhere; }
+  .bar { height: 6px; background: var(--bar); border-radius: 3px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--done); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .badge { border-radius: 4px; padding: 0 6px; font-size: 12px; white-space: nowrap; border: 1px solid currentColor; }
+  .badge.pending { color: var(--warn); } .badge.blocked { color: var(--bad); } .badge.decided { color: var(--done); }
+  details { margin-top: 8px; } summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+  ul { list-style: none; margin: 6px 0 0; padding: 0; }
+  li { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; font-size: 12px; min-width: 0; }
+  li .id { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  li .t { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .st { white-space: nowrap; border-radius: 4px; padding: 0 5px; color: #fff; font-size: 11px; }
+  .st.spec { background: var(--s-spec); } .st.dev { background: var(--s-dev); } .st.ship { background: var(--s-ship); }
+  .st.done { background: var(--s-done); } .st.off { background: var(--s-off); } .st.unknown { background: var(--bad); }
+  .empty { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SDLC en direct</h1>
+  <div class="tabs" id="tabs" role="group" aria-label="Projets"></div>
+  <label class="opt"><input type="checkbox" id="hideDone"> masquer les épics terminés</label>
+  <label class="opt"><input type="checkbox" id="hideEmpty"> masquer les épics sans story</label>
+  <span id="stamp">chargement…</span>
+</header>
+<main id="root"></main>
+<script>
+(() => {
+  const REFRESH_MS = 5000;
+  const GROUP = {
+    draft: "spec", spec_func: "spec", spec_func_validated: "spec", spec_tech: "spec", spec_validated: "spec",
+    implemented: "dev", reviewed: "dev", deployed: "ship",
+    recette_ok: "done", accepted: "done", done: "done", merged: "done",
+    abandoned: "off", superseded: "off",
+  };
+  const prefs = load();
+  const opened = new Set();   // <details> kept open across refreshes
+  let data = null;
+
+  function details(key, label) {
+    const det = el("details");
+    det.open = opened.has(key);
+    det.addEventListener("toggle", () => { det.open ? opened.add(key) : opened.delete(key); });
+    det.append(el("summary", null, label));
+    return det;
+  }
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem("sdlc-view") || "{}"); } catch { return {}; }
+  }
+  function save() {
+    try { localStorage.setItem("sdlc-view", JSON.stringify(prefs)); } catch { /* storage unavailable */ }
+  }
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function when(iso) {
+    return iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "—";
+  }
+
+  for (const id of ["hideDone", "hideEmpty"]) {
+    const box = document.getElementById(id);
+    box.checked = !!prefs[id];
+    box.addEventListener("change", () => { prefs[id] = box.checked; save(); render(); });
+  }
+
+  function renderTabs() {
+    const tabs = document.getElementById("tabs");
+    tabs.replaceChildren();
+    const names = ["Tous", ...data.projects.map(p => p.prefix)];
+    if (prefs.project && !names.includes(prefs.project)) prefs.project = null;
+    for (const name of names) {
+      const b = el("button", null, name);
+      const value = name === "Tous" ? null : name;
+      b.setAttribute("aria-pressed", String((prefs.project || null) === value));
+      b.addEventListener("click", () => { prefs.project = value; save(); render(); });
+      tabs.append(b);
+    }
+  }
+
+  function epicCard(e) {
+    const card = el("article", "epic");
+    card.append(el("h3", null, e.id));
+    if (e.title) card.append(el("div", "title", e.title));
+    const p = e.progress;
+    const bar = el("div", "bar");
+    const fill = el("span");
+    fill.style.width = (p.percent || 0) + "%";
+    bar.append(fill);
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuenow", String(p.percent || 0));
+    bar.title = `${p.done}/${p.total} terminées`;
+    card.append(bar);
+
+    const meta = el("div", "meta");
+    meta.append(el("span", null, p.total ? `${p.done}/${p.total} terminées (${p.percent} %)` : "aucune story"));
+    if (p.excluded) meta.append(el("span", null, `${p.excluded} abandonnée(s)/remplacée(s)`));
+    const d = e.decisions;
+    if (d) {
+      if (d.blocked) meta.append(el("span", "badge blocked", `⛔ ${d.blocked} bloquée(s)`));
+      if (d.pending) meta.append(el("span", "badge pending", `🟡 ${d.pending} à valider`));
+      if (d.decided) meta.append(el("span", "badge decided", `✅ ${d.decided}`));
+    }
+    meta.append(el("span", null, `maj ${when(e.updatedAt)}`));
+    card.append(meta);
+
+    if (e.stories.length) {
+      const det = details(e.id + ":stories", `${e.stories.length} stories`);
+      const ul = el("ul");
+      for (const s of e.stories) {
+        const li = el("li");
+        li.append(el("span", "st " + (GROUP[s.status] || "unknown"), s.status));
+        li.append(el("span", "id", s.id));
+        const t = el("span", "t", s.title || "");
+        t.title = s.title || "";
+        li.append(t);
+        ul.append(li);
+      }
+      det.append(ul);
+      card.append(det);
+    }
+    if (d && d.open.length) {
+      const det = details(e.id + ":decisions", `${d.open.length} décision(s) ouverte(s)`);
+      const ul = el("ul");
+      for (const o of d.open) {
+        const li = el("li");
+        li.append(el("span", "badge " + o.kind, o.id));
+        const t = el("span", "t", o.text);
+        t.title = o.text;
+        li.append(t);
+        ul.append(li);
+      }
+      det.append(ul);
+      card.append(det);
+    }
+    return card;
+  }
+
+  function render() {
+    if (!data) return;
+    renderTabs();
+    const root = document.getElementById("root");
+    root.replaceChildren();
+    const projects = data.projects.filter(p => !prefs.project || p.prefix === prefs.project);
+    for (const p of projects) {
+      const sec = el("section", "project");
+      const h = el("h2", null, p.prefix);
+      if (p.progress && p.progress.total) h.append(el("span", "muted", `${p.progress.done}/${p.progress.total} stories terminées`));
+      h.append(el("span", "muted", p.workspace));
+      sec.append(h);
+      if (!p.exists) sec.append(el("p", "empty", "Dossier du projet introuvable."));
+      else if (p.error) sec.append(el("p", "empty", p.error));
+      let epics = p.epics;
+      if (prefs.hideDone) epics = epics.filter(e => !(e.progress.total && e.progress.done === e.progress.total));
+      if (prefs.hideEmpty) epics = epics.filter(e => e.stories.length);
+      if (p.exists && !p.error && !epics.length) sec.append(el("p", "empty", "Aucun épic à afficher."));
+      const grid = el("div", "grid");
+      for (const e of epics) grid.append(epicCard(e));
+      sec.append(grid);
+      root.append(sec);
+    }
+  }
+
+  async function refresh() {
+    const stamp = document.getElementById("stamp");
+    try {
+      const r = await fetch("/api/live", { cache: "no-store" });
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error || r.status);
+      data = body;
+      stamp.className = "";
+      stamp.textContent = `à jour ${when(data.generatedAt)}`;
+      render();
+    } catch (err) {
+      stamp.className = "err";
+      stamp.textContent = `erreur de rafraîchissement : ${err.message}`;
+    }
+  }
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+})();
+</script>
+</body>
+</html>
