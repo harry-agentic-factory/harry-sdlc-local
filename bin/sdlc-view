@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# sdlc-view — LOCAL board over the SDLC engine data (board, web page, running activities).
+# Not part of the installed tooling/ package. Resolves its own real path (follows symlinks),
+# then runs the module with the engine and the local package on PYTHONPATH.
+set -euo pipefail
+
+src="${BASH_SOURCE[0]}"
+while [ -h "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ "$src" != /* ]] && src="$dir/$src"
+done
+BIN="$(cd -P "$(dirname "$src")" && pwd)"
+ENG="$(cd "$BIN/.." && pwd)"
+
+exec env PYTHONPATH="$ENG/tooling:$ENG/local${PYTHONPATH:+:$PYTHONPATH}" python3 -m sdlc_view "$@"

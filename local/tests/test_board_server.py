@@ -1,14 +1,14 @@
-"""`sdlc live` (read-only cross-project snapshot) and `sdlc view` (local page over it)."""
+"""`sdlc-view board` (read-only cross-project snapshot) and `sdlc-view view` (local page over it)."""
 import http.client
 import json
 import threading
 
 import pytest
 
-from sdlc import cli
-from sdlc.live import parse_decisions, progress, snapshot
 from sdlc.project import register_project
-from sdlc.view import PortNotConfigured, make_server, resolve_port
+from sdlc_view import cli
+from sdlc_view.board import parse_decisions, progress, snapshot
+from sdlc_view.server import PortNotConfigured, make_server, resolve_port
 
 
 # --- fixtures ---------------------------------------------------------------------------------
@@ -118,7 +118,8 @@ def test_snapshot_reads_all_projects_without_writing(home, tmp_path):
     assert _tree(tmp_path) == before                        # strictly read-only
     assert not missing.exists()
     aa, bb = s["projects"]
-    assert bb == {"prefix": "BB", "workspace": str(missing), "exists": False, "epics": []}
+    assert bb == {"prefix": "BB", "workspace": str(missing), "exists": False, "epics": [],
+                  "running": [], "recent": []}
     epics = {e["id"]: e for e in aa["epics"]}
     assert set(epics) == {"AA-ONE", "AA-EMPTY"}
     one = epics["AA-ONE"]
@@ -149,10 +150,10 @@ def test_snapshot_reports_a_broken_project_without_hiding_others(home, tmp_path)
     assert "error" in bad_p and good_p["progress"]["done"] == 1
 
 
-def test_cli_live(home, tmp_path, capsys):
+def test_cli_board(home, tmp_path, capsys):
     _story(tmp_path / "d", "E", "E-1", "accepted")
     _registry(home, {"P": {"workspace": str(tmp_path / "d")}})
-    assert cli.main(["live"]) == 0
+    assert cli.main(["board"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["projects"][0]["progress"]["percent"] == 100
 

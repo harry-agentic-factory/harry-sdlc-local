@@ -1,7 +1,7 @@
-"""`sdlc view`: a local, read-only web page over the cross-project snapshot of `sdlc live`.
+"""`sdlc-view view`: a local, read-only web page over the cross-project snapshot of `sdlc-view board`.
 
-Standard library only (the engine has no web dependency). Binds to 127.0.0.1, serves:
-    GET /            the page (sdlc/view.html), which polls /api/live
+Standard library only (no web dependency). Binds to 127.0.0.1, serves:
+    GET /            the page (sdlc_view/view.html), which polls /api/live
     GET /api/live    the JSON snapshot (optional ?project=<PREFIX>)
     GET /healthz     {"ok": true}
 
@@ -18,8 +18,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .config import registry_path
-from .live import snapshot
+from sdlc.config import registry_path
+
+from .board import snapshot
 
 HOST = "127.0.0.1"
 PORT_ENV = "SDLC_VIEW_PORT"
@@ -60,7 +61,7 @@ def resolve_port(cli_port: int | str | None = None) -> tuple[int, str]:
         if isinstance(view, dict) and view.get("port") is not None:
             return _check_port(view["port"], f"{reg} view.port"), "registry"
     raise PortNotConfigured(
-        "aucun port configuré pour `sdlc view` : passe --port N, exporte "
+        "aucun port configuré pour `sdlc-view view` : passe --port N, exporte "
         f"{PORT_ENV}=N, ou ajoute \"view\": {{\"port\": N}} au premier niveau de {reg}. "
         f"Port suggéré : {SUGGESTED_PORT} (prochain port libre du port-registry du Brain — "
         "à y enregistrer avant usage).")
@@ -134,7 +135,7 @@ def serve(cli_port: int | None = None) -> dict:
     port, source = resolve_port(cli_port)
     httpd = make_server(port)
     url = f"http://{HOST}:{port}/"
-    print(f"sdlc view : {url} (port depuis {source}, Ctrl-C pour arrêter)", file=sys.stderr, flush=True)
+    print(f"sdlc-view : {url} (port depuis {source}, Ctrl-C pour arrêter)", file=sys.stderr, flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

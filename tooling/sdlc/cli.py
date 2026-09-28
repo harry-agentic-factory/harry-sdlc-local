@@ -141,12 +141,6 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("--repo", help="limiter à un repo (sinon tous)")
     a = sub.add_parser("status", help="statut exact d'un ticket/épic (état + artefacts + recaps agents)")
     a.add_argument("target", nargs="?", help="ID ticket ou épic (sinon : projet entier)")
-    sub.add_parser("live", help="instantané LECTURE SEULE de tous les projets du registre : épics, stories, "
-                                "avancement, décisions ouvertes (--project pour n'en garder qu'un)")
-    a = sub.add_parser("view", help="page web locale (127.0.0.1) sur `sdlc live`, rafraîchie en continu. "
-                                    "Port : --port, sinon SDLC_VIEW_PORT, sinon \"view\": {\"port\": N} "
-                                    "dans ~/.claude/sdlc/projects.json")
-    a.add_argument("--port", type=int, help="port d'écoute (prioritaire sur SDLC_VIEW_PORT et le registre)")
     a = sub.add_parser("deploy-target",
                        help="résout un environnement LOGIQUE (dev = pré-merge, integration = post-merge) "
                             "en cible CONCRÈTE pour un repo. Le deployer appelle ça et ne devine rien.")
@@ -244,12 +238,6 @@ def run(argv: list[str] | None = None) -> dict:
         sbr = man.get("skillsByRepo", {})
         names = [args.repo] if args.repo else list(stacks.keys())
         return {"skills": {n: {"stack": stacks.get(n), "skills": sbr.get(n, [])} for n in names}}
-    if args.cmd == "live":
-        from .live import snapshot
-        return snapshot(args.project)
-    if args.cmd == "view":
-        from .view import serve
-        return serve(args.port)
     if args.cmd == "status":
         from .status_report import build_status
         return build_status(resolve_workspace(args.project), args.target)

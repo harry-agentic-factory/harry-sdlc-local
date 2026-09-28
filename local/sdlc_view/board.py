@@ -1,7 +1,9 @@
-"""Read-only, cross-project snapshot of the SDLC board (`sdlc live`, and the data behind `sdlc view`).
+"""Read-only, cross-project snapshot of the SDLC board (`sdlc-view board`, and the data behind
+`sdlc-view view`).
 
 For every project in the registry (`~/.claude/sdlc/projects.json`) it lists the epics, their stories
-with status, a progress count and, when the epic has one, a summary of `decisions-autonomie.md`.
+with status, a progress count, when the epic has one a summary of `decisions-autonomie.md`, and what
+is running right now (`_live.json`, see `activity.py`): per project, per epic, and across projects.
 
 Strictly read-only: nothing is created, migrated or rewritten. In particular `Workspace()` creates its
 root folder when built, so it is only instantiated once the folder is known to exist.
@@ -12,9 +14,11 @@ import datetime as _dt
 import re
 from pathlib import Path
 
-from .project import list_projects
-from .status import PIPELINE
-from .workspace import Workspace
+from sdlc.project import list_projects
+from sdlc.status import PIPELINE
+from sdlc.workspace import Workspace
+
+from .activity import RECENT_SHOWN, STALE_AFTER, read_activity
 
 # Statuses counted as "done" for the progress bar. `merged` is not an engine status today but is
 # accepted in case a data repo ever uses it.
@@ -117,13 +121,25 @@ def _epic_dirs(root: Path) -> list[Path]:
                   and ((d / "stories").is_dir() or (d / "prd.md").is_file()))
 
 
-def project_snapshot(prefix: str, workspace: str | Path) -> dict:
+def _for_epic(activity: dict, epic: str) -> tuple[list[dict], list[dict]]:
+    running = [a for a in activity["running"] if a.get("epic") == epic]
+    recent = [a for a in activity["recent"] if a.get("epic") == epic][:RECENT_SHOWN]
+    return running, recent
+
+
+def project_snapshot(prefix: str, workspace: str | Path, now: _dt.datetime | None = None) -> dict:
     root = Path(workspace).expanduser()
     # An empty path would resolve to the CWD: treat it as missing.
     exists = bool(str(workspace).strip()) and root.is_dir()
-    out: dict = {"prefix": prefix, "workspace": str(workspace), "exists": exists, "epics": []}
+    out: dict = {"prefix": prefix, "workspace": str(workspace), "exists": exists, "epics": [],
+                 "running": [], "recent": []}
     if not exists:
         return out
+    # Activity first: it stays visible even when the stories cannot be read.
+    activity = read_activity(root, now=now)
+    out["running"], out["recent"] = activity["running"], activity["recent"]
+    if "error" in activity:
+        out["activityError"] = activity["error"]
     try:
         tickets = Workspace(root).all_tickets()
     except Exception as e:  # noqa: BLE001 - one broken status.json must not hide the other projects
@@ -133,7 +149,8 @@ def project_snapshot(prefix: str, workspace: str | Path) -> dict:
     by_epic: dict[str, list] = {}
     for t in tickets:
         by_epic.setdefault(t.epic, []).append(t)
-    epic_names = {d.name for d in _epic_dirs(root)} | set(by_epic)
+    epic_names = ({d.name for d in _epic_dirs(root)} | set(by_epic)
+                  | {a["epic"] for a in activity["running"] if a.get("epic")})
 
     for name in epic_names:
         d = root / name
@@ -148,6 +165,7 @@ def project_snapshot(prefix: str, workspace: str | Path) -> dict:
         counts: dict[str, int] = {}
         for s in statuses:
             counts[s] = counts.get(s, 0) + 1
+        running, recent = _for_epic(activity, name)
         out["epics"].append({
             "id": name,
             "title": _epic_title(d),
@@ -157,25 +175,33 @@ def project_snapshot(prefix: str, workspace: str | Path) -> dict:
             "progress": progress(statuses),
             "decisions": decisions,
             "updatedAt": _iso(max(mtimes) if mtimes else None),
+            "running": running,
+            "recent": recent,
         })
-    # Most recently touched epics first.
-    out["epics"].sort(key=lambda e: e["updatedAt"] or "", reverse=True)
+    # Epics with something running first, then the most recently touched.
+    out["epics"].sort(key=lambda e: (bool(e["running"]), e["updatedAt"] or ""), reverse=True)
     out["progress"] = progress([s["status"] for e in out["epics"] for s in e["stories"]])
     return out
 
 
-def snapshot(project: str | None = None) -> dict:
+def snapshot(project: str | None = None, now: _dt.datetime | None = None) -> dict:
     """Snapshot of every registered project, or only `project` when given."""
     projects = list_projects()
     if project is not None:
         if project not in projects:
             raise KeyError(f"projet inconnu : {project} (connus : {', '.join(sorted(projects)) or 'aucun'})")
         projects = {project: projects[project]}
+    now = now or _dt.datetime.now(tz=_dt.timezone.utc)
+    snaps = [project_snapshot(prefix, (cfg or {}).get("workspace", ""), now=now)
+             for prefix, cfg in projects.items()]
     return {
-        "generatedAt": _dt.datetime.now(tz=_dt.timezone.utc).isoformat(timespec="seconds"),
+        "generatedAt": now.isoformat(timespec="seconds"),
+        "staleAfterMin": int(STALE_AFTER.total_seconds() // 60),
         "pipeline": PIPELINE_ORDER,
         "doneStatuses": sorted(DONE_STATUSES),
         "excludedStatuses": sorted(EXCLUDED_STATUSES),
-        "projects": [project_snapshot(prefix, (cfg or {}).get("workspace", ""))
-                     for prefix, cfg in projects.items()],
+        # Every running activity across projects, oldest first: the "En cours maintenant" banner.
+        "running": sorted(({"project": p["prefix"], **a} for p in snaps for a in p["running"]),
+                          key=lambda a: a.get("startedAt") or ""),
+        "projects": snaps,
     }

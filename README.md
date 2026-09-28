@@ -162,6 +162,9 @@ tooling/
   sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/
   cockpit/     board + Inbox HITL (FastAPI + page)
   tests/       27 tests (déterministe, offline)
+local/
+  sdlc_view/   sdlc-view : tableau de bord LOCAL (board, page web, activités en cours) — non installé
+  tests/
 docs/PRD.md
 ```
 
@@ -235,6 +238,30 @@ Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-
 `curl -s -n`/`~/.netrc`, `~/.kube/config`, keyring `gh`/`glab` — **utilisées sans jamais être lues ni
 affichées**. `service` (futur) = creds de service scopées injectées dans la bulle de l'agent (l'étape
 qui rendra les agents pleinement session-indépendants).
+
+### `sdlc-view` — tableau de bord LOCAL (hors package `tooling/`)
+Utilitaire **local** du poste : il vit dans `local/sdlc_view/` et n'est **pas** installé avec `tooling/`
+(la plateforme ne l'embarque pas). Il lit la data de l'engine (`sdlc.*`), jamais l'inverse.
+```bash
+bin/sdlc-view board [--project P]      # instantané LECTURE SEULE : épics, stories, avancement, décisions, ce qui tourne
+bin/sdlc-view view --port 4002         # page http://127.0.0.1:4002/ rafraîchie toutes les 5 s
+bin/sdlc-view --project P activity start --epic E [--story S] --what "recette live MR-A" [--agent recetteur]
+bin/sdlc-view --project P activity beat <id>     # signe de vie (sans beat depuis 15 min → « sans signe de vie »)
+bin/sdlc-view --project P activity stop <id> [--result ok|ko|cancelled] [--note "…"]
+bin/sdlc-view --project P activity list
+```
+- **Port** : `--port`, sinon `SDLC_VIEW_PORT`, sinon `"view": {"port": N}` au 1er niveau du registre
+  `~/.claude/sdlc/projects.json`. Aucun port en dur.
+- **Ce qui tourne** : un fichier par projet, `<workspace>/_live.json` (schéma versionné, écriture atomique,
+  verrou sur le dossier). Les commandes `activity` en sont les **seuls** écrivains ; la page et `board`
+  ne font que lire. Il garde les activités en cours + les 20 dernières terminées. À ignorer dans git
+  côté repo data (`_live.json` dans son `.gitignore`).
+- **Page** : bandeau « En cours maintenant » (pastille verte clignotante, grise et figée si plus de
+  signe de vie), pastille sur chaque projet/épic concerné, blocs « En cours » + « Derniers événements »
+  par épic.
+- Tests : `make test-local` (ou `cd local && python3 -m pytest`).
+- Commande globale : `install.sh` ne la pose pas ; pour l'avoir dans le PATH, une ligne suffit à côté de
+  celle de `sdlc` : `ln -sfn "$ENG/bin/sdlc-view" "$target/sdlc-view"`.
 
 ## Découverte pas à pas
 
