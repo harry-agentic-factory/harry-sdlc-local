@@ -143,7 +143,7 @@ class Tracker:
             if nature and self.nature(c) != nature:
                 continue
             out.append({"card": cid, "nature": self.nature(c), **c})
-        return sorted(out, key=lambda c: (c.get("list") or "", c.get("name") or ""))
+        return sorted(out, key=lambda c: (c.get("list") or "", c.get("rank") or 10**6, c.get("name") or ""))
 
     # ---- pull: tracker -> links.json ----------------------------------------------------------
     def merge_pull(self, remote: Iterable[dict], at: Optional[str] = None) -> dict:
@@ -152,6 +152,12 @@ class Tracker:
         intake = set(self.config.get("intake", {}))
         seen: set[str] = set()
         report = {"new": [], "changed": [], "gone": [], "toInstruct": [], "toReview": []}
+        remote = list(remote)
+        # Priority = position in the list (the reporter drags what matters most to the top): rank 1 = top.
+        rank: dict[str, int] = {}
+        for list_id in {r.get("idList") for r in remote}:
+            ordered = sorted((r for r in remote if r.get("idList") == list_id), key=lambda r: r.get("pos") or 0)
+            rank.update({r["id"]: i + 1 for i, r in enumerate(ordered)})
         for r in remote:
             cid = r["id"]
             seen.add(cid)
@@ -162,6 +168,7 @@ class Tracker:
                 "list": self.list_name(r.get("idList", "")),
                 "labels": sorted(lb["name"] for lb in r.get("labels", []) if lb.get("name")),
                 "dateLastActivity": r.get("dateLastActivity"),
+                "rank": rank.get(cid),
                 "gone": False,
             }
             entry = self.cards.get(cid)

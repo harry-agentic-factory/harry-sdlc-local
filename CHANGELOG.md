@@ -14,7 +14,7 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
     `<workspace>/_tracker/`, local working storage git-ignored by `tracker init` (the signed review verdict is
     copied into its epic folder): `config.json` (built once from the manifest `tracker` block by `tracker init`) and
     `links.json` (one entry per card, never deleted: `new → instructed → reviewed → planned`, human decision,
-    linked stories). Commands: `init`, `dir`, `pull [--nature bug]`, `card`, `show`, `instructed`, `decide`,
+    linked stories). Commands: `init`, `dir`, `pull [--nature bug]` (records each card priority as its rank in the list), `card [--download]` (saves uploaded attachments under `_tracker/cards/<card>/attachments/` so the investigators read the screenshots), `show`, `instructed`, `decide`,
     `link`, `push [--apply] [--comment]`. `push` only moves a card forward, following its least advanced story;
     a card sent back by a human, accepted by the reporter or ahead of its story is a signal, never a move.
     Trello adapter; credentials read in-process, never printed.

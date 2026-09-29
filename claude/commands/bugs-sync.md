@@ -40,16 +40,18 @@ rien. Ta mémoire est le CLI **`tracker`** et son répertoire `<workspace>/_trac
 
 ## 3. Lis chaque carte
 
-Pour chaque carte retenue : `tracker --project <PREFIX> card <ref>` → garde `name`, `list`, `labels`, et en
-`raw` : `desc`, `comments`, les **noms** des pièces jointes. Pas d'extraction du symptôme ici : le workflow
-le fait, carte par carte, dans un contexte propre.
+Pour chaque carte retenue : `tracker --project <PREFIX> card <ref> --download` → **tout** ce que le rapporteur a
+mis sur la carte : `name`, `list`, `labels`, la priorité (`rank` dans la liste, repris du `pull`), et en `raw` :
+`desc`, `comments`, et les **pièces jointes téléchargées** dans `<tracker dir>/cards/<shortLink>/attachments/`
+(chacune avec son `path` local : captures d'écran, fichiers). Pas d'extraction du symptôme ici : le workflow le
+fait, carte par carte, dans un contexte propre, en lisant les captures.
 
 ## 4. Lance le workflow
 
 ```
 Workflow({ scriptPath: '~/.claude/workflows/bugs-sync.js',
            args: { prefix: '<PREFIX>', date: '<YYYY-MM-DD du jour>', trackerDir: '<tracker dir absolu>',
-                   cards: [{ card, shortLink, name, url, list, labels, raw }] } })
+                   cards: [{ card, shortLink, name, url, list, rank, labels, raw }] } })
 ```
 
 Il extrait le symptôme (sans l'analyse déjà écrite sur la carte), lance un `investigator` par carte (5 à la

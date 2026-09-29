@@ -85,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--nature", help="only report cards of this nature (e.g. bug); links.json still gets all")
     s = sub.add_parser("card", help="read one card in full, live (description, comments, attachments)")
     s.add_argument("ref", help="card URL, shortLink or id")
+    s.add_argument("--download", action="store_true",
+                   help="save uploaded attachments under <tracker dir>/cards/<shortLink>/attachments/ (path in output)")
     s = sub.add_parser("show", help="cards known to links.json")
     s.add_argument("ref", nargs="?")
     s.add_argument("--state", choices=STATES)
@@ -124,13 +126,26 @@ def main(argv: list[str] | None = None) -> int:
             def row(cid):
                 c = t.cards[cid]
                 return {"card": cid, "shortLink": c["shortLink"], "nature": t.nature(c), "list": c["list"],
-                        "labels": c["labels"], "name": c["name"]}
-            rows = {k: [row(c) for c in v] for k, v in report.items()}
+                        "rank": c.get("rank"), "labels": c["labels"], "name": c["name"]}
+            by_priority = lambda cids: sorted(cids, key=lambda c: (t.cards[c]["list"], t.cards[c].get("rank") or 10**6))
+            rows = {k: [row(c) for c in by_priority(v)] for k, v in report.items()}
             if a.nature:
                 rows = {k: [r for r in v if r["nature"] == a.nature] for k, v in rows.items()}
             _emit(rows | {"lastPull": t.links["lastPull"]})
         elif a.cmd == "card":
-            _emit(source_for(t.config).card(a.ref))
+            src = source_for(t.config)
+            card = src.card(a.ref)
+            if a.download:
+                dest = root / "cards" / card["shortLink"] / "attachments"
+                for att in card["attachments"]:
+                    path = src.download(att, dest)
+                    att["path"] = str(path) if path else None
+                if card["id"] in t.cards:
+                    t.cards[card["id"]]["attachments"] = [
+                        {"name": x["name"], "mimeType": x.get("mimeType"), "path": x.get("path"), "url": x["url"]}
+                        for x in card["attachments"]]
+                    t.save()
+            _emit(card)
         elif a.cmd == "show":
             if a.ref:
                 cid, c = t.find(a.ref)

@@ -55,6 +55,14 @@ def test_pull_flags_a_card_edited_after_instruction_and_never_forgets_a_card(t):
     assert t.merge_pull([])["gone"] == []       # reported once
 
 
+def test_priority_is_the_rank_in_the_list(t):
+    cards = [dict(remote("c1", "AAA"), pos=300), dict(remote("c2", "BBB"), pos=100),
+             dict(remote("c3", "CCC", lst="L0"), pos=50)]
+    t.merge_pull(cards)
+    assert [t.cards[c]["rank"] for c in ("c1", "c2", "c3")] == [2, 1, 1]
+    assert [c["shortLink"] for c in t.select(state="new") if c["list"] == "TODO"] == ["BBB", "AAA"]
+
+
 def test_nature_comes_from_the_label_then_the_intake_list(t):
     t.merge_pull([remote("c1", "AAA", lst="L0", labels=("bug", "bloquant")),
                   remote("c2", "BBB", lst="L0", labels=()), remote("c3", "CCC", lst="L2", labels=())])
@@ -175,7 +183,7 @@ def test_cli_full_cycle(env, capsys):
     assert run(capsys, "init")[1]["config"] == "exists"
 
     _, out, _ = run(capsys, "pull")
-    assert [(c["shortLink"], c["nature"]) for c in out["toInstruct"]] == [("AAA", "bug"), ("BBB", "evol")]
+    assert sorted((c["shortLink"], c["nature"]) for c in out["toInstruct"]) == [("AAA", "bug"), ("BBB", "evol")]
     _, out, _ = run(capsys, "pull", "--nature", "bug")
     assert [c["shortLink"] for c in out["toInstruct"]] == ["AAA"]
 
@@ -193,6 +201,28 @@ def test_cli_full_cycle(env, capsys):
 
     _, out, _ = run(capsys, "show", "--state", "planned")
     assert [c["shortLink"] for c in out] == ["AAA"] and out[0]["lastPushedList"] == "IN PROGRESS"
+
+
+def test_cli_card_download_saves_uploads_and_records_their_path(env, capsys, tmp_path):
+    root, board, _ = env
+    atts = [{"id": "a1", "name": "écran 1.png", "url": "u1", "isUpload": True, "bytes": 3, "mimeType": "image/png"},
+            {"id": "a2", "name": "link", "url": "https://x", "isUpload": False}]
+    board.card = lambda ref: {"id": "c1", "shortLink": "AAA", "attachments": [dict(a) for a in atts]}
+
+    def download(att, dest):
+        if not att["isUpload"]:
+            return None
+        dest.mkdir(parents=True, exist_ok=True)
+        p = dest / f"{att['id']}-x.png"
+        p.write_bytes(b"png")
+        return p
+    board.download = download
+    run(capsys, "init")
+    run(capsys, "pull")
+    _, out, _ = run(capsys, "card", "AAA", "--download")
+    saved = out["attachments"][0]["path"]
+    assert saved.startswith(str(root / "_tracker" / "cards" / "AAA" / "attachments")) and out["attachments"][1]["path"] is None
+    assert run(capsys, "show", "AAA")[1]["attachments"][0]["path"] == saved
 
 
 def test_cli_unknown_card_is_a_clean_error(env, capsys):

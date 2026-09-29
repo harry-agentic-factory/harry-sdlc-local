@@ -25,6 +25,15 @@ if (!CARDS.length) return { review: null, cards: [], note: 'no card to instruct'
 
 const REVIEW_DIR = `${DIR}/reviews/${DATE}`
 const fichePath = (c) => `${DIR}/cards/${c.shortLink}/fiche.md`
+// Attachments were downloaded by `tracker card --download`: each carries a local `path` (null for a plain link).
+const localFiles = (c) => ((c.raw && c.raw.attachments) || []).filter((a) => a && a.path)
+const filesNote = (c) => {
+  const files = localFiles(c)
+  if (!files.length) return 'Pièces jointes : aucune.'
+  return `Pièces jointes, téléchargées en local — LIS-LES avec l'outil Read (les captures d'écran sont des faits ` +
+    `observés, souvent les seuls de la carte ; les liens d'image de la description pointent vers ces mêmes ` +
+    `fichiers, par l'id de la pièce jointe) :\n` + files.map((a) => `- ${a.path} (${a.mimeType || a.name})`).join('\n')
+}
 
 const SYMPTOM = { type: 'object', required: ['hasObservableFacts', 'symptom'], properties: {
   hasObservableFacts: { type: 'boolean' },
@@ -68,8 +77,10 @@ for (let i = 0; i < CARDS.length; i += MAX_PARALLEL) {
   const out = await pipeline(wave,
     (c) => agent(
       `Tu prépares le signalement d'un bug pour un investigateur. Voici la carte brute du tracker (JSON) :\n\n` +
-      `${JSON.stringify({ name: c.name, list: c.list, labels: c.labels, ...c.raw })}\n\n` +
-      `Extrais le SYMPTÔME, pas l'analyse. Garde ce qui a été observé : qui, quand, sur quel écran ou quel appel, ` +
+      `${JSON.stringify({ name: c.name, list: c.list, rank: c.rank, labels: c.labels, ...c.raw })}\n\n` +
+      `${filesNote(c)}\n\n` +
+      `Extrais le SYMPTÔME, pas l'analyse. Décris ce que montre chaque capture (écran, valeurs lisibles, message), ` +
+      `sans l'interpréter. Garde ce qui a été observé : qui, quand, sur quel écran ou quel appel, ` +
       `ce qui était attendu, ce qui s'est produit, les identifiants réels (compte, tenant, horodatage, référence). ` +
       `RETIRE toute cause supposée, tout correctif envisagé, tout numéro de ligne ou chemin de code, tout ` +
       `rapprochement avec une autre carte, toute hypothèse — même quand la carte dit qu'elle « tranche ». ` +
@@ -85,7 +96,8 @@ for (let i = 0; i < CARDS.length; i += MAX_PARALLEL) {
         `Projet : ${PREFIX} (résous tes accès avec \`sdlc --project ${PREFIX} config\`). Rapport final en français.\n\n` +
         `Symptôme signalé (faits observés seulement ; l'analyse de la carte a été retirée exprès, établis la cause toi-même) :\n` +
         `${s.symptom}\n\nIdentifiants cités : ${(s.identifiers || []).join(', ') || 'aucun'}\n` +
-        `Carte : ${c.url} — « ${c.name} »\n\n` +
+        `Carte : ${c.url} — « ${c.name} » (labels : ${(c.labels || []).join(', ') || 'aucun'} ; priorité : rang ${c.rank || '?'} dans « ${c.list} »)\n` +
+        `${filesNote(c)}\n\n` +
         `Ce qu'il faut établir :\n` +
         `1. Le constat réel (données stockées, réponses d'API, code à la version DÉPLOYÉE), avec le niveau de preuve de chaque fait.\n` +
         `2. La cause, ou « non établie » avec la mesure qui trancherait.\n` +
