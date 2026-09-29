@@ -116,6 +116,7 @@ def test_ac6_all_links_through_current(env, remote):
     outside = {k: v for k, v in links.items() if not v.startswith(f"{hsh}/current/")}
     assert outside == {}
     assert readlink(local_bin / "sdlc") == f"{hsh}/current/bin/sdlc"
+    assert readlink(local_bin / "tracker") == f"{hsh}/current/bin/tracker"
 
 
 def test_ac6_link_counts_match_version(env, remote):

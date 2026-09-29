@@ -226,6 +226,8 @@ case "$foreign" in
   *" $bin_dir "*) ;;  # foreign sdlc already reported, left intact
   *) manage_link "$bin_dir/sdlc" "$ACTIVE/bin/sdlc" "bin/sdlc" ;;
 esac
+# the tracker command (issue tracker <-> SDLC bridge) lives next to sdlc
+manage_link "$bin_dir/tracker" "$ACTIVE/bin/tracker" "bin/tracker"
 
 # ---- 7. orphans: links through current whose target no longer exists (links only, never recursive) -------
 for kind in agents commands workflows skills sdlc; do

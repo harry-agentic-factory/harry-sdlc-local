@@ -94,6 +94,20 @@ molle, un écran qui s'affiche sans rien prouver. C'est la recette **manuelle** 
 **Le loop vit dans le monde du développeur.** Deploy vise un dev dédié ou un éphémère de story, Promote
 vise l'intégration. La mise en production, sa CI/CD et sa recette classique sont un autre univers.
 
+### Flux bugs depuis un tracker (Trello, …)
+
+La SDLC ne connaît aucun tracker. Le pont est le CLI **`tracker`**, avec sa propre mémoire dans
+`<workspace>/_tracker/` (`config.json`, `links.json` = qui est lié à quoi, `cards/<carte>/fiche.md`,
+`reviews/<date>/`). Cinq commandes, un rôle de *Scrum Master* :
+
+| Commande | Ce qu'elle fait | Écrit dans la SDLC ? | Écrit sur le tracker ? |
+|---|---|---|---|
+| `/bugs-sync` | relit le board, un `investigator` par nouvelle carte bug, consolidation → `review-bugs.md` | non | non |
+| `/bugs-review` | revue carte par carte avec l'humain (conventions de `/process-review`), verdict signé, puis l'épic du jour : une story par module, un commit par bug | oui, après signature | non |
+| `/bugs-run` | enchaîne `/spec-tech` → `/implement` → `run-ticket` par story ; le verdict signé tient lieu des gates de spec | oui | non |
+| `/bugs-push` | déplace les cartes selon les statuts (vers l'avant seulement) et relit les retours du rapporteur | sur accord | sur accord |
+| `/bugs-status` | l'état de chaque carte, des deux côtés | non | non |
+
 ### La state-machine
 
 ```mermaid
