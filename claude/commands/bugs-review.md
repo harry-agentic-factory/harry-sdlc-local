@@ -88,10 +88,12 @@ les fiches d'investigation.
 
 ## 4. Signature — un acte humain
 
-Quand plus aucune carte n'est non décidée ni en `discuss`, **demande** l'issue (`validated`,
-`validated_with_reserves`, `returned`) et **le nom** de l'humain. Seulement sur sa réponse explicite : `status:
-signed`, `outcome`, `signed_by: <son nom>`, `signed_at: <ISO 8601>`. Jamais sous un nom d'agent. Sans humain
-(run autonome), **arrête-toi** en `draft`. Issue `returned` : rien n'est créé ; dis ce qu'il faut ré-instruire.
+Quand plus aucune carte n'est non décidée ni en `discuss`, **demande l'issue** (`validated`,
+`validated_with_reserves` avec ses réserves, `returned`) — une seule question, expliquée en une ligne si l'humain
+hésite. Le signataire est **l'utilisateur git de la session** (`git -C <workspace> config user.name`) : ne demande
+pas son nom. Sur sa réponse explicite : `status: signed`, `outcome`, `signed_by: <user.name>`, `signed_at: <ISO 8601
+UTC>`. Jamais sous un nom d'agent. Sans humain (run autonome), **arrête-toi** en `draft`. Issue `returned` : rien
+n'est créé ; dis ce qu'il faut ré-instruire.
 
 ## 5. Organiser les corrections — proposer, puis créer
 
