@@ -58,7 +58,19 @@ def cmd_init(a) -> dict:
     cfg_path.write_text(json.dumps(Tracker.build_config(block), indent=2, ensure_ascii=False) + "\n")
     t = Tracker.load(root)
     t.save()
-    return {"root": str(root), "config": "written", "board": t.config.get("board")}
+    return {"root": str(root), "config": "written", "board": t.config.get("board"),
+            "gitignore": _ignore_in_workspace(root.parent)}
+
+
+def _ignore_in_workspace(workspace: Path) -> str:
+    """`_tracker/` is working storage, rewritten on every run: keep it out of the data repo."""
+    gitignore = workspace / ".gitignore"
+    text = gitignore.read_text() if gitignore.exists() else ""
+    if any(line.strip() in (f"{TRACKER_DIR}/", TRACKER_DIR, f"/{TRACKER_DIR}/") for line in text.splitlines()):
+        return "already ignored"
+    sep = "" if not text or text.endswith("\n") else "\n"
+    gitignore.write_text(f"{text}{sep}\n# Tracker bridge working storage (local, not versioned)\n{TRACKER_DIR}/\n")
+    return "added"
 
 
 def main(argv: list[str] | None = None) -> int:

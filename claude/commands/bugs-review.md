@@ -117,9 +117,13 @@ Sur validation :
    (Étant donné / Quand / Alors — jamais « ça s'affiche »), non-régression visée, et le message de commit attendu
    `fix(<scope>): <quoi> (<shortLink>)`. Puis `sdlc --project <PREFIX> link <STORY> spec_func <chemin>`.
 4. `sdlc --project <PREFIX> journal <STORY> --entry "Née de la revue des bugs du <date> (verdict signé par <nom> :
-   <chemin>). Cartes : <liste>. Le verdict tient lieu de gate de spec fonctionnelle."`
+   <EPIC>/review-bugs-verdict.md). Cartes : <liste>. Le verdict tient lieu de gate de spec fonctionnelle."`
 5. Par carte : `tracker --project <PREFIX> link <shortLink> <STORY> --epic <EPIC>` (une fois par story).
-6. `git -C <workspace> add _tracker <EPIC> && git -C <workspace> commit -m "chore(bugs): review of <date>, epic <EPIC>"`.
+6. `_tracker/` n'est pas versionné : **copie** la revue et le verdict signé dans l'épic
+   (`<EPIC>/review-bugs.md`, `<EPIC>/review-bugs-verdict.md`) — c'est la preuve des décisions, elle voyage avec
+   l'épic. Les journaux des stories pointent vers ces copies.
+7. `git -C <workspace> add <EPIC> && git -C <workspace> commit -m "chore(bugs): review of <date>, epic <EPIC>"`
+   (vérifie la branche du dépôt data avant ; pas de push sans demande).
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

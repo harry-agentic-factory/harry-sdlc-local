@@ -25,9 +25,6 @@ explicite de l'humain**, et jamais de suppression (au pire : archiver).
 Montre le tableau des déplacements (carte, de → vers, stories et statuts) et le commentaire qui sera posté
 (« Suivi SDLC : <STORY> (<statut>) → <liste> »). Sur un OK explicite, total ou partiel :
 `tracker --project <PREFIX> push --apply --comment [--only <carte> …]`.
-
-Puis versionne : `git -C <workspace> add _tracker && git -C <workspace> commit -m "chore(tracker): push <n> move(s)"`.
-
 ## Sortie
 
 Déplacements faits, signaux traités (et ce qui attend l'humain), cartes restées en place et pourquoi.

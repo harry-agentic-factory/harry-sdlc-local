@@ -96,7 +96,7 @@ vise l'intégration. La mise en production, sa CI/CD et sa recette classique son
 
 ### Flux bugs depuis un tracker (Trello, …)
 
-La SDLC ne connaît aucun tracker. Le pont est le CLI **`tracker`**, avec sa propre mémoire dans
+La SDLC ne connaît aucun tracker. Le pont est le CLI **`tracker`**, avec sa propre mémoire, locale et non versionnée, dans
 `<workspace>/_tracker/` (`config.json`, `links.json` = qui est lié à quoi, `cards/<carte>/fiche.md`,
 `reviews/<date>/`). Cinq commandes, un rôle de *Scrum Master* :
 

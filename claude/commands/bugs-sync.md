@@ -2,7 +2,7 @@ Récupère les bugs du tracker et instruis-les, un investigateur par carte : $AR
 
 Tu es le **Scrum Master** du flux bugs. Tu es le seul à connaître le tracker (Trello, …) : la SDLC n'en sait
 rien. Ta mémoire est le CLI **`tracker`** et son répertoire `<workspace>/_tracker/` (`config.json`,
-`links.json`, `cards/<carte>/fiche.md`, `reviews/<date>/`). Cette commande **instruit** : elle ne crée
+`links.json`, `cards/<carte>/fiche.md`, `reviews/<date>/`) — local, non versionné. Cette commande **instruit** : elle ne crée
 **aucune** story et n'écrit **rien** sur le tracker. Les épics et stories naissent après `/bugs-review`.
 
 `$ARGUMENTS` (tout optionnel) : des références de cartes (URL, shortLink) pour se limiter à elles, et/ou
@@ -56,8 +56,7 @@ preuves d'une carte à l'autre et écrit `reviews/<date>/review-bugs.md`. Pendan
 - Carte sans fait observable (`skipped`) : écris une fiche de 3 lignes (« aucun fait observable, à retourner
   au rapporteur », ce qui manque : URL de l'écran, capture, heure, compte) et enregistre-la de même.
 - Carte en échec (`failed`) : laisse-la `new`, elle sera reprise au prochain passage ; dis-le.
-- Versionne la mémoire dans le dépôt data : `git -C <workspace> add _tracker && git -C <workspace> commit -m
-  "chore(tracker): instruct <n> bug card(s) (<date>)"`. Pas de push sans demande.
+- `_tracker/` est un stockage de travail **non versionné** (ignoré par git) : aucun commit ici.
 
 ## 6. Restitue — court
 

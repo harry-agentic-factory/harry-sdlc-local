@@ -11,7 +11,8 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 - Bug flow driven by an issue tracker, kept out of the SDLC core (the SDLC knows nothing about the tracker):
   - `tracker` CLI (`bin/tracker`, `tooling/tracker/`), installed next to `sdlc`. Persistence in
-    `<workspace>/_tracker/`: `config.json` (built once from the manifest `tracker` block by `tracker init`) and
+    `<workspace>/_tracker/`, local working storage git-ignored by `tracker init` (the signed review verdict is
+    copied into its epic folder): `config.json` (built once from the manifest `tracker` block by `tracker init`) and
     `links.json` (one entry per card, never deleted: `new → instructed → reviewed → planned`, human decision,
     linked stories). Commands: `init`, `dir`, `pull [--nature bug]`, `card`, `show`, `instructed`, `decide`,
     `link`, `push [--apply] [--comment]`. `push` only moves a card forward, following its least advanced story;

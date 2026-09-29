@@ -165,8 +165,12 @@ def run(capsys, *argv):
 
 def test_cli_full_cycle(env, capsys):
     root, board, statuses = env
+    (root / ".gitignore").write_text("*.db")
     code, out, _ = run(capsys, "init")
-    assert code == 0 and out["config"] == "written"
+    assert code == 0 and out["config"] == "written" and out["gitignore"] == "added"
+    assert (root / ".gitignore").read_text().splitlines()[0] == "*.db"
+    assert "_tracker/" in (root / ".gitignore").read_text().splitlines()
+    assert run(capsys, "init", "--force")[1]["gitignore"] == "already ignored"
     assert "_note" not in json.loads((root / "_tracker" / "config.json").read_text())
     assert run(capsys, "init")[1]["config"] == "exists"
 
