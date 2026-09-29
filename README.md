@@ -107,6 +107,7 @@ La SDLC ne connaît aucun tracker. Le pont est le CLI **`tracker`**, avec sa pro
 | `/bugs-run` | enchaîne `/spec-tech` → `/implement` → `run-ticket` par story ; le verdict signé tient lieu des gates de spec | oui | non |
 | `/bugs-push` | déplace les cartes selon les statuts (vers l'avant seulement) et relit les retours du rapporteur | sur accord | sur accord |
 | `/bugs-status` | l'état de chaque carte, des deux côtés | non | non |
+| `/bugs-close` | fin de journée : commit, push et MR de la branche du jour `bugs/<date>` du dépôt data | commit | non |
 
 ### La state-machine
 

@@ -23,7 +23,7 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
     `_tracker/reviews/<date>/review-bugs.md`.
   - Slash commands `/bugs-sync`, `/bugs-review` (same conventions as `/process-review`: prioritised queue,
     verdict written at each decision, resumable, human signature; then the day's epic with one story per module
-    and one commit per bug), `/bugs-run`, `/bugs-push`, `/bugs-status`.
+    and one commit per bug), `/bugs-run`, `/bugs-push`, `/bugs-status`, `/bugs-close` (the SDLC data written by the flow lives on a daily branch `bugs/<date>` of the data repo, closed by a merge request).
 
 ### Changed
 

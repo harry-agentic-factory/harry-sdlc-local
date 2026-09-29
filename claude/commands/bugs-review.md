@@ -122,8 +122,9 @@ Sur validation :
 6. `_tracker/` n'est pas versionné : **copie** la revue et le verdict signé dans l'épic
    (`<EPIC>/review-bugs.md`, `<EPIC>/review-bugs-verdict.md`) — c'est la preuve des décisions, elle voyage avec
    l'épic. Les journaux des stories pointent vers ces copies.
-7. `git -C <workspace> add <EPIC> && git -C <workspace> commit -m "chore(bugs): review of <date>, epic <EPIC>"`
-   (vérifie la branche du dépôt data avant ; pas de push sans demande).
+7. Sur la **branche du jour** `bugs/<date>` du dépôt data (cf. `/bugs-sync` §1 ; vérifie-la avant d'écrire) :
+   `git -C <workspace> add <EPIC> && git -C <workspace> commit -m "chore(bugs): review of <date>, epic <EPIC>"`.
+   Pas de push : c'est `/bugs-close`.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

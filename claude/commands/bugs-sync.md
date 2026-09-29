@@ -13,6 +13,14 @@ rien. Ta mémoire est le CLI **`tracker`** et son répertoire `<workspace>/_trac
 - `sdlc projects` → le préfixe (ambigu → demande). Toutes les commandes : `tracker --project <PREFIX> …`.
 - `tracker --project <PREFIX> dir` → le répertoire. `config.json` absent → `tracker --project <PREFIX> init`
   (il est bâti depuis le bloc `tracker` du manifest), puis annonce-le.
+- **Branche du jour** du dépôt data (`sdlc config` → `workspace`) : tout ce que le flux bugs écrit dans la SDLC
+  (épic, stories, livrables) va sur `bugs/<YYYY-MM-DD>`, fermée le soir par `/bugs-close`.
+  - Déjà dessus → rien à faire. Elle existe → `git checkout bugs/<date>`. Sinon →
+    `git fetch && git checkout -b bugs/<date> origin/main`.
+  - Modifications **suivies** non commitées sur la branche courante → **arrête-toi** et montre-les : c'est le
+    travail d'autre chose, l'humain décide (commit sur sa branche, en général). Ne les emporte jamais en silence.
+  - Git refuse car des fichiers non suivis seraient écrasés → compare-les à `origin/main` ; identiques, mets-les
+    de côté puis restaure-les ; différents, montre-les à l'humain.
 
 ## 2. Relis le board
 
