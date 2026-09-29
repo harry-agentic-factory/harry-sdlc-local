@@ -2,13 +2,16 @@
 they never reach stdout, and error messages never carry a URL (it would contain the key)."""
 from __future__ import annotations
 
+import http.client
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
 CARD_FIELDS = "id,name,shortLink,shortUrl,idList,labels,dateLastActivity,closed"
+RETRIES = 2
 
 
 class TrelloError(RuntimeError):
@@ -26,14 +29,20 @@ class TrelloSource:
     def _call(self, method: str, path: str, params: dict | None = None):
         query = urllib.parse.urlencode({**(params or {}), **self._auth})
         req = urllib.request.Request(f"{self.api}{path}?{query}", method=method)
-        try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                body = resp.read()
-        except urllib.error.HTTPError as e:
-            raise TrelloError(f"Trello {method} {path} -> HTTP {e.code}") from None
-        except urllib.error.URLError as e:
-            raise TrelloError(f"Trello {method} {path} -> {e.reason}") from None
-        return json.loads(body) if body else None
+        for attempt in range(RETRIES + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    body = resp.read()
+                return json.loads(body) if body else None
+            except urllib.error.HTTPError as e:
+                if e.code < 500 and e.code != 429 or attempt == RETRIES:
+                    raise TrelloError(f"Trello {method} {path} -> HTTP {e.code}") from None
+            except (urllib.error.URLError, http.client.HTTPException, ConnectionError, TimeoutError) as e:
+                # Trello drops idle keep-alive connections now and then: a dropped connection is retried.
+                if attempt == RETRIES:
+                    reason = getattr(e, "reason", None) or type(e).__name__
+                    raise TrelloError(f"Trello {method} {path} -> {reason}") from None
+            time.sleep(1 + attempt)
 
     def board_cards(self) -> list[dict]:
         return self._call("GET", f"/boards/{self.board}/cards/open", {"fields": CARD_FIELDS})
