@@ -112,6 +112,91 @@ def review_findings(text: str) -> dict[str, str]:
     return {m.group(1): m.group(1)[0] for m in _FINDING_ROW.finditer(text)}
 
 
+# --- finding roles (AISDLC-POASSIST-14, PRD D27) ----------------------------------------------------------------
+# At the feature gate the agent review assigns each finding to a role in a `Rôle` column; each role verdict
+# decides only the findings assigned to it. A review without that column (or a finding without a readable
+# role) keeps the historical rule: both roles decide it.
+
+GATE_ROLES = ("po", "techlead")
+ROLE_HEADERS = frozenset({"rôle", "role", "rôles", "roles", "owner", "owners", "pour", "porteur"})
+_ROLE_TOKENS = {
+    "po": ("po",), "product owner": ("po",), "productowner": ("po",),
+    "techlead": ("techlead",), "tech lead": ("techlead",), "tech-lead": ("techlead",),
+    "tech_lead": ("techlead",), "tl": ("techlead",),
+    "both": GATE_ROLES, "les deux": GATE_ROLES, "deux": GATE_ROLES, "tous": GATE_ROLES, "all": GATE_ROLES,
+}
+_ROLE_SPLIT = re.compile(r"\s*(?:\+|,|/|&|;|\bet\b|\band\b)\s*", re.I)
+_HEADER_ROW = re.compile(r"^\|\s*#\s*\|")
+_TARGETED = re.compile(r"^##\s+revue\s+cibl[ée]e", re.I)
+
+
+def _row_cells(line: str) -> list[str]:
+    raw = line.strip()
+    raw = raw[1:] if raw.startswith("|") else raw
+    raw = raw[:-1] if raw.endswith("|") else raw
+    return [c.strip() for c in raw.split("|")]
+
+
+def _header_name(cell: str) -> str:
+    return cell.strip().strip("`*_ ").strip().lower()
+
+
+def parse_roles(cell: str) -> tuple[str, ...]:
+    """`[po]`, `techlead`, `tech lead`, `TL`, `po+techlead`, `les deux`, `both` … -> roles; unreadable/empty ->
+    both roles (never a finding nobody decides)."""
+    raw = cell.strip().strip("`*_[]() ").strip().lower()
+    if raw in _ROLE_TOKENS:
+        return _ROLE_TOKENS[raw]
+    roles: set[str] = set()
+    for token in _ROLE_SPLIT.split(raw):
+        token = token.strip("`*_[]() ").strip()
+        if not token:
+            continue
+        if token not in _ROLE_TOKENS:
+            return GATE_ROLES
+        roles.update(_ROLE_TOKENS[token])
+    return tuple(r for r in GATE_ROLES if r in roles) or GATE_ROLES
+
+
+def review_roles(text: str) -> dict[str, tuple[str, ...]]:
+    """Finding id -> roles that decide it, read from the `Rôle` column BY HEADER NAME.
+
+    Precedence (same as the platform's `parse_review`): the rows of a `## Revue ciblée` section first, then the
+    document order; the first occurrence of an id wins. A finding in a table without a role column -> both."""
+    targeted: list[tuple[str, tuple[str, ...]]] = []
+    others: list[tuple[str, tuple[str, ...]]] = []
+    role_col: int | None = None
+    in_targeted = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            in_targeted = bool(_TARGETED.match(stripped))
+            continue
+        if _HEADER_ROW.match(stripped):
+            names = [_header_name(c) for c in _row_cells(stripped)]
+            role_col = next((i for i, n in enumerate(names) if n in ROLE_HEADERS), None)
+            continue
+        m = _FINDING_ROW.match(stripped)
+        if not m:
+            continue
+        cells = _row_cells(stripped)
+        roles = parse_roles(cells[role_col]) if role_col is not None and role_col < len(cells) else GATE_ROLES
+        (targeted if in_targeted else others).append((m.group(1), roles))
+    out: dict[str, tuple[str, ...]] = {}
+    for fid, roles in [*targeted, *others]:
+        out.setdefault(fid, roles)
+    return out
+
+
+def findings_for_role(text: str, role: str | None) -> dict[str, str]:
+    """The review findings a verdict of `role` must decide (all of them without a role)."""
+    findings = review_findings(text)
+    if not role:
+        return findings
+    roles = review_roles(text)
+    return {f: s for f, s in findings.items() if role in roles.get(f, GATE_ROLES)}
+
+
 def _decisions_section(text: str) -> str:
     out, grab = [], False
     for line in text.splitlines():
@@ -132,13 +217,32 @@ def normalize_decision(raw: str) -> str:
     return _DECISION_ALIASES.get(d, d)
 
 
+_DECISION_HEADERS = {"décision": "decision", "decision": "decision", "motif": "reason", "raison": "reason",
+                     "reason": "reason", "justification": "reason"}
+
+
 def verdict_decisions(text: str) -> dict[str, tuple[str, str]]:
-    """Rows of the `## Décisions` table: id -> (normalized decision, reason)."""
+    """Rows of the `## Décisions` table: id -> (normalized decision, reason).
+
+    Columns are read BY HEADER NAME when the table has a `| # | … |` header naming them (`Décision`, `Motif`);
+    otherwise by position (`| # | Décision | Motif | …`), the canonical layout."""
     out: dict[str, tuple[str, str]] = {}
+    decision_col, reason_col = 1, 2
     for line in _decisions_section(text).splitlines():
-        m = _DECISION_ROW.match(line.strip())
-        if m:
-            out[m.group(1)] = (normalize_decision(m.group(2)), _clean(m.group(3)))
+        stripped = line.strip()
+        if _HEADER_ROW.match(stripped):
+            names = [_DECISION_HEADERS.get(_header_name(c), "") for c in _row_cells(stripped)]
+            if "decision" in names:
+                decision_col = names.index("decision")
+                reason_col = names.index("reason") if "reason" in names else -1
+            continue
+        m = _DECISION_ROW.match(stripped)
+        if not m:
+            continue
+        cells = _row_cells(stripped)
+        decision = cells[decision_col] if decision_col < len(cells) else ""
+        reason = cells[reason_col] if 0 <= reason_col < len(cells) else ""
+        out[m.group(1)] = (normalize_decision(decision), _clean(reason))
     return out
 
 
@@ -242,17 +346,22 @@ def check_verdict(root: str | Path, path: str, gate: str, target: str, review: s
         raise GateRefused(f"{rel}: signed on review version '{signed_on or '?'}' but {rrel} is at version "
                           f"'{version or '?'}' — both are required and must match (process the targeted "
                           f"re-review first)", "stale_verdict")
-    findings = review_findings(rtext)
-    decisions = verdict_decisions(text)
+    all_findings = review_findings(rtext)
+    # feature gate: a role verdict decides only the findings assigned to its role (D27); a decision it records on
+    # another role's finding is informative only (neither required, nor checked, nor turned into debt)
+    findings = findings_for_role(rtext, role) if g.roles else all_findings
+    decisions = {i: d for i, d in verdict_decisions(text).items()
+                 if i.startswith("H") or i in findings or i not in all_findings}
+    who = f" (role {role})" if role else ""
     missing = [f for f in findings if f not in decisions]
     if missing:
-        raise GateRefused(f"{rel}: findings without a decision: {', '.join(missing)}", "undecided")
+        raise GateRefused(f"{rel}: findings without a decision{who}: {', '.join(missing)}", "undecided")
     unknown = [i for i in decisions if not i.startswith("H") and i not in findings]
     if unknown:
         raise GateRefused(f"{rel}: decisions on unknown findings: {', '.join(unknown)}", "unknown_finding")
     pending = [i for i, (d, _) in decisions.items() if d not in FINAL_DECISIONS]
     if pending:
-        raise GateRefused(f"{rel}: undecided findings (discuss or unknown decision): {', '.join(pending)}",
+        raise GateRefused(f"{rel}: undecided findings{who} (discuss or unknown decision): {', '.join(pending)}",
                           "undecided")
     unexplained = [i for i, (d, why) in decisions.items() if d in NEEDS_REASON and not why]
     if unexplained:

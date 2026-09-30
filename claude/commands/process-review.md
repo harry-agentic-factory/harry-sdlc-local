@@ -14,6 +14,13 @@ repo data.
 
 - Lis la revue : frontmatter (`gate`, `target`, `version`) et les constats `| # | Gravité | Constat | Preuve |
   Recommandation | Consensus |` (ids `B<n>` bloquant, `M<n>` majeur, `m<n>` mineur, `S<n>` suggestion).
+- **Gate feature — règle des rôles (D27)** : la revue attribue chaque constat à un rôle dans une colonne **`Rôle`**
+  (lue par son nom d'en-tête ; synonymes `Role`/`Owner`/`Pour` ; valeurs `po`, `techlead`/`tech lead`/`tl`,
+  `po+techlead`/`both`/`les deux`). **Le verdict d'un rôle ne décide QUE les constats de ce rôle** (un constat
+  « les deux » est décidé par les deux verdicts ; un constat **sans rôle**, ou une revue **sans colonne `Rôle`**,
+  est décidé par les deux). Avec `--role po`, ne traite que les constats `po` + « les deux » ; ceux du tech lead ne
+  sont ni demandés ni requis (une décision que tu y inscrirais est ignorée par la gate). La gate feature passe quand
+  chaque constat est décidé par tous ses rôles **et** que les deux verdicts sont signés.
 - Verdict = à côté de la revue : `review-<gate>-verdict.md`, ou `review-feature-verdict-<role>.md` pour la feature.
   - **Absent** ⇒ crée-le en `status: draft` (format ci-dessous).
   - **Présent en `draft`** ⇒ **reprise** : ne redemande **aucun** point déjà décidé, repars du premier non décidé.
