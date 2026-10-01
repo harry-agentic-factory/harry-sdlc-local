@@ -20,26 +20,29 @@ annonce-le. Réhydrate : `python3 -m sdlc.cli --project SAMPLE get <STORY>` ; li
 
 ## Gate SPECS TECHNIQUE — la fin de la chaîne, pas une option
 
-> Il y a **deux** gates, et elles ne valident pas la même chose :
-> **fonctionnelle** `spec_func → spec_func_validated` (`validate-func`, cf. `/spec-func`) — le PRD et les
+> Il y a **trois** gates, et elles ne valident pas la même chose :
+> **fonctionnelle** `spec_func → spec_func_validated` (`/validate-spec-func`, cf. `/spec-func`) — le PRD et les
 > critères d'acceptation, idéalement **par épic**, avant que le technique soit écrit par-dessus ;
-> **technique** `spec_tech → spec_validated` (`validate-spec`) — le plan d'implémentation et les
-> invariants. Celle-ci est la seconde. Les deux acceptent une **story OU un épic entier**, et les deux
-> sont sautables dans la state-machine : la version dure est portée par l'orchestration.
+> **technique** `spec_tech → spec_validated` (`/validate-spec-tech`) — le plan d'implémentation et les
+> invariants ; **feature** `spec_validated → feature_validated` (`/validate-feature <EPIC>`) — la feature entière,
+> avant l'envoi à l'usine, signée par le PO **et** le tech lead. Les deux premières acceptent une **story OU un
+> épic** ; les trois sont sautables dans la state-machine, la version dure est portée par la CLI.
 
-`spec_tech` n'est **pas** le feu vert du codage. L'état suivant est `spec_validated`, et on y entre par
-une seule porte :
+`spec_tech` n'est **pas** le feu vert du codage. On entre en `spec_validated` par une seule porte —
+**l'agent recommande, l'humain décide** :
 
-1. **`harry-archi`** relit les specs (Brain + code réel), tranche **dans son périmètre** et **escalade**
-   ce qui n'y est pas (produit, sécurité, PII, relation client). Il écrit `<EPIC>/spec-review.md` et
-   rend `{decision, rationale, sources, escalate}`.
-2. Les escalades — **et elles seules** — remontent à l'humain.
-3. Tu consignes : `sdlc --project <PREFIX> validate-spec <STORY|EPIC> --review <EPIC>/spec-review.md`.
-   La commande **enregistre** un verdict rendu en amont ; elle ne valide rien par elle-même.
-4. Verdict « à corriger » → tu corriges les specs et tu **repasses la gate**. Un invariant faux fait
-   rejeter une MR conforme et discrédite les autres : c'est le défaut le plus coûteux d'un jeu de specs.
+1. **`harry-archi`** en **mode document de revue** relit les specs (Brain + code réel) et écrit
+   `review-spec-tech.md` (constats `B/M/m/S`, preuve, reco, consensus) — `<EPIC>/` ou `<EPIC>/stories/<STORY>/`.
+2. **`/process-review`** fait décider l'humain point par point ; le verdict `review-spec-tech-verdict.md` avance en
+   `draft`, puis l'**humain** le signe. Tu ne signes jamais.
+3. Tu consignes : `sdlc --project <PREFIX> validate-spec-tech <STORY|EPIC> --verdict <…>/review-spec-tech-verdict.md`.
+   La CLI **refuse** sans verdict signé par un humain ; sinon journal, liens, dette (réserves) et transition.
+4. Issue `returned` → tu corriges les specs, `harry-archi` fait une **revue ciblée** (nouvelle version), et on
+   repasse. Un invariant faux fait rejeter une MR conforme et discrédite les autres : c'est le défaut le plus
+   coûteux d'un jeu de specs.
 
-`sdlc reject --to spec_func|spec_tech|implemented --note …` est la sortie, consignée dans `journal.md`.
+Anciens noms de la sous-commande : `validate-spec`, `validate-tech` (alias). `sdlc reject --to
+spec_func|spec_tech|implemented --note …` est la sortie, consignée dans `journal.md`.
 
-**Seulement ensuite** : `/implement`.
+**Ensuite** : `/validate-feature <EPIC>` quand toutes les stories de l'épic sont `spec_validated`, **puis** `/implement`.
 

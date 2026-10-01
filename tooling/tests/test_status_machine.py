@@ -66,3 +66,25 @@ def test_functional_gate_does_not_reach_the_technical_one():
         validate_transition(Status.SPEC_FUNC_VALIDATED, Status.SPEC_VALIDATED)
     with pytest.raises(InvalidTransition):
         validate_transition(Status.SPEC_FUNC_VALIDATED, Status.IMPLEMENTED)
+
+
+def test_feature_gate_sits_between_spec_validated_and_implemented():
+    from sdlc import PIPELINE
+    i = PIPELINE.index(Status.FEATURE_VALIDATED)
+    assert PIPELINE[i - 1] == Status.SPEC_VALIDATED and PIPELINE[i + 1] == Status.IMPLEMENTED
+    assert validate_transition(Status.SPEC_VALIDATED, Status.FEATURE_VALIDATED) == Status.FEATURE_VALIDATED
+    assert validate_transition(Status.FEATURE_VALIDATED, Status.IMPLEMENTED) == Status.IMPLEMENTED
+
+
+def test_feature_gate_is_skippable_but_not_reachable_from_spec_tech():
+    assert validate_transition(Status.SPEC_VALIDATED, Status.IMPLEMENTED) == Status.IMPLEMENTED
+    with pytest.raises(InvalidTransition):
+        validate_transition(Status.SPEC_TECH, Status.FEATURE_VALIDATED)
+    with pytest.raises(InvalidTransition):
+        validate_transition(Status.FEATURE_VALIDATED, Status.SPEC_VALIDATED)
+
+
+def test_routed_return_after_a_spec_or_feature_gate():
+    for src in (Status.SPEC_VALIDATED, Status.FEATURE_VALIDATED):
+        assert validate_transition(src, Status.SPEC_TECH) == Status.SPEC_TECH
+        assert validate_transition(src, Status.SPEC_FUNC) == Status.SPEC_FUNC
