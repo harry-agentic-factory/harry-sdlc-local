@@ -7,7 +7,7 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
-## [0.8.0] - 2026-09-27
+## [0.8.0] - 2026-10-01
 
 ### Added
 
@@ -38,6 +38,13 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 - `/spec-func`, `/spec-tech`, `/full-spec`, `/run-story`, the persona, the `loop-engineering` skill and doc and the
   README describe the new gates; `/run-story` runs unattended from `feature_validated` and stops at each gate
   signature.
+- Feature gate, role verdicts (AISDLC-POASSIST-14): when `review-feature.md` has a `Rôle` column, each role verdict
+  (`po`, `techlead`) decides only the findings of its own role (`po+techlead` findings are decided by both); without
+  the column the previous rule applies (every verdict decides every finding).
+
+### Fixed
+
+- Verdict front matter: inline comments (`key: value  # note`) are ignored when the verdict is read.
 
 ## [0.7.1] - 2026-09-26
 
