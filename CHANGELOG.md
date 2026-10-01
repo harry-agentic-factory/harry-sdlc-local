@@ -7,6 +7,20 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-01
+
+### Changed
+
+- `/process-review` speaks French to the human: the queue is announced in a sentence, evidences by their subject
+  (id in parentheses), decision cards labelled « Appliquer la recommandation », « Autre correction », « Accepter avec
+  réserve », « Rejeter le constat », « Passer outre », « En discuter », and the signature outcome asked in words; the
+  verdict still stores the same values (AISDLC-POASSIST-22 review).
+- Persona: profiles are kept without being announced (platform: the connected person's profile, PO by default);
+  the register follows the person, not the profile a command adopts; paths only on request for technical profiles;
+  the rule section is written without arrows; signature wording works both on the platform and locally.
+- `Sortie` sections point to the rule in a short form; `/implement` announces its skills in a sentence; `/ticket`
+  names documents by their title.
+
 ## [0.8.1] - 2026-10-01
 
 ### Changed

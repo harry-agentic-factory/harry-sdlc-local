@@ -29,5 +29,5 @@ une erreur fonctionnelle entre deux stories ne se voit qu'en lisant tout le lot)
 Ancien nom accepté : `sdlc validate-func` (alias, même comportement — `--verdict` compris).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : l'issue de la gate fonctionnelle, les stories qui avancent, la dette créée s'il y en a.
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : l'issue de la gate fonctionnelle, les stories qui avancent, la dette créée s'il y en a.
 **Puis** propose de passer à la spec technique.

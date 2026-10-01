@@ -22,6 +22,6 @@ sans l'annoncer (« Écrire pour un humain »). L'idée est souvent un **épic**
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : le PRD est écrit, son résumé en 3 lignes, et la proposition de passer au découpage en
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : le PRD est écrit, son résumé en 3 lignes, et la proposition de passer au découpage en
 stories.
 Ne code rien. Ne crée pas encore les stories (c'est `/refine`).

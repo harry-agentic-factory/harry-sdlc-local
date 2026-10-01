@@ -34,6 +34,6 @@ ambigu demande) ; toutes les commandes sont `sdlc --project <PREFIX> …`. Cible
 Ancien nom accepté : `sdlc validate-epic` (alias).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : la recommandation de la revue de la feature, où en sont les verdicts PO et tech lead (et
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : la recommandation de la revue de la feature, où en sont les verdicts PO et tech lead (et
 lequel attend une signature), les stories validées. **Puis** propose de lancer l'usine story par story, dans
 l'ordre des dépendances.

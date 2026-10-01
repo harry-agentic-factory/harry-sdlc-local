@@ -25,5 +25,5 @@ toutes les commandes sont `sdlc --project <PREFIX> …`. Cible = `<STORY>` ou `<
 Anciens noms acceptés : `sdlc validate-spec`, `sdlc validate-tech` (alias, même comportement).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : l'issue de la gate technique, les stories qui avancent, la dette créée s'il y en a. **Puis**
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : l'issue de la gate technique, les stories qui avancent, la dette créée s'il y en a. **Puis**
 propose la revue de la feature quand toutes les stories de l'épic ont leur spec technique validée.

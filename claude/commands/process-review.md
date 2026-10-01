@@ -28,22 +28,25 @@ repo data.
     `review_version` = la nouvelle version, déplace l'ancienne signature dans `## Signatures précédentes`, **garde**
     toutes les décisions prises (un constat levé par la revue ciblée garde sa décision) et ne demande que les
     **nouveaux** constats.
-- Annonce la file : « N constats : x évidences, b bloquants, M majeurs, r autres — déjà décidés : d ».
+- Annonce la file **en phrase** (règle « Écrire pour un humain »), par exemple : « 11 constats à décider : 3 évidences
+  que je te propose d'appliquer en lot, 4 majeurs et 4 mineurs ; aucun n'est encore décidé. »
 
 ## 2. La file, dans cet ordre (mode `priorise`)
 
-1. **Lot des évidences** : constats **non bloquants** de consensus ≥ 0,8. Présente-les ensemble (id, constat, reco
-   en une ligne) ; **une seule décision** : « appliquer tout le lot » — l'humain peut en retirer, qui retournent
+1. **Lot des évidences** : constats **non bloquants** de consensus ≥ 0,8. Présente-les ensemble (le sujet du
+   constat et la recommandation en une ligne, l'identifiant entre parenthèses) ; **une seule décision** : « appliquer tout le lot » — l'humain peut en retirer, qui retournent
    dans la file.
 2. **Bloquants, un par un.**
 3. **Majeurs.**
 4. **Le reste** (mineurs, suggestions).
 
 Mode `un-par-un` : tout dans l'ordre des ids, sans lot. Mode `en-vrac` : un tableau de tout, l'humain répond d'un
-bloc. Après chaque point : « il reste … » (compte par gravité).
+bloc. Après chaque point : « il reste … » (compte par gravité, en toutes lettres).
 
 **Pour chaque point**, propose les décisions (en cartes à choix — `AskUserQuestion` quand l'outil existe —, réponse
-libre toujours possible) :
+libre toujours possible). Les libellés des choix sont en français, jamais les valeurs du verdict : « Appliquer la
+recommandation », « Autre correction (je la décris) », « Accepter avec réserve », « Rejeter le constat »,
+« Passer outre », « En discuter » ; tu écris ensuite la valeur correspondante dans le verdict :
 
 | Décision (valeur du verdict) | Sens | Motif |
 |---|---|---|
@@ -100,7 +103,8 @@ jamais dans la revue ; une correction de spec après décision appelle une **rev
 
 ## 4. Signature — un acte humain
 
-Quand plus aucun point n'est non décidé ni en `discuss`, **demande** à l'humain : l'issue (`validated`,
+Quand plus aucun point n'est non décidé ni en `discuss`, **demande** à l'humain, en mots, l'issue (« Validé »,
+« Validé avec réserves », « Renvoyé pour correction », « Passé outre », que tu écris `validated`,
 `validated_with_reserves`, `returned`, `bypassed`) et **son nom**. Seulement sur sa réponse explicite, passe le
 verdict en `status: signed` avec `outcome`, `signed_by: <son nom>`, `signed_at: <ISO 8601>`. Sans réponse humaine
 (sous-agent, run autonome), **arrête-toi** en `draft` et dis ce qui attend l'humain. Tu ne signes jamais pour lui, et
@@ -118,8 +122,8 @@ La CLI refuse un verdict en `draft`, un constat sans décision, une version de r
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : où en est le traitement (combien de constats décidés, ce qui reste par gravité, en mots),
-ce que contient le verdict (corrections appliquées, réserves, dette qui en naîtra), et ce qui l'attend (signer au
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : où en est le traitement (combien de constats décidés, ce qui reste par gravité, en mots),
+ce que contient le verdict (corrections appliquées, réserves, dette qui en naîtra), et ce qui l'attend (signer le verdict ; sur la plateforme, au
 panneau de revue). Si le verdict est signé : l'issue et ce que la signature a débloqué (« la spec fonctionnelle de
 US-1 est validée »). Le chemin du verdict et la commande `sdlc validate-…` jouée ne sont donnés qu'au profil techlead,
 dev ou solo, s'il les demande.

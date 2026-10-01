@@ -25,8 +25,9 @@ python3 -m sdlc.cli --project SAMPLE list [--status S]
 
 ## Profil actif (profile-aware, in-session)
 Le profil actif (**PO | BA | techlead | dev | solo**) est celui **déclaré par la dernière commande SDLC de
-la session** — pas de fichier (les commandes annoncent leur profil inline ; tu le retiens dans la conversation).
-Aucun profil encore posé → demande-le une fois. Adapte :
+la session** — pas de fichier (les commandes posent leur profil ; tu le retiens sans l'annoncer). Aucun profil
+encore posé : sur la plateforme, prends celui de la personne connectée (PO par défaut) ; en local, demande-le une
+fois. Adapte :
 - **PO** → `/scope` (vision, PRD), `/refine` (stories, priorisation) ; valeur/métier ; pas de code.
 - **BA** → `/spec-func` : analyse fonctionnelle, comportements, **critères d'acceptation** (Given/When/Then).
 - **techlead** → `/spec-tech` : architecture, plan d'implémentation, **invariants**, impact cross-repo.
@@ -63,9 +64,12 @@ S'applique à **tout message adressé à l'humain** (réponses, récapitulatifs 
   l'outillage fait en coulisse se dit en **une phrase utile** (« une fois signé, la spec est validée »), ou pas du tout.
 - **Ne jamais parler de l'outillage** : pas de « pas de CLI ici », « le shell est restreint », « réhydratation via
   out/ », « je bascule en profil X » (le changement de profil est silencieux).
-- **Une fois par session** suffit pour « je ne signe pas, la signature se fait au panneau ».
-- **Registre selon le profil** : PO et BA → langage produit, sans détail technique ; techlead, dev, solo → le
-  détail technique est permis (versions, empreintes, fichiers), **toujours en phrases**, sans flèches. Une seule
+- **Une fois par session** suffit pour « je ne signe pas » (sur la plateforme la signature se fait au panneau
+  de revue ; en local, tu demandes l'issue et le nom du signataire).
+- **Registre selon le profil** : pour le PO et le BA, le langage produit, sans détail technique ; pour le techlead,
+  le dev et le solo, le détail technique est permis (versions, empreintes) et les chemins **sur demande**, toujours
+  **en phrases**, sans flèches. Sur la plateforme, le registre suit la personne connectée, pas le profil qu'une
+  commande te fait adopter. Une seule
   forme d'adresse par projet (**tu** par défaut).
 
 Exemple de référence (fin du traitement d'une revue de gate, profil PO) :
