@@ -109,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--apply", action="store_true", help="perform the moves on the tracker")
     s.add_argument("--only", action="append", default=[], help="restrict to these cards (repeatable)")
     s.add_argument("--comment", action="store_true", help="also post a status comment on each moved card")
+    s = sub.add_parser("forget-push", help="forget our last push of cards moved back on purpose (not reporter feedback)")
+    s.add_argument("refs", nargs="+")
     a = p.parse_args(argv)
 
     try:
@@ -177,6 +179,9 @@ def main(argv: list[str] | None = None) -> int:
                     t.mark_pushed(m["card"], m["to"])
                 t.save()
             _emit({"applied": a.apply, **plan})
+        elif a.cmd == "forget-push":
+            _emit([t.forget_push(t.find(r)[0]) for r in a.refs])
+            t.save()
     except (KeyError, ValueError, FileNotFoundError, TrelloError, RuntimeError) as e:
         print(json.dumps({"error": str(e).strip("'\"")}, ensure_ascii=False), file=sys.stderr)
         return 2

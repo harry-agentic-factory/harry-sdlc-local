@@ -26,7 +26,8 @@ remonte la question : c'est une décision humaine, pas un détail d'implémentat
 | `draft` | `/spec-tech <STORY>` — plan + invariants, **un commit par bug** prévu (message `fix(<scope>): … (<shortLink>)`), critères d'acceptation repris du spec-func. Puis `sdlc set-status <STORY> spec_tech` et journal : « gates de spec couvertes par le verdict <chemin> ». |
 | `spec_tech` | `/implement <STORY>` : une branche `fix/<STORY>` depuis la branche de référence du repo, un commit par bug, build + tests (gate `mvn verify` / équivalent de la stack), puis le workflow `run-ticket` (review → déploiement de branche → recette → fix-loop). |
 | `implemented` → `recette_ok` | laisse `run-ticket` / `/run-story <STORY>` avancer. La recette vérifie **chaque bug** de la story contre ses critères, pas la story en bloc. |
-| `recette_ok` | **gate humaine** : arrête-toi, résume par bug (vert/rouge, preuve), et propose **`/bugs-push`** pour que le rapporteur re-teste. La promotion (merge + redéploiement de main) ne part que sur un « tu peux promouvoir » explicite. |
+| `recette_ok` | **gate humaine** : arrête-toi, résume par bug (vert/rouge, preuve). **Ne propose PAS `/bugs-push` ici** : le rapporteur ne re-teste que ce qui est sur `main`. La promotion ne part que sur un « tu peux promouvoir » / « go » explicite. |
+| « go » de l'humain | **promotion, dans cet ordre** : (1) verdict signé `<EPIC>/promote-verdict.md` (signataire = `git config user.name`) + stories en `accepted` ; (2) **`/doc-feature`** sur chaque repo touché, mergé dans le trunk **avant** tout merge vers `main` ; (3) merge trunk → `main` par module + MR liées (gitops, e2e, config) ; (4) rebuild CI **depuis `main`** puis CD (le CD prend le dernier CI réussi) ; (5) TNR complète sur l'env redéployé ; (6) stories en `done` ; (7) **en dernier seulement**, `/bugs-push`. |
 
 3. Un bug d'une story qui résiste (recette rouge après la fix-loop) ne bloque pas les autres : isole son commit,
    livre les autres, et remonte-le avec son dossier de repro — l'humain choisit de le sortir de la story.
@@ -34,4 +35,4 @@ remonte la question : c'est une décision humaine, pas un détail d'implémentat
 ## Sortie
 
 Un tableau par story : module, statut, bugs (✅/❌/⏳ par carte), branche/MR, version déployée ; ce qui attend
-l'humain. Puis : « `/bugs-push` pour refléter l'avancement sur le tracker ».
+l'humain. `/bugs-push` n'est proposé qu'une fois les stories en `done` (promues sur `main`, redéployées, TNR verte).

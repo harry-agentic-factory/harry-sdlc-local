@@ -31,6 +31,9 @@ PIPELINE = [
     "implemented", "reviewed", "deployed", "recette_ok", "accepted", "done",
 ]
 # SDLC status -> tracker list, as seen by the reporter.
+# A card reaches "to validate" only once its stories are `done` (merged to main, redeployed, non-reg green):
+# the reporter re-tests what is on main, never a branch. `recette_ok` / `accepted` (promote in flight) stay
+# in progress. "Validated" is the reporter's own move, never pushed.
 DEFAULT_STATUS_TO_LIST = {
     "draft": "TODO",
     "spec_func": "TODO",
@@ -41,9 +44,9 @@ DEFAULT_STATUS_TO_LIST = {
     "implemented": "IN PROGRESS",
     "reviewed": "IN PROGRESS",
     "deployed": "IN PROGRESS",
-    "recette_ok": "TOVALIDATE",
-    "accepted": "VALIDATED",
-    "done": "VALIDATED",
+    "recette_ok": "IN PROGRESS",
+    "accepted": "IN PROGRESS",
+    "done": "TOVALIDATE",
 }
 DEFAULT_LIST_ORDER = ["Backlog", "TODO", "IN PROGRESS", "TOVALIDATE", "VALIDATED"]
 
@@ -256,7 +259,7 @@ class Tracker:
             if current not in order or target not in order:
                 signals.append({**item, "kind": "unmapped-list"})
             elif order.index(current) > order.index(target):
-                accepted = current == order[-1] and least == "recette_ok"
+                accepted = current == order[-1] and least == "done"
                 signals.append({**item, "kind": "reporter-accepted" if accepted else "card-ahead-of-story"})
             elif c.get("lastPushedList") == target:
                 # We already moved it there and a human moved it back: that is feedback, not drift.
@@ -264,6 +267,11 @@ class Tracker:
             else:
                 moves.append(item)
         return {"moves": moves, "signals": signals}
+
+    def forget_push(self, card_id: str) -> dict:
+        """Forget our last push of a card, so a deliberate manual move back is not read as reporter feedback."""
+        self.cards[card_id]["lastPushedList"] = None
+        return {"card": card_id, "shortLink": self.cards[card_id].get("shortLink"), "lastPushedList": None}
 
     def mark_pushed(self, card_id: str, list_name: str) -> None:
         self.cards[card_id]["list"] = list_name

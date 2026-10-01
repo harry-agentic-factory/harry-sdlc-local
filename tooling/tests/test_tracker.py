@@ -33,7 +33,9 @@ def test_card_ref_accepts_url_shortlink_and_id():
 def test_build_config_drops_comments_and_adds_defaults():
     cfg = Tracker.build_config(BLOCK)
     assert "_note" not in cfg
-    assert cfg["statusToList"]["recette_ok"] == "TOVALIDATE"
+    assert cfg["statusToList"]["recette_ok"] == "IN PROGRESS"   # reporter re-tests main, not a branch
+    assert cfg["statusToList"]["accepted"] == "IN PROGRESS"     # promote in flight
+    assert cfg["statusToList"]["done"] == "TOVALIDATE"
     assert cfg["statusToList"]["feature_validated"] == "IN PROGRESS"
     assert cfg["listOrder"][0] == "Backlog"
 
@@ -106,7 +108,7 @@ def test_plan_moves_forward_following_the_least_advanced_story(t):
 
 def test_plan_never_moves_back_and_reports_why(t):
     planned(t, lst="L4")                                   # reporter put it in VALIDATED
-    assert t.plan({"S1": "recette_ok"}.get)["signals"][0]["kind"] == "reporter-accepted"
+    assert t.plan({"S1": "done"}.get)["signals"][0]["kind"] == "reporter-accepted"
     assert t.plan({"S1": "deployed"}.get)["signals"][0]["kind"] == "card-ahead-of-story"
     assert t.plan({"S1": "deployed"}.get)["moves"] == []
 
@@ -115,8 +117,23 @@ def test_plan_does_not_fight_a_human_who_sent_the_card_back(t):
     planned(t)
     t.mark_pushed("c1", "TOVALIDATE")
     t.merge_pull([remote("c1", "AAA", lst="L1")])          # reporter moved it back to TODO
-    plan = t.plan({"S1": "recette_ok"}.get)
+    plan = t.plan({"S1": "done"}.get)
     assert plan["moves"] == [] and plan["signals"][0]["kind"] == "sent-back-by-human"
+
+
+def test_a_story_waiting_for_promote_stays_in_progress(t):
+    planned(t)
+    for status in ("recette_ok", "accepted"):
+        assert [m["to"] for m in t.plan({"S1": status}.get)["moves"]] == ["IN PROGRESS"]
+    assert [m["to"] for m in t.plan({"S1": "done"}.get)["moves"]] == ["TOVALIDATE"]
+
+
+def test_forget_push_lets_a_deliberate_move_back_be_pushed_again(t):
+    planned(t)
+    t.mark_pushed("c1", "TOVALIDATE")
+    t.merge_pull([remote("c1", "AAA", lst="L1")])          # we moved it back on purpose
+    t.forget_push("c1")
+    assert [m["to"] for m in t.plan({"S1": "done"}.get)["moves"]] == ["TOVALIDATE"]
 
 
 def test_plan_reports_an_unknown_story(t):
