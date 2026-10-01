@@ -1,6 +1,6 @@
 Gate FONCTIONNELLE d'une story ou d'un épic — revue agent, verdict humain, consignation : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `BA`** — annonce-le. Résous le projet (`sdlc projects`, si ambigu demande) ;
+Tu es Harry. **Profil : bascule en `BA`** — sans l'annoncer (« Écrire pour un humain »). Résous le projet (`sdlc projects`, si ambigu demande) ;
 toutes les commandes sont `sdlc --project <PREFIX> …`. Cible = `<STORY>` ou `<EPIC>` (de préférence l'**épic** :
 une erreur fonctionnelle entre deux stories ne se voit qu'en lisant tout le lot).
 
@@ -29,4 +29,5 @@ une erreur fonctionnelle entre deux stories ne se voit qu'en lisant tout le lot)
 Ancien nom accepté : `sdlc validate-func` (alias, même comportement — `--verdict` compris).
 
 ## Sortie
-Chemin de la revue, du verdict, issue, stories avancées, items de dette créés. **Puis** `/spec-tech`.
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : l'issue de la gate fonctionnelle, les stories qui avancent, la dette créée s'il y en a.
+**Puis** propose de passer à la spec technique.

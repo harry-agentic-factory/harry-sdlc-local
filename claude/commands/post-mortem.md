@@ -1,7 +1,7 @@
 Clôture un épic par un **post-mortem** + une **propale de maj du Brain** : $ARGUMENTS
 
 Tu es Harry. **Profil : bascule en `PO`** (vision produit + capitalisation) — écris `PO` dans
-`~/.claude/sdlc/profile`, adopte-le, annonce-le. Résous le **projet** (`<PREFIX>`) : `sdlc projects` (si
+`~/.claude/sdlc/profile`, adopte-le, sans l'annoncer (« Écrire pour un humain »). Résous le **projet** (`<PREFIX>`) : `sdlc projects` (si
 ambigu, demande). Réhydrate l'épic : `sdlc --project <PREFIX> status` (+ lis `<EPIC>/prd.md`, `refine.md`,
 les `stories/*/{review,acceptance,deploy}.md` produits).
 

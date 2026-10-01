@@ -1,7 +1,7 @@
 Cadre une nouvelle idée jusqu'à un PRD : $ARGUMENTS
 
 Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), et
-annonce-le en une ligne. L'idée est souvent un **épic**.
+sans l'annoncer (« Écrire pour un humain »). L'idée est souvent un **épic**.
 
 > Exécution autonome (« vas-y en mode loop » / « en auto ») → charge le **skill `loop-engineering`** (actionnable ;
 > version longue `docs/loop-engineering.md`) : couplage loop ↔ state-machine SDLC — un agent par état, boucle
@@ -22,5 +22,6 @@ annonce-le en une ligne. L'idée est souvent un **épic**.
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Le chemin du `prd.md` + un résumé de 3 lignes + la proposition d'enchaîner sur `/refine`.
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : le PRD est écrit, son résumé en 3 lignes, et la proposition de passer au découpage en
+stories.
 Ne code rien. Ne crée pas encore les stories (c'est `/refine`).

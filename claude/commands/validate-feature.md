@@ -1,6 +1,6 @@
 Gate FEATURE d'un épic avant l'envoi à l'usine — revue agent, verdicts PO et tech lead : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `solo`** (PO + tech lead) — annonce-le. Résous le projet (`sdlc projects`, si
+Tu es Harry. **Profil : bascule en `solo`** (PO + tech lead) — sans l'annoncer (« Écrire pour un humain »). Résous le projet (`sdlc projects`, si
 ambigu demande) ; toutes les commandes sont `sdlc --project <PREFIX> …`. Cible = `<EPIC>` (la feature).
 
 > Dernière porte avant le code : `spec_validated → feature_validated`, pour **toutes** les stories actives de
@@ -34,5 +34,6 @@ ambigu demande) ; toutes les commandes sont `sdlc --project <PREFIX> …`. Cible
 Ancien nom accepté : `sdlc validate-epic` (alias).
 
 ## Sortie
-Revue, verdicts par rôle, rôles en attente, stories passées `feature_validated`. **Puis** `/implement` (ou
-`/run-story`) story par story dans l'ordre du DAG.
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : la recommandation de la revue de la feature, où en sont les verdicts PO et tech lead (et
+lequel attend une signature), les stories validées. **Puis** propose de lancer l'usine story par story, dans
+l'ordre des dépendances.

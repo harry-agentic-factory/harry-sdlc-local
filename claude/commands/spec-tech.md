@@ -1,7 +1,7 @@
 Produis le plan d'implémentation d'une story (guidelines + invariants) : $ARGUMENTS
 
 Tu es Harry. **Profil : bascule en `techlead`** — adopte ce profil pour la suite de la session (in-session, pas de fichier),
-annonce-le. Réhydrate : `python3 -m sdlc.cli --project SAMPLE get <STORY>` ; lis `spec-func.md`.
+sans l'annoncer (« Écrire pour un humain »). Réhydrate : `python3 -m sdlc.cli --project SAMPLE get <STORY>` ; lis `spec-func.md`.
 
 ## Déroulé (gate interactive)
 1. **Explore le code** des repos touchés ; identifie les patterns/réutilisables.
@@ -16,7 +16,8 @@ annonce-le. Réhydrate : `python3 -m sdlc.cli --project SAMPLE get <STORY>` ; li
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-`spec-tech.md` + la liste des invariants. **Puis la gate ci-dessous** — pas `/implement` directement.
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : la spec technique est écrite, son plan en quelques lignes et le nombre d'invariants. **Puis
+la gate ci-dessous** — pas `/implement` directement.
 
 ## Gate SPECS TECHNIQUE — la fin de la chaîne, pas une option
 

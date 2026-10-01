@@ -118,5 +118,8 @@ La CLI refuse un verdict en `draft`, un constat sans décision, une version de r
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Progression (décidés / restants par gravité), chemin du verdict, son statut ; si signé : issue, signataire, et la
-commande `sdlc validate-…` jouée avec son résultat.
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : où en est le traitement (combien de constats décidés, ce qui reste par gravité, en mots),
+ce que contient le verdict (corrections appliquées, réserves, dette qui en naîtra), et ce qui l'attend (signer au
+panneau de revue). Si le verdict est signé : l'issue et ce que la signature a débloqué (« la spec fonctionnelle de
+US-1 est validée »). Le chemin du verdict et la commande `sdlc validate-…` jouée ne sont donnés qu'au profil techlead,
+dev ou solo, s'il les demande.
