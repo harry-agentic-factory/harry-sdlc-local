@@ -7,23 +7,16 @@ Enquête sur un signalement jusqu'à établir sa cause : $ARGUMENTS
 
 ## 1. Résous l'entrée — ne devine jamais le tracker
 
-```bash
-sdlc --project <PREFIX> config | jq '{tracker, infra}'
-```
-
-Le bloc `tracker` dit d'où viennent les signalements (type, API, board, credentials, listes, labels).
-**Rien n'est en dur ici** : un autre projet a un autre tracker, voire aucun.
+Le tracker (Trello, …) n'est connu que du CLI **`tracker`** : la SDLC n'en sait rien. Sa config vit
+dans `<workspace>/_tracker/config.json` (`tracker --project <PREFIX> dir`) ; absente →
+`tracker --project <PREFIX> init`. **Rien n'est en dur ici** : un autre projet a un autre tracker, voire aucun.
 
 - **Identifiant de story** (il matche le préfixe du projet) → `sdlc get <STORY>` pour le titre, les
-  repos, le statut et les artefacts déjà produits.
-- **URL ou identifiant court de carte** → extraire le segment après `/c/`, puis lire la carte via
-  l'API du tracker. Les credentials se lisent **dans la commande** :
-  ```bash
-  F=$(sdlc --project <PREFIX> config | jq -r .tracker.credentials)
-  K=$(jq -r .apikey "$F"); T=$(jq -r .token "$F")
-  curl -s "$(sdlc --project <PREFIX> config | jq -r .tracker.api)/cards/<short>?fields=name,desc,idList,labels,shortUrl&key=$K&token=$T" | jq .
-  ```
-  Jamais de `cat`/`Read` sur le fichier, jamais d'URL contenant la clé en sortie.
+  repos, le statut et les artefacts déjà produits ; `tracker --project <PREFIX> show --story <STORY>`
+  pour la ou les cartes d'origine.
+- **URL, identifiant court ou id de carte** → `tracker --project <PREFIX> card <ref>` : nom, liste,
+  labels, description, commentaires, pièces jointes. Les credentials restent dans le CLI : jamais de
+  `cat`/`Read` sur leur fichier, jamais d'URL contenant la clé en sortie.
 
 ## 2. ⚠️ Extrais le SYMPTÔME, pas l'analyse
 
@@ -53,7 +46,9 @@ réels qui figurent dans le signalement. Il résout ses propres accès depuis le
 - Écris `analysis.md` à côté de la story quand il y en a une, et attache-le :
   `sdlc link <STORY> spec_func <chemin>`.
 - Consigne une ligne de journal : `sdlc journal <STORY> --entry "<ce qui a été établi, sans secret>"`.
-- **Pas de story ?** Rends le dossier tel quel et propose d'en créer une — ne crée rien d'office.
+- **Pas de story, mais une carte ?** Écris le dossier dans `<tracker dir>/cards/<shortLink>/fiche.md`
+  et enregistre-le : `tracker --project <PREFIX> instructed <ref> --fiche cards/<shortLink>/fiche.md`.
+  La carte passe `instructed` et entrera dans la prochaine `/bugs-review`. Ne crée aucune story d'office.
 
 ## 5. Restitue en dix lignes, pas en trois pages
 
