@@ -7,6 +7,19 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-01
+
+### Changed
+
+- Persona rule « Écrire pour un humain » (`claude/sdlc/harry.md`, AISDLC-POASSIST-22): every message to the human is
+  written in sentences — no arrows as a writing device, no front-matter fields or internal values, no file paths, no
+  command names; documents named by their title, finding counts in words, end-of-turn recap of at most 5 lines, never
+  about the tooling, register by profile (PO/BA product language; techlead/dev/solo may add technical detail, still in
+  sentences), « tu » by default. Includes a before/after reference example. File formats are unchanged.
+- The `Sortie` sections of `/scope`, `/refine`, `/spec-func`, `/spec-tech`, `/validate-spec-func`,
+  `/validate-spec-tech`, `/validate-feature` and `/process-review` follow that rule (paths and the `sdlc validate-…`
+  command only for the techlead/dev/solo profiles, on request); profile switches are no longer announced.
+
 ## [0.8.0] - 2026-10-01
 
 ### Added

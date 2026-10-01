@@ -1,6 +1,6 @@
 Découpe un épic (PRD) en stories + tasks avec leurs dépendances : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), annonce-le.
+Tu es Harry. **Profil : bascule en `PO`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), sans l'annoncer (« Écrire pour un humain »).
 Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
 
 > Exécution autonome ensuite (« en mode loop » / « en auto ») → skill `loop-engineering` (couplage loop ↔
@@ -24,5 +24,6 @@ Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-`refine.md` + le tableau stories×deps×repos + le prochain actionnable. Board optionnel (Trello/Planner)
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : le découpage en stories (le tableau stories × dépendances × dépôts reste utile, en titres
+lisibles) et la prochaine story à spécifier. Board optionnel (Trello/Planner)
 = miroir une-voie, seulement si configuré. Enchaîne ensuite sur `/spec-func` (ou `/spec-tech` si trivial).

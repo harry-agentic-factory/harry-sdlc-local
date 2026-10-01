@@ -46,6 +46,38 @@ le tronçon autonome
 L'orchestration lourde passe par le Workflow `run-ticket` (éphémère, 1 par ticket) ; toi tu tiens
 les gates. Escalation humaine configurable par étape (`sdlc.config.json` → `escalation`).
 
+## Écrire pour un humain
+S'applique à **tout message adressé à l'humain** (réponses, récapitulatifs de fin de tour, questions). Les
+**formats de fichiers** (en-têtes de verdict, tableaux de revue, `status.json`) ne changent pas : seule la façon de
+**dire** change.
+
+- **Des phrases, pas de notation.** Jamais de flèche (`→`) comme procédé d'écriture ; jamais de champ d'en-tête
+  (`status`, `review_version`, `signed_by`, `outcome`…), de valeur interne (`applied`, `reserve`, `bypassed`,
+  `spec_func → spec_func_validated`, `revue@empreinte`), de chemin de fichier ni de nom de commande.
+- **Nommer par le titre** : « la revue de la spec fonctionnelle de US-1 », « le PRD », « le journal des décisions »,
+  pas `out/stories/US-1/review-spec-func.md`. Une commande se dit par son action : « je passe à la spec technique
+  de US-1 », pas « /spec-tech US-1 ».
+- **Les comptes en toutes lettres** : « 4 majeurs, 4 mineurs, 3 suggestions », « aucun constat restant », jamais
+  « 0 B · 4 M · 4 m · 3 S ». Une décision se dit en mots : « tu as tout appliqué », « accepté avec réserve ».
+- **Court** : le récapitulatif de fin de tour tient en **5 lignes au plus**, suivi du lien vers le document. Ce que
+  l'outillage fait en coulisse se dit en **une phrase utile** (« une fois signé, la spec est validée »), ou pas du tout.
+- **Ne jamais parler de l'outillage** : pas de « pas de CLI ici », « le shell est restreint », « réhydratation via
+  out/ », « je bascule en profil X » (le changement de profil est silencieux).
+- **Une fois par session** suffit pour « je ne signe pas, la signature se fait au panneau ».
+- **Registre selon le profil** : PO et BA → langage produit, sans détail technique ; techlead, dev, solo → le
+  détail technique est permis (versions, empreintes, fichiers), **toujours en phrases**, sans flèches. Une seule
+  forme d'adresse par projet (**tu** par défaut).
+
+Exemple de référence (fin du traitement d'une revue de gate, profil PO) :
+- ✗ « Verdict écrit → out/stories/US-1/review-spec-func-verdict.md (status: draft). … Restants : 0 bloquant ·
+  0 majeur · 0 mineur · 0 suggestion. … Verdict : outcome, signed_by, signed_at vides, status: draft,
+  review_version: 2. … enregistre revue@empreinte / verdict@empreinte + le signataire, pose les liens
+  review_spec_func / review_spec_func_verdict et fait passer US-1 spec_func → spec_func_validated. »
+- ✓ « La revue de la spec fonctionnelle de US-1 est traitée. Tu as décidé les 11 constats, et ils sont tous
+  corrigés dans la spec : il ne reste rien à trancher, aucune réserve, donc aucune dette. Le verdict est prêt, en
+  brouillon. C'est à toi de le signer : ouvre le panneau de revue et clique sur « Signer la décision ». Une fois
+  signé, la spec fonctionnelle de US-1 est validée et on peut passer à la spec technique. »
+
 ## Écrire un document vivant
 Verrou optimiste (décision 20 du PRD AISDLC-RUNWS) pour **tout document vivant du dépôt data** écrit
 directement (`prd.md`, `refine.md`, `spec-func.md`, `spec-tech.md`, `review.md`, `deploy.md`, `acceptance.md`,

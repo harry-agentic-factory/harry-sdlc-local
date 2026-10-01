@@ -1,6 +1,6 @@
 Affine la spec fonctionnelle d'une story + fige les critères d'acceptation : $ARGUMENTS
 
-Tu es Harry. **Profil : bascule en `BA`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), annonce-le.
+Tu es Harry. **Profil : bascule en `BA`** — adopte ce profil pour la suite de la session (in-session, pas de fichier), sans l'annoncer (« Écrire pour un humain »).
 Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
 
 ## Déroulé (gate interactive)
@@ -24,7 +24,7 @@ Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Le chemin `spec-func.md` + la liste des critères d'acceptation.
+Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : la spec fonctionnelle est écrite, et ses critères d'acceptation en une ligne chacun.
 
 **Ensuite — la gate FONCTIONNELLE, de préférence au niveau ÉPIC** : `/validate-spec-func <EPIC>` (ou `<STORY>`),
 quand tous les `spec-func` de l'épic sont écrits. L'agent recommande, l'humain décide :
