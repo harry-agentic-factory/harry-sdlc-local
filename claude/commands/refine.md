@@ -24,6 +24,6 @@ Prends le PRD `sample-proj-sdlc-local/<EPIC>/prd.md`.
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : le découpage en stories (le tableau stories × dépendances × dépôts reste utile, en titres
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : le découpage en stories (le tableau stories × dépendances × dépôts reste utile, en titres
 lisibles) et la prochaine story à spécifier. Board optionnel (Trello/Planner)
 = miroir une-voie, seulement si configuré. Enchaîne ensuite sur `/spec-func` (ou `/spec-tech` si trivial).

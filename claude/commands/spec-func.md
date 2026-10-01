@@ -24,7 +24,7 @@ Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
-Dis à l'humain (règle « Écrire pour un humain » de la persona : en phrases, documents nommés par leur titre, comptes en toutes lettres, sans chemin, sans commande, sans flèche, 5 lignes au plus) : la spec fonctionnelle est écrite, et ses critères d'acceptation en une ligne chacun.
+Dis à l'humain (règle « Écrire pour un humain » de la persona) : la spec fonctionnelle est écrite, et ses critères d'acceptation en une ligne chacun.
 
 **Ensuite — la gate FONCTIONNELLE, de préférence au niveau ÉPIC** : `/validate-spec-func <EPIC>` (ou `<STORY>`),
 quand tous les `spec-func` de l'épic sont écrits. L'agent recommande, l'humain décide :
