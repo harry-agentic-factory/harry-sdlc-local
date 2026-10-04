@@ -7,6 +7,29 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+### Added
+
+- Bug flow driven by an issue tracker, kept out of the SDLC core (the SDLC knows nothing about the tracker):
+  - `tracker` CLI (`bin/tracker`, `tooling/tracker/`), installed next to `sdlc`. Persistence in
+    `<workspace>/_tracker/`, local working storage git-ignored by `tracker init` (the signed review verdict is
+    copied into its epic folder): `config.json` (built once from the manifest `tracker` block by `tracker init`) and
+    `links.json` (one entry per card, never deleted: `new → instructed → reviewed → planned`, human decision,
+    linked stories). Commands: `init`, `dir`, `pull [--nature bug]` (records each card priority as its rank in the list), `card [--download]` (saves uploaded attachments under `_tracker/cards/<card>/attachments/` so the investigators read the screenshots), `show`, `instructed`, `decide`,
+    `link`, `push [--apply] [--comment]`. `push` only moves a card forward, following its least advanced story;
+    a card sent back by a human, accepted by the reporter or ahead of its story is a signal, never a move.
+    Trello adapter; credentials read in-process, never printed.
+  - `bugs-sync` workflow: symptom extraction (the card's own analysis is stripped), one `investigator` per card
+    in waves of 5, then one consolidation pass (cross-card evidence, proof hierarchy, questions capped) that writes
+    `_tracker/reviews/<date>/review-bugs.md`.
+  - Slash commands `/bugs-sync`, `/bugs-review` (same conventions as `/process-review`: prioritised queue,
+    verdict written at each decision, resumable, human signature; then the day's epic with one story per module
+    and one commit per bug), `/bugs-run`, `/bugs-push`, `/bugs-status`, `/bugs-close` (the SDLC data written by the flow lives on a daily branch `bugs/<date>` of the data repo, closed by a merge request).
+
+### Changed
+
+- `/investigate` reads a card through `tracker card` instead of calling the tracker API with the manifest
+  credentials, and records a card-only investigation with `tracker instructed`.
+
 ## [0.8.0] - 2026-09-27
 
 ### Added
