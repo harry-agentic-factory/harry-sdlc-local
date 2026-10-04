@@ -41,7 +41,8 @@ se corrompent** (un login écrase l'autre → assertions faussées).
 ## 3. Discipline (charge `agent-resilience`)
 - **Contexte maigre** : un snapshot peut être gros → **cible la région** (ref d'élément), n'embarque pas
   toute la page. Filtre.
-- `acceptance.md` = **journal horodaté, le plus récent en tête** (prepend), écrit **au fil de l'eau**.
+- `acceptance.md` = **journal, le plus récent en tête** (ajout en tête), écrit **au fil de l'eau**, au format FIXE de
+  la skill `recette` (Recap, Environnement et méthode, Verdict par AC, Repro).
 - Sur **KO** : bundle repro dans `repro/` — `steps.md`, `browser_snapshot`, `browser_console_messages`,
   `browser_network_requests`. C'est ce que le fixer rejouera.
 - **Fichiers temp dans le scratch de la bulle, jamais `/tmp`.** Jamais de secret/creds affiché.

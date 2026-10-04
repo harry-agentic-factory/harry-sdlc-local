@@ -73,3 +73,34 @@ def test_all_tickets_tolerates_unknown_status_fields(tmp_path):
     assert [t.id for t in tickets] == ["E-1"]
     assert tickets[0].supersededBy == "E-2"             # known extra fields round-trip
     assert ws.load("E-1").supersededReason == "absorbed"
+
+
+# --- engine 0.8.3: fixed deliverable sections --------------------------------------------------------------------
+
+def test_epic_scaffolds_carry_the_fixed_sections_in_order(tmp_path):
+    import re
+    from pathlib import Path
+
+    from sdlc.workspace import DELIVERABLE_SECTIONS, Workspace
+
+    d = Workspace(tmp_path).create_epic("E-1", "Titre")
+    for name in ("prd.md", "refine.md"):
+        text = (d / name).read_text()
+        assert len(re.findall(r"(?m)^# ", text)) == 1, name
+        assert re.findall(r"(?m)^## (.+)$", text) == list(DELIVERABLE_SECTIONS[name]), name
+    # the same names as the command templates (one source of truth for the scaffold and the prompts)
+    commands = Path(__file__).resolve().parents[2] / "claude" / "commands"
+    for name, command in (("prd.md", "scope"), ("refine.md", "refine"), ("spec-func.md", "spec-func"),
+                          ("spec-tech.md", "spec-tech")):
+        template = (commands / f"{command}.md").read_text().split("```markdown", 1)[1].split("```", 1)[0]
+        assert re.findall(r"(?m)^## (.+)$", template) == list(DELIVERABLE_SECTIONS[name]), command
+
+
+def test_story_stubs_stay_unproduced(tmp_path):
+    from sdlc.status_report import _artifacts
+    from sdlc.workspace import Ticket, Workspace
+
+    ws = Workspace(tmp_path)
+    ws.create_epic("E-1", "Titre")
+    d = ws.create_story(Ticket(id="E-1-1", epic="E-1", title="t"))
+    assert not any(a["produced"] for a in _artifacts(d))

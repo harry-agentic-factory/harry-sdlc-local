@@ -10,8 +10,44 @@ sans l'annoncer (« Écrire pour un humain »). Réhydrate : `python3 -m sdlc.cl
    voilà la solution ».
 3. **Invariants** (OBLIGATOIRE) : les garde-fous anti-régression, **assertions vérifiables sur un
    diff**. Ce sont eux qui deviennent la **checklist du reviewer**. Sois exhaustif et précis.
-4. **Écris** `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/spec-tech.md` (Plan / Fichiers par repo / Invariants).
+4. **Écris** `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/spec-tech.md` au **format FIXE** ci-dessous.
 5. **Avance** : `set-status <STORY> spec_tech`.
+
+## Format FIXE de `spec-tech.md`
+Règle « Format des livrables » de la persona : un seul titre `#`, puis exactement ces sections `##`, dans cet ordre,
+sans suffixe. Les invariants restent le tableau habituel ; le plan a **un `###` par dépôt** touché :
+
+```markdown
+# <STORY> — <titre>
+
+## Invariants
+
+| id | Énoncé | Contrôle sur diff | Portée |
+|---|---|---|---|
+| I1 | <garde-fou> | <assertion vérifiable sur le diff> | <dépôt, fichiers> |
+
+## Plan par repo
+
+### <dépôt>
+<où brancher, nouveaux contrôleurs/services/entités, contrats d'API, migrations, fichiers>
+
+### <autre dépôt>
+<…>
+
+## Tests
+<tests à écrire ou à jouer au build, dont ceux de la spec fonctionnelle>
+
+## Sources
+<spec fonctionnelle, Brain, code>
+```
+
+N'écris pas « Invariants (checklist du reviewer) » ni aucune autre variante : écris `## Invariants`. N'écris pas
+« Fichiers par repo », « Plan d'implémentation » ni « Plan » : écris `## Plan par repo`, avec un `###` par dépôt (un
+plan en étapes va dans le `###` du dépôt qu'il touche). N'écris pas « Tests (must-run) » : écris `## Tests`. Rien
+d'autre au niveau `##` : « Contrat API », « Constat du code », « Décisions de la gate technique », « Points
+d'attention », « Risques et retour arrière », « Plan de commits », « Branches et déploiement » sont des `###` sous
+Plan par repo (ou sous Invariants pour un écart vs la spec fonctionnelle). Une spec existante écrite autrement : à sa
+réécriture, ses sections sont renommées vers ces noms et leur contenu y est rangé, sans rien perdre.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

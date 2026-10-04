@@ -36,8 +36,11 @@ chargés (ex. `🧩 skills: <repo> (java-spring) → rest-best-practices, spring
    re-run le scénario **en local** jusqu'au vert. **Boucle rapide, zéro redeploy.**
 4. **Commit + PUSH** sur la branche de la story : `git push origin <BRANCH>` (jamais sur une branche protégée).
    Le re-deploy cible un **SHA poussé** — un fix committé mais non poussé ne sera **pas** redéployé/recetté.
-5. Écris un court `implement.md` : **PREPEND en tête** (journal horodaté, récent en premier, n'écrase pas — cf. skill `agent-resilience`) un bloc `## Recap` (fixed oui/non + cause racine en
-   1 ligne + `commit` + `agent: fixer` + horodatage), puis le détail. Le `## Recap` est lu par `sdlc status`.
+5. Écris dans `implement.md` : **ajoute en tête** (sous le titre ; journal, récent en premier, n'écrase pas — cf.
+   skill `agent-resilience`) le bloc de ta passe au format FIXE (règle « Format des livrables » de la persona), exactement ces sections `##` dans
+   cet ordre : `## Recap` (fixed oui/non + cause racine en 1 ligne + `commit` + `agent: fixer` + horodatage),
+   `## Commits`, `## Fichiers par repo`, `## Build et tests`, `## Décisions d'implémentation`. Le `## Recap` est lu
+   par `sdlc status`.
    Si un invariant manquait, propose
    de l'ajouter au `spec-tech.md`.
 

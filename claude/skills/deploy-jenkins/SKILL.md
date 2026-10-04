@@ -185,8 +185,11 @@ et poll de même. **Ne lis jamais** le résultat via `-L`/redirect.
 - Note la version cible et la raison.
 
 ## 9. Trace (le contrat SDLC)
-Écris `deploy.md` — **PREPEND en tête** (journal horodaté, récent en premier, n'écrase pas — cf. skill `agent-resilience`) un bloc `## Recap` (ok/ko + `version/tag`, ns, `agent: deployer`,
-horodatage), puis le détail (image, ns, job, build#, stratégie). Le `## Recap` est ce que lit `sdlc status`.
+Écris `deploy.md` — **ajoute en tête** (sous le titre ; journal, récent en premier, n'écrase pas — cf. skill
+`agent-resilience`) le bloc de ta passe au format FIXE (règle « Format des livrables » de la persona), exactement ces sections `##` dans cet ordre :
+`## Recap` (ok/ko + `version/tag`, ns, `agent: deployer`, horodatage), `## Détail` (SHA buildé, image, ns, job,
+build#, stratégie, santé), `## Retour arrière` (la version de repli et comment y revenir). Le `## Recap` est ce que
+lit `sdlc status`.
 Enregistre l'artefact :
 ```bash
 sdlc --project <PREFIX> link <STORY> deploy <EPIC>/stories/<STORY>/deploy.md

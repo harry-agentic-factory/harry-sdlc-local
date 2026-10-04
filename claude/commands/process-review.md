@@ -97,6 +97,11 @@ signed_at:
 ## Signatures précédentes
 ```
 
+**Format FIXE** (règle « Format des livrables » de la persona) : le front matter ci-dessus, un seul titre `#`, puis
+exactement ces quatre sections `##`, dans cet ordre, sans suffixe et sans autre section : `## Décisions`,
+`## Ajouts humains`, `## Discussions` (un `### <id>` par point discuté), `## Signatures précédentes`. Une section
+vide reste présente.
+
 Le verdict **référence** les constats par id, il ne les recopie pas. Seul l'agent auteur amende la revue : tu n'écris
 jamais dans la revue ; une correction de spec après décision appelle une **revue ciblée** (nouvelle version) de
 `harry-archi`.

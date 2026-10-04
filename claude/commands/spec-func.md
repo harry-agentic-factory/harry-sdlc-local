@@ -14,12 +14,42 @@ Réhydrate le ticket : `python3 -m sdlc.cli --project SAMPLE get <STORY>`.
      HTTP, valeur de champ, compte). Un AC sans Must-validate exécutable est incomplet.
    - **Quand un AC rejoue un bug signalé**, marque-le « reproduction obligatoire du bug » : ce test DOIT passer
      au vert avant clôture.
-   - **Section « Tests obligatoires au build (must-run) »** : liste les tests unit/IT/e2e/non-reg à jouer
+   - **Section « Tests obligatoires au build »** (les *must-run*) : liste les tests unit/IT/e2e/non-reg à jouer
      (+ assertions sur le diff : grep, invariants) — ce sont des *gates*, pas des optionnels.
    - But : rendre la recette **explicite et reproductible** (finies les assertions vagues « ça s'affiche »).
-3. **Écris** `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/spec-func.md` (Comportement + Critères G/W/T
-   **avec un 🔬 Must-validate par AC** + section « Tests obligatoires au build »).
+3. **Écris** `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/spec-func.md` au **format FIXE** ci-dessous.
 4. **Avance l'état** : `python3 -m sdlc.cli --project SAMPLE set-status <STORY> spec_func`.
+
+## Format FIXE de `spec-func.md`
+Règle « Format des livrables » de la persona : un seul titre `#`, puis exactement ces sections `##`, dans cet ordre,
+sans suffixe (pas de « (Given/When/Then) » ni de « (must-run) » dans les titres) :
+
+```markdown
+# <STORY> — <titre>
+
+## Comportement
+<comportements, cas limites, messages, droits>
+
+## Critères d'acceptation
+- **AC1** — Given <contexte>, When <action>, Then <résultat attendu>.
+  - 🔬 Must-validate : <appel exact ou étape UI>, identité <compte de recette>, assertion <valeur chiffrée>.
+- **AC2** — Given …, When …, Then ….
+  - 🔬 Must-validate : ….
+
+## Tests obligatoires au build
+<tests unit/IT/e2e/non-reg à jouer + assertions sur le diff>
+
+## Sources
+<PRD, refine, Brain, code>
+```
+
+Exactement **un** « 🔬 Must-validate » sous **chaque** critère. N'écris pas « Comportement attendu » ni
+« Comportement (cible) » : écris `## Comportement`. N'écris pas « Critères d'acceptation (Given/When/Then) », « (G/W/T) »
+ni « Acceptance » : écris `## Critères d'acceptation`. N'écris pas « Tests obligatoires au build (must-run) » ni
+« Tests » : écris `## Tests obligatoires au build`. Rien d'autre au niveau `##` : « Contexte », « Objectif », « User
+stories », « Droits », « Cas limites », « Hors périmètre », « Décisions prises en l'absence du PO », « Points pour la
+spec technique » sont des `###` sous Comportement. Une spec existante écrite autrement : à sa réécriture, ses
+sections sont renommées vers ces noms et leur contenu y est rangé, sans rien perdre.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

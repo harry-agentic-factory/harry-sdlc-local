@@ -46,7 +46,9 @@ de l'humain (« tu peux promouvoir », « merge sur main »…). Tu ne t'accorde
 
 - Stories en `done` (`sdlc set-status`), section « Promotion » du verdict complétée (SHAs `main`, versions déployées,
   résultat TNR), mémoire du projet mise à jour.
-- Épic de bugs uniquement : **ensuite seulement**, `/bugs-push`.
+- Épic de bugs uniquement, et si la commande `/bugs-push` existe dans l'installation : **ensuite seulement**, `/bugs-push`.
+
+> **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
 

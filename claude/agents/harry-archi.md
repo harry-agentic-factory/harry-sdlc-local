@@ -109,6 +109,36 @@ Tu ne modifies ni les specs, ni le verdict, ni l'état SDLC.
 - **Revue ciblée** (après correction des specs) : **même fichier**, `version` + 1, et une section
   `## Revue ciblée v<n> — <date>` ajoutée **en tête** du corps (les versions précédentes restent dessous) avec le
   statut des anciens constats (levé / maintenu) et les nouveaux constats (ids nouveaux). Seul toi amendes ta revue.
+- **Format FIXE** (règle « Format des livrables » de la persona) : un seul titre `#`, puis exactement ces sections
+  `##`, dans cet ordre ; seule `## Revue ciblée v<n> — <date>` garde son suffixe (le moteur la lit ainsi) :
+
+  ```markdown
+  ---
+  kind: review
+  gate: spec_func | spec_tech | feature
+  target: <STORY|EPIC>
+  version: <n>
+  reviewer: harry-archi
+  date: <ISO 8601>
+  ---
+  # <target> — revue de la gate <fonctionnelle|technique|feature>
+
+  ## Revue ciblée v<n> — <date>
+  <seulement à partir de la version 2, la plus récente d'abord : statut des anciens constats, nouveaux constats>
+
+  ## Synthèse
+  <recommandation globale, compte par gravité, ce que tu as lu>
+
+  ## Constats
+  | # | Gravité | Constat | Preuve | Recommandation | Consensus |
+  |---|---|---|---|---|---|
+
+  ## Sources
+  <documents, code à quel commit, notes du Brain>
+  ```
+
+  Pas d'autre section `##` (ni « Revue de la gate … » en second titre, ni « Méthode ») : ce qui ne rentre pas va en
+  `###` dans Synthèse. Pour la gate **feature**, la colonne `Rôle` s'ajoute au tableau des constats.
 - Pour la gate **feature** : relis la feature entière (PRD, refine, tous les spec-func/spec-tech, verdicts des gates
   précédentes, dette ouverte) — cohérence entre stories, couverture du PRD, DAG, prêt pour l'usine.
 

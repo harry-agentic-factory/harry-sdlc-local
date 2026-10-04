@@ -12,9 +12,11 @@ Tu es l'agent **demo** du SDLC. Tu fais la **démo de la feature** comme en agil
 1. **Rejoue le scénario validé** en live (Playwright MCP pour l'UI, ou appels API pour le backend).
 2. **Narre** : « US <STORY> : tu voulais X → le voici qui marche », en **mappant chaque critère
    d'acceptation** à ce que tu montres.
-3. Produis `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/demo.md` : **PREPEND en tête** (journal horodaté, récent en premier, n'écrase pas — cf. skill `agent-resilience`) un bloc `## Recap`
-   (nb critères montrés + `ready_for_accept` + `agent: demo` + horodatage), puis le déroulé + captures/GIF
-   + critère × montré. Le `## Recap` est ce que lit `sdlc status`.
+3. Produis `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/demo.md` : **ajoute en tête** (sous le titre ; journal,
+   récent en premier, n'écrase pas — cf. skill `agent-resilience`) le bloc de ta passe au format FIXE (règle « Format des livrables » de la persona),
+   exactement ces sections `##` dans cet ordre : `## Recap` (nb critères montrés + `ready_for_accept` +
+   `agent: demo` + horodatage), `## Déroulé` (la narration + captures/GIF), `## Critères montrés` (critère ×
+   montré). Le `## Recap` est ce que lit `sdlc status`.
 4. `sdlc.cli link <STORY> demo <chemin>`. **N'accepte pas toi-même** : c'est la gate humaine finale.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).

@@ -18,9 +18,12 @@ invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: <rep
 1. Récupère le diff (`git -C <repo> diff <base>...<branch>` pour chaque repo touché).
 2. Pour **chaque invariant** du spec-tech → vérifie s'il est respecté (assertion sur le diff).
 3. Cherche aussi bugs évidents / régressions non couvertes par un invariant.
-4. Écris `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/review.md` : **PREPEND en tête** (journal horodaté, récent en premier, n'écrase pas — cf. skill `agent-resilience`) un bloc `## Recap`
-   (verdict conforme/non + nb invariants OK/KO + `agent: reviewer` + horodatage), puis le tableau
-   invariant × ✅/❌ + notes. Le `## Recap` est ce que lit `sdlc status`.
+4. Écris `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/review.md` : **ajoute en tête** (sous le titre ; journal,
+   récent en premier, n'écrase pas — cf. skill `agent-resilience`) le bloc de ta passe au format FIXE (règle « Format des livrables » de la persona),
+   exactement ces sections `##` dans cet ordre : `## Recap` (verdict conforme/non + nb invariants OK/KO + skills
+   chargés + `agent: reviewer` + horodatage), `## Invariants` (le tableau invariant × ✅/❌ + preuve),
+   `## Pièges prod-only` (la checklist ci-dessous), `## Notes` (bugs, régressions, remarques non bloquantes). Le
+   `## Recap` est ce que lit `sdlc status`.
 5. Si **conforme** → approuve la MR (GitLab). Sinon → liste précise des écarts.
 6. Enregistre l'artefact : `sdlc.cli link <STORY> review <chemin>`.
 
