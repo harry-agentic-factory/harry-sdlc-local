@@ -7,6 +7,40 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-04
+
+### Added
+
+- `/promote <EPIC>`: closes an epic after the human go (signed verdict, `/doc-feature` on every touched repo, merge
+  of the epic trunks into `main`, rebuild and deploy from `main`, full e2e non-regression, stories `done`). The
+  `/bugs-push` step runs only when that command is installed. It points to the living-document rule like the other
+  writers.
+
+### Changed
+
+- Fixed deliverable formats: every document written by the commands and agents has exactly one `#` title and
+  fixed `##` sections, with exact names, in order, without suffix; anything else is a `###` inside the matching
+  section. Persona rule « Format des livrables » (`claude/sdlc/harry.md`) with the table of types and the headings
+  Harry tended to write instead (from the HIA and Talenteo history), and one template per writer:
+  - `/scope` `prd.md`: Contexte, Besoin, Périmètre, Hors périmètre, Critères de succès, Sources;
+  - `/refine` `refine.md`: Stories (the `| Story | Titre | Deps | Repos |` table, then one
+    `### <STORY> — <titre> · deps: … · repos: …` per story), Ordre suggéré, Protocole de branches, Sources;
+  - `/spec-func` `spec-func.md`: Comportement, Critères d'acceptation (Given/When/Then, one « 🔬 Must-validate » per
+    criterion), Tests obligatoires au build, Sources;
+  - `/spec-tech` `spec-tech.md`: Invariants (the `| id | Énoncé | Contrôle sur diff | Portée |` table), Plan par repo
+    (one `###` per repo), Tests, Sources; `/full-spec` uses the same four templates;
+  - gate reviews (`harry-archi`): Revue ciblée v<n> — <date> (from version 2), Synthèse, Constats, Sources; verdicts
+    (`/process-review`): Décisions, Ajouts humains, Discussions, Signatures précédentes. Front matter, finding table,
+    `Rôle` column, `## Revue ciblée` and the `## Décisions` table are unchanged (read by `tooling/sdlc/gates.py`);
+  - step journals, one block per pass added at the top under the title, `## Recap` first (read by `sdlc status`):
+    `implement.md` (Recap, Commits, Fichiers par repo, Build et tests, Décisions d'implémentation), `review.md`
+    (Recap, Invariants, Pièges prod-only, Notes), `deploy.md` (Recap, Détail, Retour arrière), `acceptance.md`
+    (Recap, Environnement et méthode, Verdict par AC, Repro), `demo.md` (Recap, Déroulé, Critères montrés). The
+    `agent-resilience` journal convention drops the dated `## <ISO 8601> — …` heading (the timestamp is in the Recap).
+  - An existing document is renamed to these sections at its next rewrite, without losing content.
+- `sdlc create-epic` scaffolds `prd.md` and `refine.md` with these sections (`workspace.DELIVERABLE_SECTIONS`);
+  story stubs stay a single title line (`sdlc status` counts a longer file as produced).
+
 ## [0.8.2] - 2026-10-01
 
 ### Changed

@@ -13,6 +13,21 @@ from pathlib import Path
 STORY_MD = ("spec-func.md", "spec-tech.md", "implement.md", "review.md",
             "deploy.md", "acceptance.md", "demo.md")
 
+# Fixed sections of the deliverables, in order (persona rule « Format des livrables » and the
+# templates of /scope, /refine, /spec-func, /spec-tech). The scaffolds below use exactly these.
+DELIVERABLE_SECTIONS: dict[str, tuple[str, ...]] = {
+    "prd.md": ("Contexte", "Besoin", "Périmètre", "Hors périmètre", "Critères de succès", "Sources"),
+    "refine.md": ("Stories", "Ordre suggéré", "Protocole de branches", "Sources"),
+    "spec-func.md": ("Comportement", "Critères d'acceptation", "Tests obligatoires au build", "Sources"),
+    "spec-tech.md": ("Invariants", "Plan par repo", "Tests", "Sources"),
+}
+
+
+def _scaffold(title: str, name: str) -> str:
+    """One `#` title, then the fixed `##` sections of the deliverable, empty."""
+    body = "".join(f"## {s}\n\n" for s in DELIVERABLE_SECTIONS[name])
+    return f"# {title}\n\n{body}".rstrip("\n") + "\n"
+
 
 @dataclass
 class Ticket:
@@ -59,14 +74,16 @@ class Workspace:
     def create_epic(self, epic: str, title: str) -> Path:
         d = self.epic_dir(epic)
         (d / "stories").mkdir(parents=True, exist_ok=True)
-        _write_if_absent(d / "prd.md", f"# {epic} — {title}\n\n## Context\n\n## Besoin\n")
-        _write_if_absent(d / "refine.md", f"# {epic} — refine\n\n## Stories\n\n## Ordre suggéré\n")
+        _write_if_absent(d / "prd.md", _scaffold(f"{epic} — {title}", "prd.md"))
+        _write_if_absent(d / "refine.md", _scaffold(f"{epic} — refine", "refine.md"))
         _write_if_absent(d / "_index.md", f"# {epic} — board\n\n| Story | Statut | MR | Déploiement |\n|---|---|---|---|\n")
         return d
 
     def create_story(self, ticket: Ticket) -> Path:
         d = self.story_dir(ticket.epic, ticket.id)
         d.mkdir(parents=True, exist_ok=True)
+        # Story stubs stay a single title line: `sdlc status` counts an artifact as produced as soon as it
+        # has more than one non-empty line (status_report._artifacts). The sections come with the first write.
         for name in STORY_MD:
             _write_if_absent(d / name, f"# {ticket.id} — {name.removesuffix('.md')}\n")
         self._save(ticket)

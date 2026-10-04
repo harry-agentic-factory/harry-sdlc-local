@@ -15,7 +15,7 @@ ambigu demande) ; toutes les commandes sont `sdlc --project <PREFIX> …`. Cible
    spec-func et spec-tech, verdicts des gates précédentes) : cohérence entre stories, couverture du PRD, DAG,
    dette acceptée jusqu'ici. Il écrit `<EPIC>/review-feature.md`, avec une colonne **`Rôle`** qui attribue chaque
    constat : `| # | Rôle | Gravité | Constat | Preuve | Recommandation | Consensus |`, valeurs `po`, `techlead` ou
-   `po+techlead` (les deux).
+   `po+techlead` (les deux). Format FIXE (Revue ciblée, Synthèse, Constats, Sources), comme les autres revues.
 3. **Traitement humain, par rôle** : `/process-review <EPIC>/review-feature.md --role po` puis `--role techlead`
    (dans la même session ou plus tard) → `<EPIC>/review-feature-verdict-po.md` et
    `<EPIC>/review-feature-verdict-techlead.md`, chacun `draft` puis **signé** par la personne du rôle.

@@ -47,7 +47,8 @@ taille.** Applique cette discipline **du début à la fin** :
 9. **Émets un heartbeat (obligatoire pour être ping-able).** Le ping orchestrateur repose sur le **mtime** de
    ta sortie, qui n'avance qu'à chaque appel d'outil. Donc : **AVANT toute op potentiellement longue**
    (build, déploiement, attente CI, gros poll) et **au moins toutes les ~5 min**, écris une **ligne de
-   heartbeat** dans ton artefact d'étape — ex. `PREPEND` `- <ISO 8601> ⏳ <ce que je fais / j'attends>`. Sans
+   heartbeat** dans ton artefact d'étape — ex. une puce `- <ISO 8601> ⏳ <ce que je fais / j'attends>` en tête du
+   `## Recap` de ta passe en cours (jamais au-dessus du titre `#`). Sans
    heartbeat, une op longue mais saine peut être prise pour un gel (faux positif) ; avec, un vrai gel est
    détecté vite. Un `safe_run.sh`/poll borné suffit à faire avancer le mtime — mais trace quand même l'étape.
 10. **Commit-early — sécurise le travail qui compile AVANT de continuer.** Si tu écris du code (fixer,
@@ -109,12 +110,15 @@ de les surveiller. Protocole **obligatoire** pour tout agent long lancé en dire
 > que l'agent tourne (OK) et n'a pas notifié sa fin, son verdict est inconnu.
 
 ## Artefacts = journal horodaté, le plus RÉCENT en tête
-Ton artefact d'étape (`review.md` / `deploy.md` / `implement.md` / `acceptance.md`) est un **journal**,
-pas un fichier écrasable. À chaque run :
-- **PREPEND** une section datée en **tête** : `## <ISO 8601> — <résumé 1 ligne>` (newest-first), puis le
-  détail. **N'écrase JAMAIS** les entrées précédentes (v1/v2, itérations de fix-loop) — elles descendent.
-- Le bloc du **haut** = le run **le plus récent** → un `## Recap` en tête reflète toujours le dernier état,
-  et `sdlc status` lit cette tête.
+Ton artefact d'étape (`review.md` / `deploy.md` / `implement.md` / `acceptance.md` / `demo.md`) est un
+**journal**, pas un fichier écrasable. À chaque run :
+- **Ajoute en tête**, juste sous le titre `#` (écrit une fois), le **bloc de ta passe** au format FIXE de son type
+  (règle « Format des livrables » de la persona) : `## Recap` d'abord (résultat en 1 à 3 lignes, `agent: <rôle>`,
+  horodatage ISO 8601), puis les autres sections `##` du type, dans l'ordre. Pas de titre daté
+  (`## <ISO 8601> — …`) : l'horodatage est dans le Recap. **N'écrase JAMAIS** les blocs précédents (v1/v2,
+  itérations de fix-loop) — ils descendent.
+- Le bloc du **haut** = le run **le plus récent** → son `## Recap` reflète toujours le dernier état, et
+  `sdlc status` lit ce premier Recap.
 - Même sémantique que `journal.md` (décisions de gate) : historique préservé, lecture immédiate du récent.
 
 > Les skills d'étape (`recette`, `deploy-jenkins`, …) et les agents longs (recetteur, deployer, fixer)

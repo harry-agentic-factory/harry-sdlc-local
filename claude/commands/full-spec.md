@@ -18,25 +18,28 @@ Résous d'abord le **projet** (`<PREFIX>`) : `sdlc projects` (si ambigu, demande
 ## Déroulé (une passe, dans l'ordre)
 
 ### 1. PO — PRD (le besoin)
-Écris `<EPIC>/prd.md` : **Context / Problème / Besoin / Périmètre (repos) / Hors-scope / Critères de
-succès**. Alloue l'ID épic (`<PREFIX>-<n>`). Puis `sdlc --project <PREFIX> create-epic <EPIC> "<titre>"`.
+Écris `<EPIC>/prd.md` au **format FIXE** de `/scope` (`## Contexte`, `## Besoin`, `## Périmètre`,
+`## Hors périmètre`, `## Critères de succès`, `## Sources`). Alloue l'ID épic (`<PREFIX>-<n>`). Puis `sdlc --project <PREFIX> create-epic <EPIC> "<titre>"`.
 
 ### 2. PO — Refine (les stories + le DAG)
 Découpe en **stories** (1 task/story ; simple = 1 story). Établis les **dépendances** (DAG **sans cycle**),
 l'ordre, ce qui va en parallèle, et les **repos touchés** par story. Écris `<EPIC>/refine.md`
-(liste + `deps:` + ordre). Crée chaque ticket :
+au **format FIXE** de `/refine` (`## Stories` avec le tableau puis un `### <STORY> — <titre> · deps: … · repos: …`
+par story, `## Ordre suggéré`, `## Protocole de branches`, `## Sources`). Crée chaque ticket :
 `sdlc --project <PREFIX> create-ticket <EPIC> <STORY> "<titre>" --deps a,b --repos x,y`.
 Vérifie : `sdlc --project <PREFIX> next <EPIC>` renvoie bien les stories sans dépendances d'abord.
 
 ### 3. Pour CHAQUE story, dans l'ordre du DAG
 **a. BA — spec-func** (sauf si triviale → skip en le **notant**) : comportement, cas limites, messages,
 droits, puis **critères d'acceptation en Given/When/Then** machine-checkables (ce que le recetteur
-vérifiera). Écris `<EPIC>/stories/<STORY>/spec-func.md`, puis `set-status <STORY> spec_func`.
+vérifiera). Écris `<EPIC>/stories/<STORY>/spec-func.md` au **format FIXE** de `/spec-func` (`## Comportement`,
+`## Critères d'acceptation` avec un « 🔬 Must-validate » par critère, `## Tests obligatoires au build`, `## Sources`), puis `set-status <STORY> spec_func`.
 
 **b. techlead — spec-tech** : explore le code (patterns réutilisables), **plan d'implémentation**
 (guidelines, PAS le code : contrôleurs/services/entités, où brancher, contrats d'API, migrations,
 cross-repo) + **Invariants OBLIGATOIRES** (garde-fous anti-régression, **assertions vérifiables sur un
-diff** = la checklist du reviewer). Écris `<EPIC>/stories/<STORY>/spec-tech.md`, `link <STORY> spec_tech
+diff** = la checklist du reviewer). Écris `<EPIC>/stories/<STORY>/spec-tech.md` au **format FIXE** de `/spec-tech` (`## Invariants` en
+tableau, `## Plan par repo` avec un `###` par dépôt, `## Tests`, `## Sources`), `link <STORY> spec_tech
 <chemin>`, puis `set-status <STORY> spec_tech`.
 
 ### 4. Gates, puis suite

@@ -12,7 +12,8 @@ toutes les commandes sont `sdlc --project <PREFIX> …`. Cible = `<STORY>` ou `<
 1. **État** : les stories visées doivent être en `spec_tech`.
 2. **Revue agent** : `harry-archi` en **mode document de revue** sur les `spec-tech.md` (plan, invariants, tests),
    confrontés au **code réel** et au Brain. Il écrit `<EPIC>/review-spec-tech.md` (épic) ou
-   `<EPIC>/stories/<STORY>/review-spec-tech.md` (story). Après correction : **revue ciblée** = nouvelle version.
+   `<EPIC>/stories/<STORY>/review-spec-tech.md` (story), au format FIXE (Revue ciblée, Synthèse, Constats, Sources).
+   Après correction : **revue ciblée** = nouvelle version.
 3. **Traitement humain** : `/process-review <chemin de la revue>` → `review-spec-tech-verdict.md`, `draft` puis
    **signé par l'humain**.
 4. **Consignation** (verdict `status: signed` seulement) :

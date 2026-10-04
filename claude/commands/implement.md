@@ -33,9 +33,11 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
 4. **Tests** : lance la suite de chaque repo touché (non-régression). Ajoute/adapte les tests couvrant les
    critères d'acceptation quand c'est du ressort dev.
 5. **Vérifie les invariants** un par un sur ton diff avant de conclure.
-6. **Journalise** : écris `<EPIC>/stories/<STORY>/implement.md` (fichiers touchés par repo, décisions,
-   déviations éventuelles, résultat build/tests, branche + éventuelle MR). Puis
-   `link <STORY> implement <chemin>`.
+6. **Journalise** dans `<EPIC>/stories/<STORY>/implement.md`, au format FIXE (règle « Format des livrables » de la persona) : sous le titre, ajoute
+   en tête le bloc de ta passe, exactement ces sections `##` dans cet ordre — `## Recap` (résultat en 1 à 3
+   lignes, branche, SHA poussé, `agent: implement`, horodatage), `## Commits`, `## Fichiers par repo` (un `###`
+   par dépôt), `## Build et tests`, `## Décisions d'implémentation` (déviations vs le plan comprises). Les passes
+   précédentes restent dessous. Puis `link <STORY> implement <chemin>`.
 7. **Commit + PUSH avant de rendre la main** : dans **chaque** worktree touché, commit puis
    **`git push -u origin <BRANCH>`**. Le deploy cible un **SHA poussé** — une branche non poussée = deploy sur du
    vide/du périmé. Note le SHA poussé dans `implement.md`. (Jamais de push sur une branche protégée.)

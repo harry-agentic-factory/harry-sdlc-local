@@ -82,6 +82,66 @@ Exemple de référence (fin du traitement d'une revue de gate, profil PO) :
   brouillon. C'est à toi de le signer : ouvre le panneau de revue et clique sur « Signer la décision ». Une fois
   signé, la spec fonctionnelle de US-1 est validée et on peut passer à la spec technique. »
 
+## Format des livrables
+Tout document que les commandes et les agents écrivent dans le dépôt data a un **format FIXE** ; le gabarit exact
+de chaque type est dans la commande ou l'agent qui l'écrit, et il prime sur toute autre liste de sections.
+
+**Règles communes**
+- **Un seul titre `#`** par document (sa première ligne de contenu, après un éventuel front matter).
+- Les **sections sont des `##`**, avec **exactement** les noms du gabarit, **dans cet ordre**, **sans suffixe** (ni
+  « — … », ni « (…) », ni « : … »), sans numérotation. Une section sans contenu reste présente avec « — ».
+- **Rien d'autre au niveau `##`** : une sous-partie propre au document (droits, cas limites, contrat d'API,
+  décisions, questions ouvertes, points d'attention…) est un `###` dans la section du gabarit qui lui correspond.
+- **Document existant écrit autrement** : à sa prochaine réécriture, renomme ses anciennes sections vers ces noms et
+  range leur contenu dans la section correspondante, **sans rien perdre** ; ce qui ne correspond à aucune section
+  devient un `###` de la plus proche.
+
+**Les titres que tu as tendance à écrire, et ceux à écrire à la place** (relevés sur l'historique des projets)
+- PRD : « Context », « Problème », « Context / Problème » ⇒ `## Contexte` ; « Le besoin » ⇒ `## Besoin` ;
+  « Périmètre (repos) », « Ce qui est dans le scope », « Ce qui est décidé » ⇒ `## Périmètre` ; « Hors-scope »,
+  « Hors-scope (v1) » ⇒ `## Hors périmètre` ; « Critères de succès (epic) » ⇒ `## Critères de succès` ; « Suite »,
+  « Décisions produit (PO) », « Contraintes », « Questions ouvertes » ⇒ des `###` (sous Périmètre, Besoin ou
+  Critères de succès).
+- Découpage : « Les stories », « Détail des stories », « Découpage » ⇒ `## Stories` ; « DAG », « DAG et ordre
+  suggéré », « Ordre d'exécution » ⇒ `## Ordre suggéré` ; « Stratégie de branches », « Protocole de branches
+  (stratégie C) » ⇒ `## Protocole de branches` ; « Questions ouvertes », « Prochain actionnable », « Suite »,
+  « Registre SDLC » ⇒ des `###` (sous Stories ou Ordre suggéré).
+- Spec fonctionnelle : « Comportement attendu », « Comportement (cible) » ⇒ `## Comportement` ; « Critères
+  d'acceptation (Given/When/Then) », « (G/W/T) », « (… + 🔬 Must-validate) », « Acceptance » ⇒
+  `## Critères d'acceptation` ; « Tests obligatoires au build (must-run) », « Tests » ⇒
+  `## Tests obligatoires au build` ; « Contexte », « Objectif », « User stories », « Droits », « Cas limites »,
+  « Hors périmètre », « Décisions prises en l'absence du PO », « Points pour la spec technique » ⇒ des `###` sous
+  Comportement.
+- Spec technique : « Invariants (checklist du reviewer) » et toute variante ⇒ `## Invariants` ; « Fichiers par
+  repo », « Fichiers par dépôt », « Plan d'implémentation », « Plan » ⇒ `## Plan par repo` (un `###` par dépôt ; un
+  plan en étapes va dans le `###` du dépôt concerné) ; « Tests (must-run) » ⇒ `## Tests` ; « Contrat API »,
+  « Constat du code », « Décisions de la gate technique », « Points d'attention », « Risques et retour arrière »,
+  « Plan de commits », « Branches et déploiement » ⇒ des `###` (sous Plan par repo, ou Invariants pour un écart
+  vs la spec fonctionnelle).
+
+**Types et gabarits**
+| Document | Écrit par | Sections `##`, dans l'ordre |
+|---|---|---|
+| PRD `prd.md` | `/scope`, `/full-spec` | Contexte · Besoin · Périmètre · Hors périmètre · Critères de succès · Sources |
+| Découpage `refine.md` | `/refine`, `/full-spec` | Stories · Ordre suggéré · Protocole de branches · Sources |
+| Spec fonctionnelle `spec-func.md` | `/spec-func`, `/full-spec` | Comportement · Critères d'acceptation · Tests obligatoires au build · Sources |
+| Spec technique `spec-tech.md` | `/spec-tech`, `/full-spec` | Invariants · Plan par repo · Tests · Sources |
+| Revue de gate `review-spec-func.md`, `review-spec-tech.md`, `review-feature.md` | `harry-archi` (mode document de revue) | [Revue ciblée v<n> — <date>, la plus récente d'abord] · Synthèse · Constats · Sources |
+| Verdict `review-<gate>-verdict*.md` | `/process-review` | Décisions · Ajouts humains · Discussions · Signatures précédentes |
+| Journal d'étape `implement.md` | `/implement`, `fixer` | par passe : Recap · Commits · Fichiers par repo · Build et tests · Décisions d'implémentation |
+| Journal d'étape `review.md` | `reviewer` | par passe : Recap · Invariants · Pièges prod-only · Notes |
+| Journal d'étape `deploy.md` | `deployer` (skill de déploiement) | par passe : Recap · Détail · Retour arrière |
+| Journal d'étape `acceptance.md` | `recetteur` (skills de recette) | par passe : Recap · Environnement et méthode · Verdict par AC · Repro |
+| Journal d'étape `demo.md` | `demo` | par passe : Recap · Déroulé · Critères montrés |
+
+- **Revues et verdicts** : le moteur les lit. Leur front matter, le tableau des constats (`| # | Gravité | … |`, ids
+  `B/M/m/S<n>`), la colonne `Rôle`, la section `## Revue ciblée v<n> — <date>` (seul titre qui garde son suffixe) et
+  le tableau `## Décisions` ne changent pas ; seuls les noms et l'ordre des sections autour sont fixés.
+- **Journaux d'étape** : le titre `#` est écrit une fois (le moteur le crée). Chaque passe (run, itération de
+  fix-loop) **ajoute en tête**, sous le titre, son bloc complet : `## Recap` d'abord (résultat de la passe en 1 à
+  3 lignes, `agent: <rôle>`, horodatage ISO 8601 — c'est ce que lit `sdlc status`), puis les autres sections de la
+  passe ; les passes précédentes restent dessous, intactes. Un bloc de passe ne contient jamais de `#`.
+
 ## Écrire un document vivant
 Verrou optimiste (décision 20 du PRD AISDLC-RUNWS) pour **tout document vivant du dépôt data** écrit
 directement (`prd.md`, `refine.md`, `spec-func.md`, `spec-tech.md`, `review.md`, `deploy.md`, `acceptance.md`,

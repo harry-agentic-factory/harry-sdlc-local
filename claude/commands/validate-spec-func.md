@@ -13,7 +13,8 @@ une erreur fonctionnelle entre deux stories ne se voit qu'en lisant tout le lot)
 2. **Revue agent** : lance `harry-archi` en **mode document de revue** (cf. son prompt) sur le PRD, le `refine.md`
    et le(s) `spec-func.md` visés, code et Brain à l'appui. Il écrit :
    - épic : `<EPIC>/review-spec-func.md` ; story : `<EPIC>/stories/<STORY>/review-spec-func.md`.
-   Constats numérotés `B`/`M`/`m`/`S`, preuve, recommandation, consensus. Revue déjà présente et specs corrigées
+   Constats numérotés `B`/`M`/`m`/`S`, preuve, recommandation, consensus ; format FIXE (Revue ciblée, Synthèse,
+   Constats, Sources). Revue déjà présente et specs corrigées
    depuis ⇒ demande une **revue ciblée** (nouvelle version de la même revue), jamais un nouveau fichier.
 3. **Traitement humain** : `/process-review <chemin de la revue>` — l'humain décide point par point, le verdict
    `review-spec-func-verdict.md` (à côté de la revue) avance en `draft` puis est **signé par l'humain**.
