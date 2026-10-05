@@ -7,6 +7,18 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-10-05
+
+### Added
+
+- Brain: 9th category `recette` (reader profile `technique`) for the e2e corpus, test sequences and acceptance
+  rules. Default deduction rules `e2e/**` and `**/recette*.md`, evaluated after `cicd` and before `exploit`.
+
+### Changed
+
+- Brain: `CATEGORIES` is now the display order and starts with `usage`:
+  `usage, produit, archi, repo, config, cicd, recette, exploit, observ`.
+
 ## [0.8.3] - 2026-10-04
 
 ### Added
