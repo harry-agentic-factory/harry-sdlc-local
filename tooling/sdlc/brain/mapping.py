@@ -26,20 +26,24 @@ from typing import Iterable
 
 from .gitio import BrainError
 
-CATEGORIES: tuple[str, ...] = ("produit", "usage", "archi", "repo", "config", "cicd", "exploit", "observ")
+# Display order (consumers render the categories in this order).
+CATEGORIES: tuple[str, ...] = (
+    "usage", "produit", "archi", "repo", "config", "cicd", "recette", "exploit", "observ",
+)
 READER_PROFILE: dict[str, str] = {
     c: ("fonctionnel" if c == "produit" else "mixte" if c == "usage" else "technique") for c in CATEGORIES
 }
 DEFAULT_EXCLUDES: tuple[str, ...] = (".claude/**", "hooks/**")
 
 # Engine defaults (generic), evaluated after the project rules. First match wins;
-# `cicd` comes before `exploit` on purpose.
+# `cicd` and `recette` come before `exploit` on purpose.
 DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     ("README.md", "usage"), ("CLAUDE.md", "usage"),
     ("per-repo/**", "repo"), ("repos/**", "repo"),
     ("**/architecture*.md", "archi"), ("adr/**", "archi"),
     ("**/config*/**", "config"), ("**/config-management*.md", "config"),
     ("**/ci-cd*", "cicd"), ("**/cicd*", "cicd"),
+    ("e2e/**", "recette"), ("**/recette*.md", "recette"),
     ("**/kubernetes*", "exploit"), ("**/deploy*/**", "exploit"),
     ("**/observ*", "observ"), ("**/monitoring*", "observ"),
     ("produit/**", "produit"), ("product/**", "produit"),

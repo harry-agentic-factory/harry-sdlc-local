@@ -18,9 +18,11 @@ index or `git status`; nothing is pushed; no hosting API is called.
 
 | category | reader profile |
 |---|---|
-| `produit` | `fonctionnel` |
 | `usage` | `mixte` |
-| `archi`, `repo`, `config`, `cicd`, `exploit`, `observ` | `technique` |
+| `produit` | `fonctionnel` |
+| `archi`, `repo`, `config`, `cicd`, `recette`, `exploit`, `observ` | `technique` |
+
+The order of this list (`CATEGORIES`) is the display order: `usage` first.
 
 - Front matter reading tolerates a UTF-8 BOM and CRLF line endings. An opening `---` without a
   closing line, a duplicated `category` key or a block that is not valid UTF-8 is
@@ -39,6 +41,7 @@ in order:
 | `**/architecture*.md`, `adr/**` | `archi` |
 | `**/config*/**`, `**/config-management*.md` | `config` |
 | `**/ci-cd*`, `**/cicd*` | `cicd` |
+| `e2e/**`, `**/recette*.md` | `recette` |
 | `**/kubernetes*`, `**/deploy*/**` | `exploit` (after `cicd`, which wins) |
 | `**/observ*`, `**/monitoring*` | `observ` |
 | `produit/**`, `product/**` | `produit` |

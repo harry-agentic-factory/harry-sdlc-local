@@ -428,6 +428,17 @@ def test_default_rules_cicd_before_exploit():
     assert rules.index("**/cicd*") < rules.index("**/kubernetes*")
 
 
+def test_default_rules_recette():
+    assert deduce("e2e/login-sequence.md", DEFAULT_RULES) == ("recette", "e2e/**")
+    assert deduce("e2e/deploy/smoke.md", DEFAULT_RULES) == ("recette", "e2e/**")
+    assert deduce("technical/recette-rules.md", DEFAULT_RULES) == ("recette", "**/recette*.md")
+    assert deduce("recette.md", DEFAULT_RULES) == ("recette", "**/recette*.md")
+    assert deduce("deployments/ci-cd-recette.md", DEFAULT_RULES) == ("cicd", "**/ci-cd*")
+    rules = [p for p, _ in DEFAULT_RULES]
+    assert rules.index("**/cicd*") < rules.index("e2e/**") < rules.index("**/kubernetes*")
+    assert rules.index("**/recette*.md") < rules.index("**/deploy*/**")
+
+
 @pytest.mark.parametrize("text,expected", [
     ('rules:\n  - "misc/**": produit\n', ((("misc/**", "produit"),), ())),
     ("# comment\nrules:\n  - per-repo/**: repo  # trailing\n  - 'a b/*.md': usage\nexclude:\n  - drafts/\n"
@@ -861,10 +872,12 @@ def test_public_api_without_cli(fx):
     assert {f["status"] for f in b.diff_manifests(m1, m2)["files"]} == {"modified", "renamed", "unchanged"}
     assert b.effective_excludes(fx.path, "main", excludes=["x/"]) == (".claude/**", "hooks/**", "x/")
     assert b.is_excluded("drafts/a.md", ["drafts/"]) and not b.is_excluded("a.md", b.DEFAULT_EXCLUDES)
-    assert b.READER_PROFILE == {"produit": "fonctionnel", "usage": "mixte", "archi": "technique",
+    assert b.READER_PROFILE == {"usage": "mixte", "produit": "fonctionnel", "archi": "technique",
                                 "repo": "technique", "config": "technique", "cicd": "technique",
-                                "exploit": "technique", "observ": "technique"}
-    assert b.CATEGORIES == ("produit", "usage", "archi", "repo", "config", "cicd", "exploit", "observ")
+                                "recette": "technique", "exploit": "technique", "observ": "technique"}
+    assert b.CATEGORIES == ("usage", "produit", "archi", "repo", "config", "cicd", "recette", "exploit",
+                            "observ")
+    assert list(b.READER_PROFILE) == list(b.CATEGORIES)
     with pytest.raises(b.BrainNotGit):
         b.list_notes(fx.path.parent, "HEAD")
     with pytest.raises(b.BrainRefUnresolved):

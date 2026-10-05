@@ -268,8 +268,8 @@ Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-
 
 ### Brain (`sdlc brain`) — le dépôt de connaissance lu à un commit
 Le Brain est un dépôt git (ou un sous-dossier d'un dépôt) ; git est sa seule vérité. Une **note** = un `*.md` suivi
-au commit lu, hors `.claude/` et `hooks/` ; seul en-tête exigé : `category` (`produit`, `usage`, `archi`, `repo`,
-`config`, `cicd`, `exploit`, `observ`). Rien n'est lu dans la copie de travail. Référence : [`docs/brain.md`](docs/brain.md).
+au commit lu, hors `.claude/` et `hooks/` ; seul en-tête exigé : `category` (`usage`, `produit`, `archi`, `repo`,
+`config`, `cicd`, `recette`, `exploit`, `observ`). Rien n'est lu dans la copie de travail. Référence : [`docs/brain.md`](docs/brain.md).
 ```bash
 sdlc brain normalize --repo <brain> [--map brain-map.yaml] [--base main] [--branch b] [--dry-run] [--report r.md]
 sdlc brain lint      --repo <brain> [--ref HEAD] [--strict] [--format json|text]   # CI : exit 1 = bloquant
