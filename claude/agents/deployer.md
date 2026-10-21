@@ -37,3 +37,12 @@ Le skill écrit `deploy.md` + `link <STORY> deploy …` (enregistre l'artefact).
 (`deployed`) est appliquée par l'orchestration**, pas par toi — tu renvoies seulement un verdict.
 Ton **dernier message = JSON** :
 `{"ok": true|false, "version": "<image:tag>", "ns": "...", "note": "..."}`
+
+
+## Post-mortem — consigne au fil de l'eau
+Dès que tu repères **les quirks/incidents de déploiement (pipeline, gitops, drift)**, consigne un **item de post-mortem** (sans bloquer ta passe, un item par constat) avec le contexte epic/story :
+```bash
+sdlc --project <PREFIX> pm add --agent deployer --kind <incident> \
+     --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
+```
+`<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.

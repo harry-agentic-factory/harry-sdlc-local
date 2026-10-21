@@ -155,6 +155,32 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("story", help="ID story"); a.add_argument("--branch", help="branche")
     a.add_argument("--agent", help="rôle agent (deployer/reviewer/…) → injecte permissions.allow/deny du manifest")
 
+    # --- post-mortem : items consignés au fil de l'eau (dette/learning/incident/sécu/brain) ---
+    pm = sub.add_parser("post-mortem", aliases=["pm"],
+                        help="items de post-mortem : consigne / statue / convertit (dette ou Brain)")
+    pmsub = pm.add_subparsers(dest="pmcmd", required=True, metavar="<pm-cmd>")
+    a = pmsub.add_parser("add", help="consigne un item (qui/epic/story + kind/sévérité/texte)")
+    a.add_argument("--agent", required=True, help="qui consigne (reviewer|recetteur|deployer|fixer|dev|demo|human|<commande>)")
+    a.add_argument("--kind", required=True, help="debt|learning|incident|security|brain")
+    a.add_argument("--text", required=True, help="description (jamais de secret)")
+    a.add_argument("--epic", help="ID épic concerné")
+    a.add_argument("--story", help="ID story concernée")
+    a.add_argument("--severity", default="medium", help="low|medium|high (défaut medium)")
+    a = pmsub.add_parser("list", help="liste les items courants (filtrable)")
+    a.add_argument("--epic"); a.add_argument("--story"); a.add_argument("--agent")
+    a.add_argument("--kind"); a.add_argument("--status")
+    a = pmsub.add_parser("show", help="affiche un item"); a.add_argument("id", help="ID item (PM-…)")
+    a = pmsub.add_parser("status", help="statue sur un item (append d'un snapshot)")
+    a.add_argument("id", help="ID item (PM-…)")
+    a.add_argument("status", choices=["open", "triaged", "wontfix"], help="open|triaged|wontfix")
+    a.add_argument("--target", help="id ticket / URL PR Brain (optionnel)")
+    a = pmsub.add_parser("to-ticket", help="convertit l'item en story de dette dans un épic")
+    a.add_argument("id", help="ID item (PM-…)")
+    a.add_argument("--epic", required=True, help="épic dette cible (DEBT_EPIC)")
+    a.add_argument("--repos", help="repos touchés, séparés par des virgules")
+    a = pmsub.add_parser("to-brain", help="marque l'item pour le Brain + suggère l'entrée de propale")
+    a.add_argument("id", help="ID item (PM-…)")
+
     args = p.parse_args(_autocorrect(argv, list(sub.choices)))
 
     if args.cmd == "migrate":
@@ -178,6 +204,26 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "status":
         from .status_report import build_status
         return build_status(resolve_workspace(args.project), args.target)
+    if args.cmd in ("post-mortem", "pm"):
+        from .post_mortem import PostMortemStore
+        store = PostMortemStore(resolve_workspace(args.project))
+        if args.pmcmd == "add":
+            item = store.add(agent=args.agent, kind=args.kind, text=args.text,
+                             epic=args.epic, story=args.story, severity=args.severity)
+            return {"id": item.id}
+        if args.pmcmd == "list":
+            return {"items": [dataclasses.asdict(i) for i in store.list(
+                epic=args.epic, story=args.story, agent=args.agent,
+                kind=args.kind, status=args.status)]}
+        if args.pmcmd == "show":
+            return dataclasses.asdict(store.get(args.id))
+        if args.pmcmd == "status":
+            return dataclasses.asdict(store.set_status(args.id, args.status, target=args.target))
+        if args.pmcmd == "to-ticket":
+            return store.to_ticket(args.id, _sdlc(args.project),
+                                   debt_epic=args.epic, repos=_csv(args.repos))
+        if args.pmcmd == "to-brain":
+            return store.to_brain(args.id)
 
     s = _sdlc(args.project)
 

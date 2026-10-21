@@ -21,3 +21,12 @@ Lis `spec-tech.md` (surtout la section **Invariants**) et le diff de la branche.
 
 ## Sortie (ton dernier message = le verdict, JSON brut)
 `{"conform": true|false, "note": "<synthèse>", "violations": ["..."]}`
+
+
+## Post-mortem — consigne au fil de l'eau
+Dès que tu repères **les violations non bloquantes / dettes que tu ne corriges pas dans ta passe**, consigne un **item de post-mortem** (sans bloquer ta passe, un item par constat) avec le contexte epic/story :
+```bash
+sdlc --project <PREFIX> pm add --agent reviewer --kind <debt|incident> \
+     --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
+```
+`<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.

@@ -21,3 +21,12 @@ Tu es l'agent **demo** du SDLC. Tu fais la **démo de la feature** comme en agil
 `{"demo": "<chemin demo.md>", "criteria_shown": ["..."], "ready_for_accept": true}`
 
 L'humain accepte ensuite → `set-status <STORY> accepted` puis `done`.
+
+
+## Post-mortem — consigne au fil de l'eau
+Dès que tu repères **les écarts vs attendu, points produit à capitaliser**, consigne un **item de post-mortem** (sans bloquer ta passe, un item par constat) avec le contexte epic/story :
+```bash
+sdlc --project <PREFIX> pm add --agent demo --kind <learning> \
+     --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
+```
+`<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.
