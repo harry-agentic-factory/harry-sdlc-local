@@ -25,9 +25,18 @@ BRAIN_MARKER = "brain-propale"
 @dataclass
 class PMItem:
     id: str
-    agent: str
-    kind: str
-    text: str
+    # `agent`/`kind`/`text` carry defaults ON PURPOSE, even though `add()` requires all three.
+    # Reconstruction must survive a snapshot written OUTSIDE this API — by an older version, or by an
+    # agent appending to the .jsonl by hand. Measured 2026-10-22: three hand-appended rows without
+    # `agent` made EVERY `pm` command fail with "missing 1 required positional argument: 'agent'",
+    # including `pm add`, because `_next_id()` reconstructs the whole file first. The failure surfaces
+    # far from its cause and reads like a CLI bug, so an agent hitting it stops filing post-mortems
+    # altogether — the store silently loses the data it exists to collect.
+    # `_current()` already tolerates UNKNOWN keys; tolerating MISSING ones is the same intent.
+    # Validation stays where it belongs: on the write path (`add`), never on the read path.
+    agent: str = "unknown"
+    kind: str = "learning"
+    text: str = ""
     epic: str | None = None
     story: str | None = None
     severity: str = "medium"
