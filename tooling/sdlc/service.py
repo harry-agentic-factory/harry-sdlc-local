@@ -49,12 +49,31 @@ class Sdlc:
         return next_actionable(deps, statuses, {s.value for s in DONE_STATES})
 
     # --- écriture d'état (sdlc_set_status / link_artifact) ---
-    def set_status(self, story: str, new: str) -> Ticket:
+    def set_status(self, story: str, new: str, force_reason: str | None = None) -> Ticket:
+        """Change le statut d'une story.
+
+        `force_reason` rattrape un fait DEJA survenu que rien n'avait enregistre (typiquement un
+        deploiement effectue pour une raison d'infra, qui n'a pas notifie la state-machine). Le
+        rattrapage est toujours JOURNALISE : un saut d'etape qui ne laisse pas de trace est
+        exactement ce qui a produit, le 2026-10-24, un board affirmant `implemented` sur du code
+        en production. Les statuts a signature humaine restent inatteignables (cf. `status.py`).
+        """
         t = self.ws.load(story)
-        validate_transition(t.status, new)   # garde-fou state-machine
+        old = t.status
+        validate_transition(old, new, force_reason)   # garde-fou state-machine
         t.status = new
         self.ws.save(t)
         self.board.set_status(story, new)     # miroir
+        if force_reason is not None:
+            self.journal(
+                story,
+                f"Statut rattrape de `{old}` a `{new}` sans passer par les etapes"
+                f" intermediaires.\n\nMotif : {force_reason.strip()}\n\n"
+                "Ce rattrapage enregistre un fait deja survenu ; il ne vaut ni revue ni recette"
+                " ni accept. Les etapes sautees restent a jouer si elles portent une preuve"
+                " (une revue manquante reste manquante).",
+                actor="harry (rattrapage)",
+            )
         return t
 
     def link_artifact(self, story: str, kind: str, path: str) -> Ticket:

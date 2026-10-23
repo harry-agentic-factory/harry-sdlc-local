@@ -88,3 +88,62 @@ def test_routed_return_after_a_spec_or_feature_gate():
     for src in (Status.SPEC_VALIDATED, Status.FEATURE_VALIDATED):
         assert validate_transition(src, Status.SPEC_TECH) == Status.SPEC_TECH
         assert validate_transition(src, Status.SPEC_FUNC) == Status.SPEC_FUNC
+
+
+# --- rattrapage d'un fait deja survenu (`force_reason`) ---------------------------------------
+#
+# Ne s'est pas invente : le 2026-10-24, deux stories HIA-STATPERF tournaient EN PRODUCTION en
+# affichant encore `implemented`, parce que leur deploiement avait eu lieu pour une raison
+# d'infra et que rien n'avait notifie la state-machine. Le board inventait du retard inexistant,
+# et ce retard a ete rapporte a l'humain comme un fait. Ces tests figent le compromis retenu :
+# un FAIT se rattrape (avec motif, et journalise), une SIGNATURE jamais.
+
+
+def test_a_fact_can_be_caught_up_with_a_reason():
+    assert validate_transition(Status.IMPLEMENTED, Status.DEPLOYED,
+                               "already in prod, CI #237") == Status.DEPLOYED
+
+
+def test_without_a_reason_the_guard_holds_and_names_the_hatch():
+    with pytest.raises(InvalidTransition) as e:
+        validate_transition(Status.IMPLEMENTED, Status.DEPLOYED)
+    # l'erreur doit ENSEIGNER l'echappatoire, sinon l'appelant la contourne autrement
+    assert "force-reason" in str(e.value)
+
+
+@pytest.mark.parametrize("signed", [
+    Status.ACCEPTED, Status.DONE, Status.SPEC_VALIDATED,
+    Status.FEATURE_VALIDATED, Status.SPEC_FUNC_VALIDATED,
+])
+def test_a_human_signature_is_never_forcible(signed):
+    """Le seul refus absolu : un agent ne doit pas pouvoir s'auto-accorder une gate humaine."""
+    from sdlc import ForcedTransitionRefused
+    with pytest.raises(ForcedTransitionRefused) as e:
+        validate_transition(Status.IMPLEMENTED, signed, "je voudrais bien")
+    assert "signature" in str(e.value)
+
+
+def test_an_empty_reason_is_refused():
+    from sdlc import ForcedTransitionRefused
+    for blank in ("", "   ", "\n\t "):
+        with pytest.raises(ForcedTransitionRefused):
+            validate_transition(Status.IMPLEMENTED, Status.DEPLOYED, blank)
+
+
+def test_going_backwards_is_a_rejection_not_a_catch_up():
+    from sdlc import ForcedTransitionRefused
+    # recette_ok -> reviewed : en arriere, factuel, et PAS deja autorise
+    with pytest.raises(ForcedTransitionRefused) as e:
+        validate_transition(Status.RECETTE_OK, Status.REVIEWED, "oops")
+    assert "rejet" in str(e.value)
+
+
+def test_the_fix_loop_edge_still_works_with_or_without_a_reason():
+    # deployed -> implemented est DEJA legal (retour au dev) : le rattrapage ne doit pas le casser
+    for reason in (None, "with a reason"):
+        assert validate_transition(Status.DEPLOYED, Status.IMPLEMENTED, reason) == Status.IMPLEMENTED
+
+
+def test_fact_and_signature_sets_are_disjoint():
+    from sdlc import FACTUAL, SIGNED
+    assert not (FACTUAL & SIGNED), "un statut ne peut pas etre a la fois un fait et une signature"
