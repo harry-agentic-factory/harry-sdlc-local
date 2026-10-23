@@ -79,7 +79,7 @@ flowchart TB
 |---|---|---|
 | **1 · Spécifier** | 🧑 session | `/scope /refine /spec-func` → **gate fonctionnelle** (`/validate-spec-func` : PRD + refine + TOUS les spec-func, en batch ou story par story) → `/spec-tech` → **gate technique** (`/validate-spec-tech` : plan + invariants) → **gate feature** (`/validate-feature` : l'épic entier, PO + tech lead). À chaque gate, `harry-archi` **recommande** (revue `review-<gate>.md`), l'humain **décide** avec `/process-review` et **signe** le verdict ; `sdlc validate-… --verdict` refuse sans signature humaine (anciens noms `validate-func`, `validate-spec` : alias). `/implement` ouvre la **bulle scopée** (worktree + skills projet). |
 | **2 · La boucle** | 🤖 + 🧑 | `Workflow(run-ticket.js)` enchaîne *Prepare → Review → Deploy → Recette*, agents à contextes isolés. La **recette manuelle** de la session tranche ; chaque bug devient un item `pm` + un bundle repro, et le tour suivant **ré-entre au fixer**. |
-| **3 · Promote** | 🤖 | Après le feu vert humain seulement : merge → `main`, redéploiement sur **l'intégration**, puis **la même recette rejouée sur main**. |
+| **3 · Promote** | 🤖 | Après le feu vert humain seulement. Par story : merge → `main`, redéploiement sur **l'intégration**, puis **la même recette rejouée sur main**. Pour un **épic** : `/promote <EPIC>` enchaîne verdict signé → `/doc-feature` multi-repo → merge des trunks sur `main` → reconstruction et déploiement depuis `main` → **non-régression e2e complète** → stories `done`. |
 
 ### Ce que le dessin dit, en trois phrases
 
@@ -93,6 +93,21 @@ molle, un écran qui s'affiche sans rien prouver. C'est la recette **manuelle** 
 
 **Le loop vit dans le monde du développeur.** Deploy vise un dev dédié ou un éphémère de story, Promote
 vise l'intégration. La mise en production, sa CI/CD et sa recette classique sont un autre univers.
+
+### Flux bugs depuis un tracker (Trello, …)
+
+La SDLC ne connaît aucun tracker. Le pont est le CLI **`tracker`**, avec sa propre mémoire, locale et non versionnée, dans
+`<workspace>/_tracker/` (`config.json`, `links.json` = qui est lié à quoi, `cards/<carte>/fiche.md`,
+`reviews/<date>/`). Cinq commandes, un rôle de *Scrum Master* :
+
+| Commande | Ce qu'elle fait | Écrit dans la SDLC ? | Écrit sur le tracker ? |
+|---|---|---|---|
+| `/bugs-sync` | relit le board, un `investigator` par nouvelle carte bug, consolidation → `review-bugs.md` | non | non |
+| `/bugs-review` | revue carte par carte avec l'humain (conventions de `/process-review`), verdict signé, puis l'épic du jour : une story par module, un commit par bug | oui, après signature | non |
+| `/bugs-run` | enchaîne `/spec-tech` → `/implement` → `run-ticket` par story ; le verdict signé tient lieu des gates de spec | oui | non |
+| `/bugs-push` | déplace les cartes selon les statuts (vers l'avant seulement) et relit les retours du rapporteur | sur accord | sur accord |
+| `/bugs-status` | l'état de chaque carte, des deux côtés | non | non |
+| `/bugs-close` | fin de journée : commit, push et MR de la branche du jour `bugs/<date>` du dépôt data | commit | non |
 
 ### La state-machine
 
@@ -161,7 +176,7 @@ claude/
   agents/      reviewer, deployer, recetteur, fixer, e2e-author, nonreg-runner, demo
   commands/    harry, scope, refine, spec-func, spec-tech, full-spec (one-shot), validate-spec-func,
                validate-spec-tech, validate-feature, process-review (gates : revue agent → verdict humain signé),
-               implement, ticket,
+               implement, ticket, promote (fin d'épic : doc → main → redéploiement → TNR complète),
                run-story (le « mode auto » : enchaîne tout depuis l'état courant), sdlc (état en session)
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
   skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)

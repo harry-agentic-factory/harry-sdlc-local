@@ -24,7 +24,7 @@ POINTER = ("> **Avant d'écrire un document vivant** du dépôt data : règle «
            "persona (`~/.claude/sdlc/harry.md`).")
 WRITERS = [f"claude/commands/{c}.md" for c in
            ("scope", "refine", "spec-func", "spec-tech", "full-spec", "implement", "post-mortem", "investigate",
-            "process-review")] + \
+            "process-review", "bugs-sync", "bugs-review")] + \
           [f"claude/agents/{a}.md" for a in
            ("reviewer", "recetteur", "deployer", "demo", "fixer", "harry-archi", "nonreg-runner")]
 OFF_PROMPTS = ("reviewPrompt", "deployPrompt", "promotePrompt", "recettePrompt", "fixPrompt")
@@ -78,8 +78,8 @@ def test_writer_points_to_the_rule(path):
     assert "git hash-object" not in text, path          # pointer only, never a copy of the rule
 
 
-def test_sixteen_writers_and_no_copy_elsewhere():
-    assert len(WRITERS) == 16
+def test_eighteen_writers_and_no_copy_elsewhere():
+    assert len(WRITERS) == 18
     pointing = sorted(str(p.relative_to(REPO)) for p in (REPO / "claude").rglob("*.md") if POINTER in p.read_text())
     assert pointing == sorted(WRITERS)
     copies = sorted(str(p.relative_to(REPO)) for p in (REPO / "claude").rglob("*")

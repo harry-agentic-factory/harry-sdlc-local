@@ -7,14 +7,16 @@ pluggable mirror. Runtime is 100 % stdlib, so everything is testable offline.
 Engine version: `sdlc.version.engine_version()` (`sdlc --version` on the command line).
 """
 
-from .status import Status, PIPELINE, ALLOWED, InvalidTransition, validate_transition
+from .status import (Status, PIPELINE, ALLOWED, FACTUAL, SIGNED, InvalidTransition,
+                     ForcedTransitionRefused, validate_transition)
 from .graph import topo_order, next_actionable, CycleError
 from .board import Board, FakeBoard, TrelloBoard
 from .workspace import Workspace
 from .service import Sdlc
 
 __all__ = [
-    "Status", "PIPELINE", "ALLOWED", "InvalidTransition", "validate_transition",
+    "Status", "PIPELINE", "ALLOWED", "FACTUAL", "SIGNED", "InvalidTransition",
+    "ForcedTransitionRefused", "validate_transition",
     "topo_order", "next_actionable", "CycleError",
     "Board", "FakeBoard", "TrelloBoard",
     "Workspace", "Sdlc",

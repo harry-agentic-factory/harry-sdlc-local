@@ -65,6 +65,37 @@ def test_last_wins_reconstruction(tmp_path):
     assert len(store.list()) == 1                      # toujours 1 item logique
 
 
+def test_hand_appended_snapshot_missing_fields_does_not_break_the_store(tmp_path):
+    """Un snapshot écrit À LA MAIN dans le .jsonl ne doit casser AUCUNE commande `pm`.
+
+    Mesuré le 2026-10-22 : trois lignes appendées à la main sans `agent` faisaient échouer **tout**
+    `pm`, `pm add` compris — parce que `_next_id()` reconstruit d'abord le fichier entier. L'erreur
+    (« missing 1 required positional argument: 'agent' ») tombe donc très loin de sa cause et se lit
+    comme un bug du CLI : l'agent qui la rencontre arrête de consigner, et le store perd justement ce
+    qu'il existe pour collecter. Le `.jsonl` est append-only et partagé : on le reçoit tel qu'il est.
+    """
+    store = PostMortemStore(tmp_path)
+    store.add(agent="dev", kind="learning", text="un item normal")
+    with (tmp_path / "post-mortem.jsonl").open("a", encoding="utf-8") as fh:
+        # champs REQUIS absents (agent/kind/text) + une clé INCONNUE : les deux doivent être tolérés
+        fh.write(json.dumps({"id": "PM-042", "severity": "high", "status": "open",
+                             "title": "clé inconnue, écrite par une autre version"}) + "\n")
+
+    assert {i.id for i in store.list()} == {"PM-001", "PM-042"}   # la lecture survit
+    assert store.get("PM-042").agent == "unknown"                  # défaut, pas une exception
+    assert store._next_id() == "PM-043"                            # et `add` redevient possible
+    assert store.add(agent="dev", kind="debt", text="après").id == "PM-043"
+
+
+def test_add_still_refuses_what_it_always_refused(tmp_path):
+    """Les défauts du dataclass sont pour la RELECTURE : la validation reste sur le chemin d'écriture."""
+    store = PostMortemStore(tmp_path)
+    with pytest.raises(ValueError):
+        store.add(agent="dev", kind="pas-un-kind", text="x")
+    with pytest.raises(ValueError):
+        store.add(agent="dev", kind="debt", text="   ")
+
+
 # --- to-ticket : crée une story de dette + status=ticketed + target ---
 
 def test_to_ticket(tmp_path):

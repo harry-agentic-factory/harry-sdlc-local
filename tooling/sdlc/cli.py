@@ -147,6 +147,11 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("story", help="ID story")
     a.add_argument("status", help="spec_func|spec_func_validated|spec_tech|spec_validated|feature_validated|"
                    "implemented|reviewed|deployed|recette_ok|accepted|done")
+    a.add_argument("--force-reason", default=None,
+                   help="RATTRAPAGE d'un fait deja survenu : autorise un saut vers l'avant "
+                        "vers un statut de FAIT (implemented|reviewed|deployed|recette_ok). "
+                        "Jamais vers un statut a signature humaine (accepted|done|*_validated). "
+                        "Toujours journalise.")
     a = sub.add_parser("link", help="attache un artefact (doc) à une story")
     a.add_argument("story", help="ID story")
     a.add_argument("kind", help="type : prd|spec_func|spec_tech|implement|review|deploy|acceptance|demo|review_spec_func|…")
@@ -310,7 +315,7 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "next":
         return {"epic": args.epic, "next": s.next(args.epic)}
     if args.cmd == "set-status":
-        return dataclasses.asdict(s.set_status(args.story, args.status))
+        return dataclasses.asdict(s.set_status(args.story, args.status, args.force_reason))
     if args.cmd == "link":
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
     if args.cmd == "reject":

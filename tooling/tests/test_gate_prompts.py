@@ -55,10 +55,11 @@ def test_only_gate_prompts_mention_a_signed_status_and_forbid_signing():
     tells the agent it never signs."""
     hits = sorted(str(p.relative_to(REPO)) for p in (REPO / "claude").rglob("*.md")
                   if "status: signed" in p.read_text())
-    allowed = {f"claude/commands/{n}.md" for n in NEW}
+    # /bugs-review is the gate of a bug epic (its signed verdict stands in for the spec gates).
+    allowed = {f"claude/commands/{n}.md" for n in NEW} | {"claude/commands/bugs-review.md"}
     assert hits and set(hits) <= allowed, hits
     for h in hits:
-        assert "Tu ne signes jamais" in (REPO / h).read_text(), h
+        assert "tu ne signes jamais" in (REPO / h).read_text().lower(), h
 
 
 OLD = re.compile(r"validate-(func|tech|epic)\b|validate-spec(?=[\s`])")
