@@ -90,6 +90,19 @@ Déroule, pour chaque story actionnable du DAG :
 - **Rollback propre** — un déploiement KO est rollbacké **immédiatement** ; l'env n'est **jamais** laissé cassé.
 - **Traçabilité** — chaque itération écrit son artefact (`implement/deploy/acceptance.md`) + des items `pm` ;
   la conversation est éphémère.
+- **`deployed` sans recette n'est pas de l'avancement, c'est de la dette invisible** — une story qui dort en
+  `deployed` tourne **en production sans preuve**. Vécu le 2026-10-24 : **4 stories** étaient dans cet état,
+  leur recette a révélé un défaut d'intégrité vieux de **deux ans** (172 lignes perdues, une liste client
+  annonçant 231 pour 66 affichables). Donc : avant d'ouvrir un nouveau chantier, **balaye les stories en
+  `deployed`** (`sdlc status <EPIC>`) et recette-les. Le vert du build ne compte pas : ici le CI ne joue
+  **aucun** test.
+- **Le board peut MENTIR, parce que les faits ne le notifient pas** — déployer `main` pour une raison
+  d'infra (image de base, chart, config) embarque **tout** ce qui y a été mergé, et rien ne le dit à la
+  state-machine. Résultat mesuré le 2026-10-24 : deux stories tournaient en prod en affichant encore
+  `implemented`/`reviewed`, et ce retard **fictif** a été rapporté à l'humain comme un fait. Donc :
+  **mesure l'état réel avant de le rapporter** — le SHA déployé contient-il le commit de la story
+  (`git merge-base --is-ancestor <merge-commit> <sha déployé>`) ? — et rattrape le statut avec
+  `set-status --force-reason` (le rattrapage est journalisé et ne vaut ni revue, ni recette, ni accept).
 - **Gates** — dans le périmètre → harry-archi ; hors périmètre (irréversible, sécurité, produit, PII) →
   **escalade humaine**. Le loop ne s'auto-accorde **jamais** une gate humaine (signature d'un verdict de gate de
   spec, promote/accept).
