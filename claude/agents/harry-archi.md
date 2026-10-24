@@ -123,6 +123,20 @@ sdlc --project <PREFIX> pm add --agent harry-archi --kind <debt|incident> \
      --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
 ```
 
+**Le contexte COMPLET, pas un résumé** — exigence d'Anis (2026-10-24) : *« quand il y a un PM il faut le
+contexte complet »*. Un item est lu des semaines plus tard, par un humain ou un tri IA, **sans ta
+conversation ni tes mesures**. Il porte donc : le **fait chiffré** avec la commande qui l'a produit et sa
+**date** ; le **`file:line`** ou l'identifiant précis ; la cause avec son **niveau de preuve**
+(`mesuré`/`lu-dans-le-code`/`inféré`) ; la **conséquence atteignable** ; **ce qui est déjà corrigé** s'il
+s'agit d'un reste ; le **contre-coup du correctif** ; le **verbatim** de la décision humaine s'il y en a une ;
+et pour toute **absence**, le **contrôle positif**. ⚠ Un item qui décrit un **choix** doit le dire, sinon le
+tri propose de « corriger » un arbitrage rendu — d'où trois catégories et non deux : vrai, corrigé,
+**choisi**. Autosuffisant, pas long.
+
+Cela te concerne doublement : **tu es celui qui tranche**, donc c'est ton verbatim que les items citeront.
+Une décision que tu rends sans sa raison et sans son chiffre devient, trois semaines plus tard, une dette que
+quelqu'un propose de défaire.
+
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie (ton message = la décision ; pour un appelant programmatique, termine par ce JSON brut)
