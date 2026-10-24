@@ -396,7 +396,21 @@ def _pm_text_gaps(text: str) -> list[str]:
         gaps.append("aucun chiffre (un fait se mesure)")
     if not _re.search(r"\d{4}-\d{2}-\d{2}", text):
         gaps.append("aucune date ISO (quand a-ce ete mesure ?)")
-    if not _re.search(r"[\w/.-]+\.(java|py|ts|tsx|js|mjs|yml|yaml|xml|sh|groovy|json)\b|:\d+\b", text):
+    # Reconnait un LOCUS sous ses formes REELLES, pas seulement `fichier.ext:ligne`. Elargi le
+    # 2026-10-24 apres que ce detecteur a produit ses deux premiers faux positifs des sa premiere
+    # utilisation reelle : il refusait `knowledge-organization.md` (extension hors liste) et
+    # `TenantUserAdminService.resolveKcUserId` (forme Classe.methode). C'est exactement l'erreur que
+    # le standard reproche a l'auteur d'un item : une reconnaissance trop etroite prise pour generale.
+    locus = (
+        r"[\w/.-]+\.(java|py|ts|tsx|js|mjs|yml|yaml|xml|sh|groovy|json|md|txt|sql|csv|properties|conf|tf)\b"
+        r"|:\d+\b"                        # fichier:ligne
+        r"|\b[A-Z]\w+[.#]\w+\("          # Classe.methode( ou Classe#methode(
+        r"|\b[A-Z]\w*[A-Z]\w*\.\w+"     # CamelCase.membre
+        r"|\b/(api|v\d|actuator|admin)/"   # chemin d'endpoint
+        r"|\b[a-z0-9-]+-realm\b"           # identifiant de realm
+        r"|\bPM-\d+\b"                    # renvoi a un autre item
+    )
+    if not _re.search(locus, text):
         gaps.append("aucun file:line ni identifiant precis")
     if not _re.search(r"mesur|lu-dans-le-code|infer|niveau de preuve", text, _re.I):
         gaps.append("aucun niveau de preuve (mesure|lu-dans-le-code|infere)")
