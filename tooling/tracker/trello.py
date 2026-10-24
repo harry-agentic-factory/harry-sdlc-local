@@ -29,8 +29,9 @@ class TrelloSource:
         self._auth = {"key": creds["apikey"], "token": creds["token"]}
         self.lists = config.get("lists", {})
 
-    def _request(self, method: str, url: str, label: str, headers: dict | None = None) -> bytes:
-        req = urllib.request.Request(url, method=method, headers=headers or {})
+    def _request(self, method: str, url: str, label: str, headers: dict | None = None,
+                 data: bytes | None = None) -> bytes:
+        req = urllib.request.Request(url, method=method, headers=headers or {}, data=data)
         for attempt in range(RETRIES + 1):
             try:
                 with urllib.request.urlopen(req, timeout=60) as resp:
@@ -46,9 +47,18 @@ class TrelloSource:
             time.sleep(1 + attempt)
         raise TrelloError(f"Trello {method} {label} -> gave up")
 
-    def _call(self, method: str, path: str, params: dict | None = None):
+    def _call(self, method: str, path: str, params: dict | None = None, form: dict | None = None):
+        """`params` go in the query string, `form` in the request body.
+
+        Anything that can be long — a card description above all — must go in `form`: a query string
+        carrying a few kilobytes is answered **414 Request-URI Too Large** by the proxies in front of
+        these APIs (measured on 2026-10-24 on another service, where a per-element query parameter
+        produced a 414 that was then surfaced as a misleading 400).
+        """
         query = urllib.parse.urlencode({**(params or {}), **self._auth})
-        body = self._request(method, f"{self.api}{path}?{query}", path)
+        data = urllib.parse.urlencode(form).encode() if form else None
+        headers = {"Content-Type": "application/x-www-form-urlencoded"} if data else None
+        body = self._request(method, f"{self.api}{path}?{query}", path, headers, data)
         return json.loads(body) if body else None
 
     def board_cards(self) -> list[dict]:
@@ -85,6 +95,24 @@ class TrelloSource:
         path.write_bytes(self._request("GET", attachment["url"], f"attachment {attachment['id']}",
                                        {"Authorization": header}))
         return path
+
+    def create_card(self, list_id: str, name: str, desc: str = "",
+                    label_ids: list[str] | None = None) -> dict:
+        """Create a card and return the shape `card()` returns, so both read the same way.
+
+        Exists because the CLI could read, link and move cards but not create one: an epic card had to
+        be posted to the API by hand on 2026-10-24, outside this tool and therefore outside its
+        config, its retries and its list/label resolution. The name and description go in the BODY
+        (see `_call`).
+        """
+        form = {"name": name, "desc": desc}
+        if label_ids:
+            form["idLabels"] = ",".join(label_ids)
+        c = self._call("POST", "/cards", {"idList": list_id}, form)
+        names = {v: k for k, v in self.lists.items()}
+        return {"id": c["id"], "shortLink": c["shortLink"], "url": c["shortUrl"], "name": c["name"],
+                "list": names.get(c["idList"], c["idList"]),
+                "labels": [lb.get("name") for lb in c.get("labels", [])]}
 
     def move(self, card_id: str, list_id: str) -> None:
         self._call("PUT", f"/cards/{card_id}", {"idList": list_id})

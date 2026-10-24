@@ -109,6 +109,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--apply", action="store_true", help="perform the moves on the tracker")
     s.add_argument("--only", action="append", default=[], help="restrict to these cards (repeatable)")
     s.add_argument("--comment", action="store_true", help="also post a status comment on each moved card")
+    s = sub.add_parser("create", help="create a card on the board (list and labels resolved from the manifest)")
+    s.add_argument("--name", required=True, help="card title")
+    s.add_argument("--list", required=True, dest="list_name",
+                   help="list NAME as the manifest declares it (e.g. Backlog), never a raw id")
+    s.add_argument("--label", action="append", default=[], dest="labels",
+                   help="label NAME from the manifest (repeatable), e.g. evol")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--desc-file", help="read the description from a FILE — preferred: a description is long, "
+                                       "and text passed through argv is interpreted by the shell")
+    g.add_argument("--desc", help="short description inline")
     s = sub.add_parser("forget-push", help="forget our last push of cards moved back on purpose (not reporter feedback)")
     s.add_argument("refs", nargs="+")
     a = p.parse_args(argv)
@@ -160,6 +170,22 @@ def main(argv: list[str] | None = None) -> int:
         elif a.cmd == "decide":
             _emit(t.decide(a.ref, a.decision, a.reason, a.review))
             t.save()
+        elif a.cmd == "create":
+            # Resolve NAMES to ids from the manifest, and refuse loudly on an unknown one: posting to
+            # the wrong list is a visible mistake on someone else's board, so it must fail before the
+            # call, naming what is available rather than guessing.
+            lists, labels = t.config.get("lists") or {}, t.config.get("labels") or {}
+            if a.list_name not in lists:
+                raise SystemExit(json.dumps({"error": f"unknown list {a.list_name!r}",
+                                             "available": sorted(lists)}))
+            unknown = [lb for lb in a.labels if lb not in labels]
+            if unknown:
+                raise SystemExit(json.dumps({"error": f"unknown label(s) {unknown}",
+                                             "available": sorted(labels)}))
+            desc = Path(a.desc_file).read_text(encoding="utf-8") if a.desc_file else (a.desc or "")
+            card = source_for(t.config).create_card(
+                lists[a.list_name], a.name, desc, [labels[lb] for lb in a.labels])
+            _emit(card)
         elif a.cmd == "link":
             _emit(t.link(a.ref, a.story, a.epic))
             t.save()
