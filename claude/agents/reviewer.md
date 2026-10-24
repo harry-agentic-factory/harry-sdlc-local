@@ -38,6 +38,19 @@ Un test vert en H2/mock ne prouve pas la prod. Sur le diff, traque les pièges q
       **smoke context-load** (`@SpringBootTest`), qu'une slice `@DataJpaTest` n'attrape pas.
 - [ ] **Must-run gates présentes** : le diff ajoute-t-il (ou conserve-t-il) un **IT PostgreSQL iso-prod** +
       un **smoke context-load** quand la logique touche DB/migration/boot ?
+- [ ] **Double écriture sans compensation** : le diff écrit-il la **même donnée dans deux systèmes** (base
+      locale + service distant, base + cache, base + annuaire) ? Une transaction locale **ne rollbacke pas**
+      l'appel distant déjà commité. Exige donc une **compensation** (elle-même rejouable ou tracée) ou une
+      **réconciliation idempotente** — « best-effort » n'en est pas une. Vécu : 172 comptes existaient dans
+      le service de référence sans ligne miroir, dont 165 sur un même tenant, **pendant deux ans**.
+- [ ] **Donnée jetée en silence** : le diff contient-il un `log.warn`/`log.error` suivi d'un `continue`,
+      `return null` ou `skip` sur un état censé être impossible ? C'est un **générateur de défauts
+      invisibles** : exige un **compteur/metric ou une alerte**, pas une ligne de log. Ce qui n'est pas
+      compté n'est pas détectable — et le défaut ci-dessus faisait exactement ça, en annonçant 231 comptes
+      sur une liste qui ne pouvait en afficher que 66.
+- [ ] **Compteur et contenu de même source** : sur une réponse paginée, le `total` et les **lignes**
+      viennent-ils du **même** ensemble ? S'ils viennent de deux sources, le contrat est faux dès qu'elles
+      divergent, et la recette ne le voit qu'en comptant **toutes** les pages (cf. skill `recette`, oracle A).
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

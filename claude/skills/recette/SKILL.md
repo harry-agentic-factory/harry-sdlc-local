@@ -65,6 +65,44 @@ l'`echo` pas. `curl -s -n` pour ce qui lit `.netrc`. **Jamais** `-L`/`%{redirect
 - **Résilience** : écris le résultat de chaque critère dans `acceptance.md` **au fur et à mesure**
   (append), pour ne rien perdre en cas de coupure.
 
+## 3 bis. Deux oracles EXHAUSTIFS (liste paginée, donnée en double écriture)
+
+Un critère vérifié sur **un** échantillon passe alors que le défaut est à la ligne 313. Ces deux oracles
+comptent **tout** ; c'est le seul moyen d'attraper ce qui **manque**. Ils ont trouvé, le 2026-10-24, un
+défaut d'intégrité vieux de **deux ans** qu'aucune recette n'avait vu.
+
+### Oracle A — « ce qui est annoncé est servi »
+Pour **toute** liste paginée : parcours **toutes** les pages, à **plusieurs** tailles de page, et assère
+
+```
+totalElements annoncé  ==  nombre de lignes distinctes effectivement restituées
+```
+
+Mesure vécue : une liste annonçait `1006` et n'en rendait que `1005`, **à toutes les tailles de page**, avec
+**une page du milieu courte d'une seule ligne**. Un test sur la page 0 — ou sur le total seul — passait. La
+cause : le **compteur** venait d'un service et le **contenu** d'un autre, et la ligne absente était jetée
+par un `log.warn` sans décrémenter le total.
+
+À assérer aussi, car chacun cache une cause différente : **aucun doublon** entre pages, et **aucun trou**
+(la concaténation des pages == l'ensemble attendu, pas seulement le bon cardinal).
+
+### Oracle B — « les deux côtés d'une double écriture coïncident »
+Dès qu'une donnée vit à **deux endroits** (base de référence + miroir local, cache, index de recherche,
+annuaire…), compare les **ensembles de clés**, jamais deux `count(*)` :
+
+```
+clés à gauche  \  clés à droite   -> doit être VIDE
+clés à droite  \  clés à gauche   -> doit être VIDE
+```
+
+Un écart de **cardinal** se voit ; un écart de **contenu à cardinal égal** ne se voit pas. Et refais-le sur
+**plusieurs** tenants/périmètres : le défaut réel était absent de **13 périmètres sur 16**, donc un seul
+échantillon propre ne prouve rien.
+
+⚠ **Un `log.warn` sur un état « impossible » est un générateur de défauts silencieux.** Si tu vois du code
+qui **jette** une donnée en la journalisant, remonte-le même si le critère passe : ce qui n'est pas compté
+n'est pas détectable — ici, 172 lignes perdues et une liste client annonçant 231 pour 66 affichables.
+
 ## 4. Sur KO reproductible → bundle repro
 Dans `<data>/<EPIC>/stories/<STORY>/repro/` : `steps.md` (séquence rejouable), `env.md` (URL/version),
 `fixtures.md` (compte/ids de test, **sans secret**), la réponse/`snapshot`, le critère violé. C'est ce
