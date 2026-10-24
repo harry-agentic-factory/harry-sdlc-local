@@ -8,7 +8,8 @@ from tracker.store import Tracker, card_ref
 
 LISTS = {"Backlog": "L0", "TODO": "L1", "IN PROGRESS": "L2", "TOVALIDATE": "L3", "VALIDATED": "L4"}
 BLOCK = {"_note": "comment", "type": "trello", "board": "B", "credentials": "/nowhere.json",
-         "lists": LISTS, "intake": {"TODO": "bug", "Backlog": "evol"}}
+         "lists": LISTS, "intake": {"TODO": "bug", "Backlog": "evol"},
+         "labels": {"bug": "LB-bug", "evol": "LB-evol"}}
 
 
 def remote(cid, short, lst="L1", activity="2026-09-23T10:00:00.000Z", labels=("bug",), name=None):
@@ -151,7 +152,7 @@ def test_links_survive_a_save_load_round_trip(t):
 # ---- CLI --------------------------------------------------------------------------------------------------
 class FakeBoard:
     def __init__(self, cards):
-        self.cards, self.moved, self.comments = cards, [], []
+        self.cards, self.moved, self.comments, self.created = cards, [], [], []
 
     def board_cards(self):
         return self.cards
@@ -161,6 +162,11 @@ class FakeBoard:
 
     def comment(self, cid, text):
         self.comments.append((cid, text))
+
+    def create_card(self, list_id, name, desc="", label_ids=None):
+        self.created.append((list_id, name, desc, label_ids or []))
+        return {"id": "cNEW", "shortLink": "NEW1", "url": "https://trello.com/c/NEW1",
+                "name": name, "list": list_id, "labels": ["evol"]}
 
 
 @pytest.fixture
@@ -246,3 +252,53 @@ def test_cli_unknown_card_is_a_clean_error(env, capsys):
     run(capsys, "init")
     code, _, err = run(capsys, "show", "ZZZ")
     assert code == 2 and "unknown" in json.loads(err)["error"]
+
+
+# --- create: the CLI could read, link and move cards but not create one ------------------------
+#
+# An epic card had to be posted to the Trello API by hand on 2026-10-24 — outside this tool, so
+# outside its config, its retries and its name resolution. These tests pin the two properties that
+# make the command safe to use on someone else's board.
+
+
+def test_create_resolves_list_and_label_names_from_the_manifest(env, capsys):
+    root, board, _ = env
+    run(capsys, "init")
+    code, out, _ = run(capsys, "create", "--name", "An epic", "--list", "Backlog",
+                       "--label", "evol", "--desc", "short body")
+    assert code == 0
+    # what reached the board is the RESOLVED id, never the name the caller typed
+    assert board.created == [("L0", "An epic", "short body", ["LB-evol"])]
+    assert out["shortLink"] == "NEW1" and out["url"].endswith("/NEW1")
+
+
+def test_create_refuses_an_unknown_list_and_names_the_available_ones(env, capsys):
+    root, board, _ = env
+    run(capsys, "init")
+    with pytest.raises(SystemExit) as e:
+        run(capsys, "create", "--name", "x", "--list", "Backlogg")
+    payload = json.loads(str(e.value))
+    assert "Backlogg" in payload["error"] and "Backlog" in payload["available"]
+    assert board.created == []          # nothing was posted: it failed BEFORE the call
+
+
+def test_create_refuses_an_unknown_label(env, capsys):
+    root, board, _ = env
+    run(capsys, "init")
+    with pytest.raises(SystemExit) as e:
+        run(capsys, "create", "--name", "x", "--list", "Backlog", "--label", "nope")
+    payload = json.loads(str(e.value))
+    assert "nope" in payload["error"] and "evol" in payload["available"]
+    assert board.created == []
+
+
+def test_create_reads_a_long_description_from_a_file(env, capsys, tmp_path):
+    root, board, _ = env
+    run(capsys, "init")
+    body = "line one\n\n- a bullet with `backticks` and $VARS that a shell would have eaten\n" * 40
+    f = tmp_path / "desc.md"
+    f.write_text(body, encoding="utf-8")
+    code, _, _ = run(capsys, "create", "--name", "x", "--list", "Backlog", "--desc-file", str(f))
+    assert code == 0
+    assert board.created[0][2] == body          # verbatim, backticks and $VARS intact
+    assert len(board.created[0][2]) > 2000      # the case that must not go through a query string

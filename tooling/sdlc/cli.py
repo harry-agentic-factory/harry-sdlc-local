@@ -217,7 +217,16 @@ def run(argv: list[str] | None = None) -> dict:
     a = pmsub.add_parser("add", help="consigne un item (qui/epic/story + kind/sévérité/texte)")
     a.add_argument("--agent", required=True, help="qui consigne (reviewer|recetteur|deployer|fixer|dev|demo|human|<commande>)")
     a.add_argument("--kind", required=True, help="debt|learning|incident|security|brain")
-    a.add_argument("--text", required=True, help="description (jamais de secret)")
+    a.add_argument("--text", required=True,
+                   help="le CONTEXTE COMPLET, jamais un resume, et JAMAIS de secret. L'item sera lu des "
+                        "semaines plus tard, par un humain ou un tri IA, sans la conversation ni les mesures "
+                        "de la session. Il porte donc : le fait CHIFFRE + la commande qui l'a produit + la "
+                        "DATE ; le file:line ou l'identifiant precis ; la cause avec son NIVEAU DE PREUVE "
+                        "(mesure|lu-dans-le-code|infere) ; la consequence ATTEIGNABLE ; ce qui est DEJA "
+                        "corrige s'il s'agit d'un reste ; le CONTRE-COUP du correctif ; le verbatim de la "
+                        "decision humaine s'il y en a une ; et pour toute ABSENCE, le CONTROLE POSITIF. Un "
+                        "item qui decrit un CHOIX doit le dire, sinon le tri propose de corriger un "
+                        "arbitrage rendu. Autosuffisant, pas long.")
     a.add_argument("--epic", help="ID épic concerné")
     a.add_argument("--story", help="ID story concernée")
     a.add_argument("--severity", default="medium", help="low|medium|high (défaut medium)")
@@ -286,7 +295,16 @@ def run(argv: list[str] | None = None) -> dict:
         if args.pmcmd == "add":
             item = store.add(agent=args.agent, kind=args.kind, text=args.text,
                              epic=args.epic, story=args.story, severity=args.severity)
-            return {"id": item.id}
+            out = {"id": item.id}
+            # On AVERTIT, on ne refuse pas : un seuil qui bloque se contourne par du remplissage, alors
+            # qu'un avertissement rendu dans le JSON est lu par l'agent qui vient d'ecrire et l'amene a
+            # completer. Mesure du 2026-10-24 : sur 125 items, les plus couteux a instruire n'etaient pas
+            # les plus complexes mais les plus mal contextualises.
+            missing = _pm_text_gaps(args.text)
+            if missing:
+                out["warning"] = ("contexte probablement incomplet (cf. --text) : " + ", ".join(missing)
+                                  + ". Completer avec `pm status` ou un item de remplacement.")
+            return out
         if args.pmcmd == "list":
             return {"items": [dataclasses.asdict(i) for i in store.list(
                 epic=args.epic, story=args.story, agent=args.agent,
@@ -361,6 +379,28 @@ def run(argv: list[str] | None = None) -> dict:
         return {"story": args.story, "branch": branch, "refBranch": ref, "worktrees": out}
     raise SystemExit(2)
 
+
+
+def _pm_text_gaps(text: str) -> list[str]:
+    """Signale ce qui manque vraisemblablement au contexte d'un item de post-mortem.
+
+    Heuristique volontairement grossiere et NON bloquante : elle ne juge pas la qualite, elle rappelle
+    les marqueurs qu'un item autosuffisant porte presque toujours. Un faux positif coute une ligne
+    d'avertissement ; un item elliptique coute une re-mesure complete des semaines plus tard.
+    """
+    import re as _re
+    gaps = []
+    if len(text) < 180:
+        gaps.append("tres court (<180 car.)")
+    if not _re.search(r"\d", text):
+        gaps.append("aucun chiffre (un fait se mesure)")
+    if not _re.search(r"\d{4}-\d{2}-\d{2}", text):
+        gaps.append("aucune date ISO (quand a-ce ete mesure ?)")
+    if not _re.search(r"[\w/.-]+\.(java|py|ts|tsx|js|mjs|yml|yaml|xml|sh|groovy|json)\b|:\d+\b", text):
+        gaps.append("aucun file:line ni identifiant precis")
+    if not _re.search(r"mesur|lu-dans-le-code|infer|niveau de preuve", text, _re.I):
+        gaps.append("aucun niveau de preuve (mesure|lu-dans-le-code|infere)")
+    return gaps
 
 def main(argv: list[str] | None = None) -> int:
     from .brain import BrainError

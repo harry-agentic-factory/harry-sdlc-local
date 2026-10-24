@@ -38,6 +38,19 @@ Un test vert en H2/mock ne prouve pas la prod. Sur le diff, traque les pièges q
       **smoke context-load** (`@SpringBootTest`), qu'une slice `@DataJpaTest` n'attrape pas.
 - [ ] **Must-run gates présentes** : le diff ajoute-t-il (ou conserve-t-il) un **IT PostgreSQL iso-prod** +
       un **smoke context-load** quand la logique touche DB/migration/boot ?
+- [ ] **Double écriture sans compensation** : le diff écrit-il la **même donnée dans deux systèmes** (base
+      locale + service distant, base + cache, base + annuaire) ? Une transaction locale **ne rollbacke pas**
+      l'appel distant déjà commité. Exige donc une **compensation** (elle-même rejouable ou tracée) ou une
+      **réconciliation idempotente** — « best-effort » n'en est pas une. Vécu : 172 comptes existaient dans
+      le service de référence sans ligne miroir, dont 165 sur un même tenant, **pendant deux ans**.
+- [ ] **Donnée jetée en silence** : le diff contient-il un `log.warn`/`log.error` suivi d'un `continue`,
+      `return null` ou `skip` sur un état censé être impossible ? C'est un **générateur de défauts
+      invisibles** : exige un **compteur/metric ou une alerte**, pas une ligne de log. Ce qui n'est pas
+      compté n'est pas détectable — et le défaut ci-dessus faisait exactement ça, en annonçant 231 comptes
+      sur une liste qui ne pouvait en afficher que 66.
+- [ ] **Compteur et contenu de même source** : sur une réponse paginée, le `total` et les **lignes**
+      viennent-ils du **même** ensemble ? S'ils viennent de deux sources, le contrat est faux dès qu'elles
+      divergent, et la recette ne le voit qu'en comptant **toutes** les pages (cf. skill `recette`, oracle A).
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
@@ -52,6 +65,36 @@ sdlc --project <PREFIX> pm add --agent reviewer --kind <debt|incident> \
      --epic <EPIC> --story <STORY> --severity <low|medium|high> --text '<constat concis, JAMAIS de secret>'
 ```
 `<PREFIX>/<EPIC>/<STORY>` = ceux de ta story (fournis par l'orchestration). Tu ne fais **pas** avancer l'état ; l'item sera trié plus tard (`pm status` / `pm to-ticket` / `pm to-brain`). Charge le skill `agent-resilience` pour le rappel transverse.
+
+### Le contexte COMPLET, pas un résumé — exigence d'Anis (2026-10-24)
+
+> « pour la suite quand il y a un PM il faut le contexte complet »
+
+Un item est lu **des semaines plus tard**, par un humain ou par un tri IA, qui n'a **ni ta conversation, ni
+tes mesures, ni les décisions de la session**. Un item elliptique coûte donc plus cher qu'il ne rapporte : il
+faut tout re-mesurer pour comprendre de quoi il parle. Mesuré sur 125 items : les plus coûteux à instruire
+n'étaient pas les plus complexes, c'étaient les plus **mal contextualisés** — et plusieurs attribuaient leur
+cause à la mauvaise chose, ce qui fait **escalader le lecteur dans la mauvaise direction**.
+
+Ton `--text` porte donc, au minimum :
+
+- **le fait mesuré** : la valeur chiffrée, la commande ou la requête qui l'a produite, et la **date** ;
+- **le `file:line`** ou l'identifiant précis (realm, tenant, pod, numéro de build) — jamais « dans le service X » ;
+- **la cause**, avec son **niveau de preuve** explicite : `mesuré` / `lu-dans-le-code` / `inféré` ;
+- **la conséquence atteignable** : qui est touché, aujourd'hui, et par quel chemin ;
+- **ce qui est DÉJÀ corrigé**, s'il s'agit d'un reste — sinon le tri instruit du résolu ;
+- **le contre-coup du correctif** s'il y en a un, parce que c'est souvent lui qui décide ;
+- **le verbatim de la décision humaine**, si une décision a été prise ;
+- et, pour toute affirmation d'**absence**, le **contrôle positif** qui prouve que ta méthode sait trouver
+  ce qui existe.
+
+⚠ **Un item qui décrit un CHOIX doit le dire.** Sans ça, le tri propose de « corriger » un arbitrage rendu.
+Vécu : l'absence délibérée de `livenessProbe` lue comme un défaut ouvert. D'où **trois** catégories et non
+deux — vrai, corrigé, **choisi**.
+
+Long n'est pas le but : **autosuffisant** l'est. Un item qu'on peut traiter sans te poser de question est
+réussi, quelle que soit sa taille.
+
 
 ## Workspace de run
 
