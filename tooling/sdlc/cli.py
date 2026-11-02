@@ -15,6 +15,7 @@ import dataclasses
 import difflib
 import json
 import sys
+from pathlib import Path
 
 from .config import current_project, load_config, resolve_deploy_target, resolve_workspace, resolved_manifest
 from .board import NullBoard
@@ -162,6 +163,22 @@ def run(argv: list[str] | None = None) -> dict:
     a = sub.add_parser("register", help="enregistre un projet existant dans le registre")
     a.add_argument("prefix", help="préfixe projet"); a.add_argument("path", help="chemin du repo data")
     sub.add_parser("projects", help="liste les projets enregistrés")
+    a = sub.add_parser("fidelity", help="fidélité à la maquette d'un ticket/épic (maquette déclarée, section, "
+                                        "éléments, manques)")
+    a.add_argument("target", nargs="?", help="ID ticket ou épic (sinon : projet entier)")
+    a = sub.add_parser("maquette", help="outils de maquette : lire la table d'une spec, rendre un verdict de "
+                                        "comparaison")
+    m = a.add_subparsers(dest="sub", metavar="<sous-commande>")
+    b = m.add_parser("extract", help="la table « Fidélité à la maquette » d'une spec, en JSON")
+    b.add_argument("spec", help="chemin d'un spec-func.md ou spec-tech.md")
+    b = m.add_parser("verdict", help="compare une checklist et des mesures ; CODE DE RETOUR 1 s'il y a un écart")
+    b.add_argument("checklist", help="sortie de `maquette extract`")
+    b.add_argument("measures", help="JSON {<id>: {\"obtenu\": \"<valeur>\"}}")
+    b = m.add_parser("socle", help="une maquette est-elle construite avec les jetons et composants du socle ? "
+                                   "CODE DE RETOUR 1 s'il y a un signalement, 2 sans socle déclaré")
+    b.add_argument("maquette", help="chemin du .html de la maquette")
+    b.add_argument("--repo", required=True, help="repo dont le socle fait référence (manifest `socle.<repo>`)")
+    b.add_argument("--spec", help="spec portant la table, pour contrôler la correspondance et les écarts")
     a = sub.add_parser("config", help="manifest résolu du projet (deploy/recette/credentials…)")
     a.add_argument("--raw", action="store_true", help="config brute non résolue")
     a = sub.add_parser("skills", help="skills matchés par la stack de chaque repo (repo → stack → skills)")
@@ -255,6 +272,81 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "register":
         from .project import register_project
         return {"prefix": args.prefix, "registered": register_project(args.prefix, args.path)}
+    if args.cmd == "fidelity":
+        from . import maquette
+        s = _sdlc(args.project)
+        target = args.target
+        tickets = [t for t in s.list_backlog(None)
+                   if target is None or t.id == target or t.epic == target]
+        if target is not None and not tickets:
+            raise ValueError(f"fidelity: '{target}' est inconnu (ni ticket, ni épic)")
+        stories = [maquette.report(t, s.ws.root) for t in tickets]
+        by_id = {t.id: t for t in tickets}
+        if target is not None and target in by_id:   # the target IS a story, not an epic of one story
+            return {"target": target, "stories": stories}
+        # Over several stories the per-story note repeats for every story of an epic that draws maquettes —
+        # measured at 86 of 126 on a real repository, which is noise, not a signal. One line per epic instead.
+        notes, undeclared = [], {}
+        for story in stories:
+            if story.pop("note", None) == maquette.POSSIBLE_UNDECLARED:
+                epic = by_id[story["id"]].epic          # authoritative, unlike slicing the identifier
+                undeclared[epic] = undeclared.get(epic, 0) + 1
+        for epic, count in sorted(undeclared.items()):
+            notes.append(f"{epic} : {count} stories sans maquette déclarée, alors que l'épic en contient "
+                         f"(déclarez-la sur les stories d'écran — `sdlc link <STORY> maquette <chemin>`)")
+        out = {"target": target, "stories": stories}
+        if notes:
+            out["notes"] = notes
+        return out
+    if args.cmd == "maquette":
+        from . import maquette
+        from .brain.cli import CommandResult
+        if args.sub == "extract":
+            section = maquette.read_section(Path(args.spec).read_text(encoding="utf-8"))
+            if section is None:
+                raise ValueError(f"maquette extract: {args.spec} n'a pas de section « {maquette.SECTION} »")
+            return [{"id": i.id, "element": i.element, "attendu": i.expected, "socle": i.token,
+                     "controle": None if i.control is None else {"selecteur": i.control.selector,
+                                                                 "propriete": i.control.prop,
+                                                                 "valeur": i.control.value},
+                     "invalide": i.invalid} for i in section.items]
+        if args.sub == "verdict":
+            raw = json.loads(Path(args.checklist).read_text(encoding="utf-8"))
+            items = [maquette.Item(
+                id=o["id"], element=o.get("element", ""), expected=o.get("attendu", ""), token=o.get("socle", ""),
+                control=None if not o.get("controle") else maquette.Control(
+                    o["controle"]["selecteur"], o["controle"]["propriete"], o["controle"]["valeur"]),
+                invalid=bool(o.get("invalide")),
+            ) for o in raw]
+            measures = json.loads(Path(args.measures).read_text(encoding="utf-8"))
+            deviations = maquette.compare(items, measures)
+            payload = {"écarts": [{"id": d.id, "attendu": d.expected, "obtenu": d.obtained, "cause": d.cause}
+                                  for d in deviations],
+                       # An invalid element has, by construction, no measure: counting it as measured would
+                       # put a false number in acceptance.md, which the recette skill pastes verbatim.
+                       "mesurés": len(items) - sum(1 for d in deviations
+                                                   if d.cause in (maquette.NOT_MEASURED, maquette.CHECK_INVALID)),
+                       "éléments": len(items)}
+            # The only subcommands with a business exit code: a deviation must fail a caller.
+            return CommandResult(payload, exit_code=1 if deviations else 0)
+        if args.sub == "socle":
+            socle = (resolved_manifest(args.project).get("socle") or {}).get(args.repo)
+            if not socle:
+                return CommandResult({"error": f"aucun socle déclaré pour {args.repo} "
+                                               f"(manifest : `socle.{args.repo}`)"}, exit_code=2)
+            items, deviations = None, ""
+            if args.spec:
+                section = maquette.read_section(Path(args.spec).read_text(encoding="utf-8"))
+                if section is not None:
+                    items, deviations = section.items, section.deviations or ""
+            payload = maquette.analyse_socle(
+                Path(args.maquette).read_text(encoding="utf-8", errors="replace"),
+                maquette.tokens_of(socle.get("tokens") or []),
+                maquette.socle_prefix(socle.get("components")),
+                items, deviations)
+            undeclared = [s for s in payload["signalements"] if not s["déclaré"]]
+            return CommandResult(payload, exit_code=1 if (undeclared or payload["notes"]) else 0)
+        raise SystemExit(2)
     if args.cmd == "projects":
         from .project import list_projects
         # `current` = projet déduit du CWD (lève l'ambiguïté quand plusieurs sont enregistrés).

@@ -1,0 +1,6 @@
+{
+  "_source": "Valeurs lues sur le code livré au commit 06a270d4 de la plateforme. Un sha de commit situe une mesure : c'est l'exception déclarée à la règle qui interdit un identifiant de ticket. Les icônes portent sur les quatre étapes du parcours ; la ligne « usine » est hors de la liste contrôlée.",
+  "icones": {"obtenu": "circle-dashed, circle-dashed, circle-dashed, circle-dashed"},
+  "trait": {"obtenu": "none"},
+  "italique": {"obtenu": "italic"}
+}

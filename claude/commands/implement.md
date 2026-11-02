@@ -9,6 +9,8 @@ Réhydrate : `sdlc --project <PREFIX> get <STORY>` ; lis son `spec-tech.md` (pla
 - Tu **suis le plan** du `spec-tech.md`, tu ne re-designes pas. Déviation ⇒ tu l'expliques et tu la fais
   valider avant de continuer.
 - **Les invariants sont la loi** : ton code ne doit en casser aucun (ils seront la checklist du reviewer).
+- **Les éléments de la table « Fidélité à la maquette » sont attendus à l'écran**, comme les invariants. Un
+  conflit entre la maquette et le plan est une **question posée avant de coder**, jamais un arbitrage silencieux.
 - **Worktree DÈS l'implémentation** : code dans le **worktree isolé** du ticket (`_wt/<repo>/<branche>`), pas
   dans le working tree principal → N stories implémentables en parallèle, et le worktree porte
   **implement→review→deploy→fix** en continu (les agents lisent le même worktree).
@@ -44,6 +46,8 @@ un seul). Charge les skills de **chaque repo touché** (ex. `java-spring` → `r
 8. **Avance** : `set-status <STORY> implemented`.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
 - Récap : fichiers par repo, statut build/tests, invariants vérifiés (✓/✗), branche(s)/MR.

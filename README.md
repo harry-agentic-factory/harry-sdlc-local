@@ -164,13 +164,15 @@ claude/
                implement, ticket, promote (fin d'épic : doc → main → redéploiement → TNR complète),
                run-story (le « mode auto » : enchaîne tout depuis l'état courant), sdlc (état en session)
   workflows/   run-ticket.js (gates) · run-ticket-full-auto.js (env d'intégration)
-  skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · agent-resilience (discipline agents longs)
+  skills/      loop-engineering (mode op du run auto) · deploy-jenkins · recette · recette-ui (dont l'étape
+               « 2 bis. Comparaison à la maquette ») · agent-resilience (discipline agents longs)
   sdlc/        harry.md (persona)
 tooling/
   sdlc/        state-machine, DAG, workspace, board, service, cli, mcp_server, migrations/, brain/
   cockpit/     board + Inbox HITL (FastAPI + page)
-  tests/       216 tests (déterministe, offline)
-docs/PRD.md
+  tests/       tests déterministes, offline (`make -C tooling test`)
+docs/PRD.md · docs/maquettes.md (une maquette se construit avec le design system du projet)
+docs/engine-distribution.md (comment une version du moteur atteint les sessions)
 ```
 
 ## Installer / tester
@@ -260,11 +262,42 @@ Source de vérité lue par **les agents** via `sdlc config` (au lieu de reverse-
   "brainRef": "main",                      // optionnel : branche, tag ou sha lu dans le Brain (défaut main puis master)
   "refBranch": "main",                     // cible de merge ⇒ cleanup worktree
   "deploy": { "app-repo": { "skill": "deploy-jenkins", "ci": "prod/app/ci", "gitops": "ops@prod" } },
+  "socle": { "web-repo": { "tokens": ["src/tokens.css"], "components": "src/ui" } },  // design system du projet
   "escalation": { … }, "schemaVersion": "0.2.0" }
 ```
 `sdlc config` renvoie la vue **résolue** (chemins absolus) ; `sdlc config --raw` renvoie le fichier brut.
 `sdlc config` ajoute `brainRef` (la ref retenue), `brainCommit` (sha résolu, **sans fetch**) et `brainRefFrom`
 (`origin` | `local` | `tag` | `sha`) ; ref introuvable ou Brain hors git ⇒ `null` + un avertissement JSON sur stderr.
+
+### Fidélité à la maquette (`sdlc fidelity`, `sdlc maquette`) — un écran tient ce que sa maquette montre
+Quand une story d'écran a une maquette **déclarée** (`sdlc link <STORY> maquette <chemin>`), sa fidélité est
+contrôlée à chaque étape. Origine : un panneau livré sans ses icônes, sans son trait de liaison et en italique,
+alors que la maquette validée les montrait — avec 99 contrôles d'alignement au pixel tous verts.
+
+```bash
+sdlc link <STORY> maquette <chemin relatif au dépôt data>   # la SEULE façon de créer l'obligation
+sdlc fidelity <STORY|EPIC>                                  # état : maquette, section, éléments, manques
+sdlc maquette extract <spec-func.md>                        # la table de la section, en JSON
+sdlc maquette verdict <checklist.json> <mesures.json>       # écarts ; CODE DE RETOUR 1 s'il y en a
+sdlc maquette socle <maquette.html> --repo <repo> [--spec …]  # hors design system ? 1 signalement · 2 sans socle
+```
+
+- **Les specs** portent alors une section **conditionnelle** `## Fidélité à la maquette` (après `## Comportement`,
+  après `## Invariants`), avec une table dont la colonne `Contrôle` a une **forme fermée** :
+  `` `<sélecteur>` → `<propriété>` = `<valeur>` `` — propriété CSS **longhand**, ou `icône`, ou `présence`. Une
+  liste séparée par des virgules se compare comme une **suite ordonnée**. `Attendu (maquette)` reste de la prose
+  pour l'humain et n'entre pas dans le verdict.
+- **Les trois gates refusent** (`maquette_section_missing`) une spec d'écran à maquette sans section conforme,
+  **avant toute écriture**.
+- **La recette UI** compare élément par élément **avant** de mesurer les alignements, et ne conclut pas `pass`
+  sans ce verdict (skill `recette-ui`, étape « 2 bis »).
+- **Le moteur ne devine jamais** quelle maquette appartient à quelle story : déduire le fichier du numéro de la
+  story a été implémenté, mesuré sur 126 stories réelles — **14 détections fausses sur 17**, le suffixe d'une
+  maquette étant un numéro de **version** — puis retiré. Reste un filet qui ne nomme aucun fichier : quand un épic
+  dessine des maquettes et qu'une story n'en déclare aucune, l'état le **signale**, sans rien refuser.
+- **Un écart à une maquette validée par un humain** ne se tranche pas par délégation : il remonte à l'humain
+  (règle « La maquette est une exigence » de la persona, pointée par les prompts de spec, de revue et de recette).
+- Construire une maquette avec le design system du projet, et la faire relire : `docs/maquettes.md`.
 
 ### Brain (`sdlc brain`) — le dépôt de connaissance lu à un commit
 Le Brain est un dépôt git (ou un sous-dossier d'un dépôt) ; git est sa seule vérité. Une **note** = un `*.md` suivi

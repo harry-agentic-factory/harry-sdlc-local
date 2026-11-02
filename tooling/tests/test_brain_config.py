@@ -14,7 +14,8 @@ from test_brain import fx_add_commit, fx_clone, git, make_fx_brain, make_fx_mast
 BRAIN_KEYS = {"brainRef", "brainCommit", "brainRefFrom"}
 MANIFEST_KEYS = {"prefix", "workspace", "reposRoot", "repos", "roles", "stacks", "brain", "refBranch", "deploy",
                  "recette", "guidelines", "skillsByRepo", "credentials", "permissions", "escalation", "board",
-                 "schemaVersion", "infra", "tracker"}  # infra/tracker: trunk (investigate)
+                 "schemaVersion", "infra", "tracker",  # infra/tracker: trunk (investigate)
+                 "socle"}                              # socle: the project design system (maquette fidelity)
 
 
 def project(tmp_path: Path, monkeypatch, name: str = "ws", **cfg) -> Path:

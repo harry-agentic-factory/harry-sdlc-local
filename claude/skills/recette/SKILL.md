@@ -34,6 +34,10 @@ bash $D/pf_curl.sh <ns> <deploy> <containerPort> <path> [curl_opts…]   # port-
 bash $D/safe_run.sh <timeout_sec> -- <commande…>                        # borne n'importe quoi (rc=124 si dépassé)
 ```
 
+
+> **Story à maquette** : la passe UI comprend l'étape de comparaison du skill `recette-ui` (« 2 bis. Comparaison à la
+> maquette »), **obligatoire** dès que la spec porte une section « Fidélité à la maquette ». Sans son verdict, `pass: false`.
+
 ## 1. Récupère le QUOI et le COMMENT
 ```bash
 sdlc --project <PREFIX> get <STORY>          # repos touchés, branche, artefacts
@@ -111,6 +115,8 @@ resume-safe, découpe si long). Spécifique recette : **filtre** chaque réponse
 ## Fallback connaissances profondes
 Spécifiques d'auth/endpoint d'un projet : le **Brain** (`.brain` du manifest) + le `CLAUDE.md` du repo.
 Le manifest reste la source des **paramètres d'accès** ; le Brain, le **pourquoi/comment fin**.
+
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Workspace de run
 
