@@ -22,6 +22,13 @@ DELIVERABLE_SECTIONS: dict[str, tuple[str, ...]] = {
     "spec-tech.md": ("Invariants", "Plan par repo", "Tests", "Sources"),
 }
 
+# Sections a deliverable carries ONLY under a condition, with the index they take among the required ones.
+# `_scaffold` must never use them: a story without a maquette would get an empty section.
+CONDITIONAL_SECTIONS: dict[str, tuple[tuple[str, int], ...]] = {
+    "spec-func.md": (("Fidélité à la maquette", 1),),
+    "spec-tech.md": (("Fidélité à la maquette", 1),),
+}
+
 
 def _scaffold(title: str, name: str) -> str:
     """One `#` title, then the fixed `##` sections of the deliverable, empty."""

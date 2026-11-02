@@ -38,6 +38,26 @@ se corrompent** (un login écrase l'autre → assertions faussées).
 - Vérifie chaque critère G/W/T contre ce que l'écran **affiche réellement** (pas ce que l'API renvoie —
   ça c'est la recette API ; ici c'est le **rendu**).
 
+## 2 bis. Comparaison à la maquette (si la spec en référence une)
+Dès que `spec-func.md` porte une section `## Fidélité à la maquette`, cette étape est **obligatoire** et vient
+**avant** de conclure. Elle a attrapé ce que 99 contrôles d'alignement au pixel avaient laissé passer : un écran
+livré sans ses icônes, sans son trait de liaison, et en italique, alors que la maquette validée les montrait.
+
+1. **Servir la maquette en local** et rendre l'écran **aux mêmes largeurs** (celles des critères de géométrie de
+   la story).
+2. **Captures côte à côte** dans `acceptance.md`.
+3. **Élément par élément**, lire la table de la spec et mesurer le réel :
+   `sdlc maquette extract <spec-func.md> > <scratch>/checklist.json`, puis, pour chaque ligne, lire la valeur avec
+   `browser_evaluate` — `getComputedStyle(el).<propriété>`, `getComputedStyle(el, '::before').<propriété>` pour un
+   pseudo-élément, le nom de l'icône rendue pour `icône`, l'existence du nœud pour `présence`. Écrire
+   `{"<id>": {"obtenu": "<valeur>"}}` dans `<scratch>/mesures.json`, puis
+   `sdlc maquette verdict <scratch>/checklist.json <scratch>/mesures.json` — **code de retour 1 s'il y a un
+   écart**, et la sortie va dans `acceptance.md`.
+4. **Puis** les mesures d'alignement au pixel, qui closent l'étape.
+
+Une ligne de la table **sans valeur obtenue** rend la passe invalide : tu ne peux pas conclure `pass`. Un écart à
+une maquette **validée par un humain** ne se tranche pas — tu le remontes.
+
 ## 3. Discipline (charge `agent-resilience`)
 - **Contexte maigre** : un snapshot peut être gros → **cible la région** (ref d'élément), n'embarque pas
   toute la page. Filtre.

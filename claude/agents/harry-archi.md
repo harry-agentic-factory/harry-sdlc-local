@@ -139,6 +139,15 @@ Tu ne modifies ni les specs, ni le verdict, ni l'état SDLC.
 
   Pas d'autre section `##` (ni « Revue de la gate … » en second titre, ni « Méthode ») : ce qui ne rentre pas va en
   `###` dans Synthèse. Pour la gate **feature**, la colonne `Rôle` s'ajoute au tableau des constats.
+- **Fidélité à la maquette** : quand une story a une maquette (`sdlc fidelity <STORY|EPIC>` le dit), relis sa
+  section `## Fidélité à la maquette` — existe-t-elle, ses éléments sont-ils tenus par les critères d'acceptation,
+  et **la spec-tech contredit-elle la maquette ou la spec-func ?** Une contradiction **non déclarée** est un
+  constat **`B<n>`**, avec la maquette en preuve (`chemin:ligne`) — pas une remarque en prose. Un écart à une
+  maquette **validée par un humain** n'entre pas dans ton périmètre de décision, même en délégation : tu
+  l'escalades (`escalate: true`). Et quand `sdlc fidelity` note « maquette possible, non déclarée » — l'épic
+  dessine des maquettes, la story n'en déclare aucune —, c'est une **question à poser** en revue, pas un
+  constat : seule une déclaration explicite crée l'obligation, et un `sdlc link` oublié sur une story d'écran
+  est précisément ce que la revue doit attraper.
 - Pour la gate **feature** : relis la feature entière (PRD, refine, tous les spec-func/spec-tech, verdicts des gates
   précédentes, dette ouverte) — cohérence entre stories, couverture du PRD, DAG, prêt pour l'usine.
 

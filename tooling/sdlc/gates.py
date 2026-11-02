@@ -425,6 +425,22 @@ def debt_tag(gate: str, target: str, finding: str, role: str | None) -> str:
     return f"[{gate} {target} {role} {finding}]" if role else f"[{gate} {target} {finding}]"
 
 
+_MAQUETTE_DOCS = {"spec_func": ("spec-func.md",), "spec_tech": ("spec-tech.md",),
+                  "feature": ("spec-func.md", "spec-tech.md")}
+
+
+def _refuse_unfaithful_specs(root: Path, g: Gate, targets: list) -> None:
+    """A spec of a mocked-up screen without a conform « Fidélité à la maquette » section stops the gate, before
+    anything is written. A story without a maquette is not read at all."""
+    from . import maquette
+
+    gaps = [gap for t in targets for gap in maquette.check(t, root, _MAQUETTE_DOCS[g.name])]
+    if gaps:
+        raise GateRefused(f"{g.command}: a maquette is declared but its spec does not carry a conform "
+                          f"« {maquette.SECTION} » section — {'; '.join(str(gap) for gap in gaps)}",
+                          "maquette_section_missing")
+
+
 def run_gate(sdlc, gate: str, target: str, verdicts: list[str] | None, review: str | None = None,
              signers: list[str] | None = None, now: str | None = None) -> dict:
     """Check everything, then record the gate. A `GateRefused` leaves the workspace untouched."""
@@ -436,6 +452,7 @@ def run_gate(sdlc, gate: str, target: str, verdicts: list[str] | None, review: s
     if not g.roles and len(verdicts) > 1:
         raise GateRefused(f"{g.command}: one verdict per spec gate", "duplicate_role")
     targets = _targets(sdlc, g, target)
+    _refuse_unfaithful_specs(root, g, targets)
     checked = [check_verdict(root, v, gate, target, review, signers) for v in verdicts]
 
     # --- decide (still read-only) ---

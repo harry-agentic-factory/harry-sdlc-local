@@ -93,7 +93,35 @@ def test_epic_scaffolds_carry_the_fixed_sections_in_order(tmp_path):
     for name, command in (("prd.md", "scope"), ("refine.md", "refine"), ("spec-func.md", "spec-func"),
                           ("spec-tech.md", "spec-tech")):
         template = (commands / f"{command}.md").read_text().split("```markdown", 1)[1].split("```", 1)[0]
-        assert re.findall(r"(?m)^## (.+)$", template) == list(DELIVERABLE_SECTIONS[name]), command
+        assert re.findall(r"(?m)^## (.+)$", template) == expected_sections(name), command
+
+
+def expected_sections(name: str) -> list[str]:
+    """The required sections, plus the conditional ones inserted at their declared index. Stronger than the
+    former equality: it pins the POSITION of a conditional section, not only its presence."""
+    from sdlc.workspace import CONDITIONAL_SECTIONS, DELIVERABLE_SECTIONS
+
+    out = list(DELIVERABLE_SECTIONS[name])
+    for section, index in CONDITIONAL_SECTIONS.get(name, ()):
+        out.insert(index, section)
+    return out
+
+
+def test_the_one_pass_command_enumerates_the_same_sections():
+    """`full-spec.md` has no ```markdown block: it duplicates the two fixed formats IN PROSE, and nothing used to
+    check it. A section added to a format would silently miss that prompt, and the gate would then refuse specs
+    written by following it."""
+    import re as _re
+    from pathlib import Path as _Path
+
+    text = (_Path(__file__).resolve().parents[2] / "claude" / "commands" / "full-spec.md").read_text()
+    for name, marker in (("spec-func.md", "spec-func.md` au **format FIXE**"),
+                         ("spec-tech.md", "spec-tech.md` au **format FIXE**")):
+        prose = text.split(marker, 1)[1].split("set-status", 1)[0]
+        cited = set(_re.findall(r"`## ([^`]+)`", prose))
+        assert set(expected_sections(name)) - {"Sources"} <= cited | {"Sources"}, name
+        for section, _index in __import__("sdlc.workspace", fromlist=["x"]).CONDITIONAL_SECTIONS.get(name, ()):
+            assert section in prose, f"{name}: the conditional section is missing from the prose enumeration"
 
 
 def test_story_stubs_stay_unproduced(tmp_path):

@@ -26,6 +26,18 @@ sans suffixe. Les invariants restent le tableau habituel ; le plan a **un `###` 
 |---|---|---|---|
 | I1 | <garde-fou> | <assertion vérifiable sur le diff> | <dépôt, fichiers> |
 
+## Fidélité à la maquette
+<SEULEMENT si la story a une maquette — sinon cette section n'existe pas>
+
+Maquette : <chemin du fichier dans le dépôt data>
+
+| Élément | Attendu (maquette) | Jeton / composant du socle | Contrôle |
+|---|---|---|---|
+| <icône, trait, typographie, couleur, disposition, alignement> | <ce que la maquette montre, en prose, pour l'humain> | <composant du socle, classe existante, ou « à créer »> | `<sélecteur>` → `<propriété>` = `<valeur>` |
+
+### Écarts déclarés
+<un écart volontaire par ligne, avec sa raison et qui l'a tranché ; « aucun » sinon>
+
 ## Plan par repo
 
 ### <dépôt>
@@ -44,10 +56,19 @@ sans suffixe. Les invariants restent le tableau habituel ; le plan a **un `###` 
 N'écris pas « Invariants (checklist du reviewer) » ni aucune autre variante : écris `## Invariants`. N'écris pas
 « Fichiers par repo », « Plan d'implémentation » ni « Plan » : écris `## Plan par repo`, avec un `###` par dépôt (un
 plan en étapes va dans le `###` du dépôt qu'il touche). N'écris pas « Tests (must-run) » : écris `## Tests`. Rien
-d'autre au niveau `##` : « Contrat API », « Constat du code », « Décisions de la gate technique », « Points
+d'autre au niveau `##` **sauf la section conditionnelle « Fidélité à la maquette »** décrite ci-dessous :
+« Contrat API », « Constat du code », « Décisions de la gate technique », « Points
 d'attention », « Risques et retour arrière », « Plan de commits », « Branches et déploiement » sont des `###` sous
 Plan par repo (ou sous Invariants pour un écart vs la spec fonctionnelle). Une spec existante écrite autrement : à sa
 réécriture, ses sections sont renommées vers ces noms et leur contenu y est rangé, sans rien perdre.
+
+La section `## Fidélité à la maquette` est **conditionnelle** : obligatoire dès que la story a une maquette
+(`sdlc fidelity <STORY>` le dit), absente sinon. C'est la colonne **`Contrôle`** qui porte le verdict de recette,
+et elle a une **forme fermée** : `` `<sélecteur>` → `<propriété>` = `<valeur>` ``, où `<propriété>` est une
+propriété CSS **longhand** (`border-left-style`, jamais `border-left` : la valeur calculée d'une raccourcie porte
+ce qu'on ne mesure pas), ou `icône`, ou `présence`. `Attendu (maquette)` reste de la prose pour l'humain et
+n'entre pas dans le verdict. Une valeur en liste séparée par des virgules se compare comme une **suite ordonnée**.
+Un écart à une maquette **validée par un humain** ne se tranche pas : il remonte à l'humain.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

@@ -30,6 +30,18 @@ sans suffixe (pas de « (Given/When/Then) » ni de « (must-run) » dans les tit
 ## Comportement
 <comportements, cas limites, messages, droits>
 
+## Fidélité à la maquette
+<SEULEMENT si la story a une maquette — sinon cette section n'existe pas>
+
+Maquette : <chemin du fichier dans le dépôt data>
+
+| Élément | Attendu (maquette) | Jeton / composant du socle | Contrôle |
+|---|---|---|---|
+| <icône, trait, typographie, couleur, disposition, alignement> | <ce que la maquette montre, en prose, pour l'humain> | <composant du socle, classe existante, ou « à créer »> | `<sélecteur>` → `<propriété>` = `<valeur>` |
+
+### Écarts déclarés
+<un écart volontaire par ligne, avec sa raison et qui l'a tranché ; « aucun » sinon>
+
 ## Critères d'acceptation
 - **AC1** — Given <contexte>, When <action>, Then <résultat attendu>.
   - 🔬 Must-validate : <appel exact ou étape UI>, identité <compte de recette>, assertion <valeur chiffrée>.
@@ -46,10 +58,19 @@ sans suffixe (pas de « (Given/When/Then) » ni de « (must-run) » dans les tit
 Exactement **un** « 🔬 Must-validate » sous **chaque** critère. N'écris pas « Comportement attendu » ni
 « Comportement (cible) » : écris `## Comportement`. N'écris pas « Critères d'acceptation (Given/When/Then) », « (G/W/T) »
 ni « Acceptance » : écris `## Critères d'acceptation`. N'écris pas « Tests obligatoires au build (must-run) » ni
-« Tests » : écris `## Tests obligatoires au build`. Rien d'autre au niveau `##` : « Contexte », « Objectif », « User
+« Tests » : écris `## Tests obligatoires au build`. Rien d'autre au niveau `##` **sauf la section
+conditionnelle « Fidélité à la maquette »** décrite ci-dessous : « Contexte », « Objectif », « User
 stories », « Droits », « Cas limites », « Hors périmètre », « Décisions prises en l'absence du PO », « Points pour la
 spec technique » sont des `###` sous Comportement. Une spec existante écrite autrement : à sa réécriture, ses
 sections sont renommées vers ces noms et leur contenu y est rangé, sans rien perdre.
+
+La section `## Fidélité à la maquette` est **conditionnelle** : obligatoire dès que la story a une maquette
+(`sdlc fidelity <STORY>` le dit), absente sinon. C'est la colonne **`Contrôle`** qui porte le verdict de recette,
+et elle a une **forme fermée** : `` `<sélecteur>` → `<propriété>` = `<valeur>` ``, où `<propriété>` est une
+propriété CSS **longhand** (`border-left-style`, jamais `border-left` : la valeur calculée d'une raccourcie porte
+ce qu'on ne mesure pas), ou `icône`, ou `présence`. `Attendu (maquette)` reste de la prose pour l'humain et
+n'entre pas dans le verdict. Une valeur en liste séparée par des virgules se compare comme une **suite ordonnée**.
+Un écart à une maquette **validée par un humain** ne se tranche pas : il remonte à l'humain.
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 

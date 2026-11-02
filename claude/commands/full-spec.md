@@ -12,7 +12,8 @@ Résous d'abord le **projet** (`<PREFIX>`) : `sdlc projects` (si ambigu, demande
   d'acceptation qu'on ne peut pas trancher sans l'humain). Sinon, tu décides et tu annonces tes choix.
 - **Factuel** : lis le **Brain du projet** s'il existe (pointé par `sdlc config` → `.brain`) + le code des
   repos concernés. N'invente rien (chiffre/nom/contrat non trouvé ⇒ demande).
-- **Adaptatif** : besoin trivial → PRD léger, 1 story, **spec-func skippée** (direct spec-tech) ;
+- **Adaptatif** : besoin trivial → PRD léger, 1 story, **spec-func skippée** (direct spec-tech) — **sauf si la
+  story a une maquette** : elle ne peut pas sauter la spec-func, le document absent fait refuser la gate ;
   besoin riche → PRD complet, N stories avec DAG, spec-func (G/W/T) + spec-tech (invariants) par story.
 
 ## Déroulé (une passe, dans l'ordre)
@@ -30,16 +31,18 @@ par story, `## Ordre suggéré`, `## Protocole de branches`, `## Sources`). Cré
 Vérifie : `sdlc --project <PREFIX> next <EPIC>` renvoie bien les stories sans dépendances d'abord.
 
 ### 3. Pour CHAQUE story, dans l'ordre du DAG
-**a. BA — spec-func** (sauf si triviale → skip en le **notant**) : comportement, cas limites, messages,
+**a. BA — spec-func** (sauf si triviale → skip en le **notant** ; **jamais** si la story a une maquette) : comportement, cas limites, messages,
 droits, puis **critères d'acceptation en Given/When/Then** machine-checkables (ce que le recetteur
 vérifiera). Écris `<EPIC>/stories/<STORY>/spec-func.md` au **format FIXE** de `/spec-func` (`## Comportement`,
-`## Critères d'acceptation` avec un « 🔬 Must-validate » par critère, `## Tests obligatoires au build`, `## Sources`), puis `set-status <STORY> spec_func`.
+`## Fidélité à la maquette` **seulement si la story a une maquette**, `## Critères d'acceptation` avec un
+« 🔬 Must-validate » par critère, `## Tests obligatoires au build`, `## Sources`), puis `set-status <STORY> spec_func`.
 
 **b. techlead — spec-tech** : explore le code (patterns réutilisables), **plan d'implémentation**
 (guidelines, PAS le code : contrôleurs/services/entités, où brancher, contrats d'API, migrations,
 cross-repo) + **Invariants OBLIGATOIRES** (garde-fous anti-régression, **assertions vérifiables sur un
 diff** = la checklist du reviewer). Écris `<EPIC>/stories/<STORY>/spec-tech.md` au **format FIXE** de `/spec-tech` (`## Invariants` en
-tableau, `## Plan par repo` avec un `###` par dépôt, `## Tests`, `## Sources`), `link <STORY> spec_tech
+tableau, `## Fidélité à la maquette` **seulement si la story a une maquette**, `## Plan par repo` avec un `###`
+par dépôt, `## Tests`, `## Sources`), `link <STORY> spec_tech
 <chemin>`, puis `set-status <STORY> spec_tech`.
 
 ### 4. Gates, puis suite
