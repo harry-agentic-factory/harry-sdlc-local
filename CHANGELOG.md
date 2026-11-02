@@ -7,6 +7,68 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-02
+
+Fidélité aux maquettes validées : quand une story d'écran a une maquette, le moteur la connaît, la nomme et la
+contrôle — dans le format des specs, aux gates, dans la recette et dans la revue de maquette.
+
+Origine : un panneau livré sans ses icônes, sans son trait de liaison et en italique, alors que la maquette
+validée les montrait, avec 99 contrôles d'alignement au pixel tous verts.
+
+### Added
+
+- `tooling/sdlc/maquette.py` : la déclaration d'une maquette, la lecture de la section « Fidélité à la maquette »,
+  la forme fermée de la colonne `Contrôle` et **la** règle de comparaison, en un seul endroit.
+- Section **conditionnelle** `## Fidélité à la maquette` dans `spec-func.md` et `spec-tech.md`
+  (`CONDITIONAL_SECTIONS`), obligatoire dès qu'une maquette est déclarée, absente sinon.
+- Les trois gates **refusent** (`maquette_section_missing`) la spec d'un écran à maquette sans section conforme,
+  avant toute écriture, en nommant la story, le document et la cause parmi cinq.
+- `sdlc fidelity <STORY|EPIC>` : l'état de la fidélité, en lecture seule, sans code de retour non nul.
+- `sdlc maquette extract | verdict | socle` : lire la table, rendre un verdict de comparaison, et dire ce qu'une
+  maquette dessine hors du design system. `verdict` et `socle` sont les **seules** sous-commandes à porter un code
+  de retour métier.
+- Bloc `socle.<repo>` du manifest (`tokens`, `components`) : le design system est **résolu par projet**, aucun nom
+  de jeton ni chemin n'est en dur dans le moteur.
+- Règle de persona **« La maquette est une exigence »**, écrite une fois et pointée par neuf prompts : la maquette
+  se lit, c'est une exigence, un conflit se **déclare** au lieu d'être tranché en silence, et un écart à une
+  maquette validée par un humain **remonte à l'humain** même quand les gates sont déléguées.
+- Étape « 2 bis. Comparaison à la maquette » du skill `recette-ui`, **avant** les mesures d'alignement, et
+  obligatoire dès que la spec porte la section. Le `recetteur` la porte dans ses **trois** énoncés de condition de
+  sortie.
+- Mode **revue de maquette** de l'agent architecte, avec son verdict (`kind: maquette-verdict`,
+  `validated | validated_with_fixes | returned`), et le guide `docs/maquettes.md`.
+- `docs/engine-distribution.md` : comment une version du moteur atteint les sessions — et le piège des deux
+  consommations avec un dossier sans version au milieu.
+
+### Changed
+
+- Le contrat « modèles de commande ↔ sections » vérifie désormais la **position** des sections conditionnelles, et
+  couvre `full-spec.md`, qui duplique les formats **en prose** et n'était couvert par rien.
+- `full-spec.md` : une story à maquette ne peut pas sauter la spec-func.
+- Le `reviewer` contrôle la table de la maquette au même titre que les invariants, et `review.md` porte une
+  section « Fidélité à la maquette » quand la story en a une.
+
+### Mesuré pendant le développement, et qui a changé la conception
+
+- **Déduire la maquette du numéro de la story a été implémenté, mesuré, puis supprimé** : sur 126 stories réelles,
+  17 détections dont **14 fausses**, le suffixe numérique d'une maquette étant un numéro de **version**. Un
+  correctif existait (3 détections, 3 justes) et a été écarté : il ne marche que par corrélation avec une habitude
+  de nommage, une mauvaise détection échoue **fermé et trompeur** là où une non-détection échoue ouvert, et une
+  convention de nommage est de la connaissance projet. Seule une **déclaration** crée l'obligation ; un projet qui
+  veut une convention la déclarera dans son manifest.
+- Le filet de remplacement ne nomme **aucun** fichier : il dit qu'une maquette est *possible*. Par story il se
+  déclenchait sur 86 des 126 — il est donc **agrégé par épic**, un signal illisible n'étant pas un filet.
+- Une liste de valeurs se compare en **suite ordonnée**, jamais en ensemble : l'attendu du cas de référence répète
+  le même dessin à deux étapes, et un ensemble aurait écrasé le doublon.
+- La colonne `Contrôle` n'accepte que des propriétés **longhand** : la valeur calculée d'une raccourcie porte ce
+  qu'on ne mesure pas.
+- Un signalement de sélecteur compte **une fois par règle** : par déclaration, il en sortait 44 pour 6 règles.
+
+### Point de retour arrière
+
+Le refus de gate est le seul point qui porte un risque de régression sur les épics existants. Le retirer laisse la
+commande d'état et les sous-commandes d'analyse intactes.
+
 ## [0.8.4] - 2026-10-05
 
 ### Added
