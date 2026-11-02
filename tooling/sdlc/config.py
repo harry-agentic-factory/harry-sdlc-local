@@ -121,6 +121,7 @@ def load_config(workspace: str | Path) -> dict:
     cfg.setdefault("refBranch", "main")
     cfg.setdefault("deploy", {})
     cfg.setdefault("recette", {})
+    cfg.setdefault("socle", {})
     # Accès d'INVESTIGATION (agent `investigator`) : ce qui existe et où — cluster, base, identité,
     # CI, mail, UI, bac à sable. Chaque entrée nomme le skill qui porte son mode d'emploi, de sorte
     # que l'agent reste agnostique du projet et ne charge que les accès dont son enquête a besoin.
@@ -178,6 +179,30 @@ def resolve_repos(cfg: dict) -> dict[str, str | None]:
     else:
         for name, val in repos.items():
             out[name] = _join(root, name) if val in (None, "") else _join(root, str(val))
+    return out
+
+
+def _resolve_socle(cfg: dict, repos: dict, workspace: str | Path) -> dict:
+    """The project design system, per repo: `tokens` (files) and `components` (folder). Nothing else — the
+    location of the maquettes is not here, since a static manifest cannot carry a path parameterised by epic.
+
+    Paths are resolved, not validated: a declared file absent from disk is returned as is and reported by the
+    tool that reads it, exactly like `brain`.
+    """
+    out: dict[str, dict] = {}
+    for repo, block in (cfg.get("socle") or {}).items():
+        if not isinstance(block, dict):
+            continue
+        base = repos.get(repo) or cfg.get("reposRoot") or workspace
+        tokens = block.get("tokens") or []
+        tokens = [tokens] if isinstance(tokens, str) else list(tokens)
+        resolved = {"tokens": [_expand(Path(base) / tk) if not os.path.isabs(tk) else _expand(tk)
+                               for tk in tokens]}
+        components = block.get("components")
+        if components:
+            resolved["components"] = (_expand(components) if os.path.isabs(components)
+                                      else _expand(Path(base) / components))
+        out[repo] = resolved
     return out
 
 
@@ -322,6 +347,7 @@ def resolved_manifest(project: str | None = None, workspace: str | Path | None =
         "refBranch": cfg.get("refBranch", "main"),
         "deploy": cfg.get("deploy", {}),
         "recette": cfg.get("recette", {}),
+        "socle": _resolve_socle(cfg, repos, ws),
         "guidelines": guidelines,
         "skillsByRepo": skills_by_repo,
         "credentials": cfg.get("credentials", {"source": "host"}),

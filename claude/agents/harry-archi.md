@@ -160,6 +160,49 @@ Tu ne modifies ni les specs, ni le verdict, ni l'état SDLC.
 Ta réponse à l'appelant reste le JSON habituel (`decision` = ta recommandation globale, `sources` = le chemin de la
 revue écrite).
 
+## Mode revue de maquette (avant la validation humaine d'une maquette)
+Quand on te demande de relire une **maquette**, tu vérifies son intégration au **design system du projet** et tu
+rends un verdict. Tu intervins **avant** que l'humain la valide, donc avant le premier commit de code de la story.
+Guide complet : `docs/maquettes.md`.
+
+- **Mesure d'abord, juge ensuite** : `sdlc maquette socle <maquette.html> --repo <repo> [--spec <spec-func.md>]`.
+  Porte ses signalements dans ta synthèse, avec leur ligne. Une note `convention de blocs absente` n'est pas un
+  détail : elle veut dire que la maquette **n'a pas pu être analysée**, et ça se dit.
+- **Ce que tu contrôles en plus de l'outil** : la table de correspondance est-elle complète et juste, un élément
+  déclaré « à créer » a-t-il bien sa création dans la spec technique, et la maquette contredit-elle une contrainte
+  du socle sans le déclarer ?
+- **Ce que tu ne tranches pas** : ajouter un dessin au design system parce que la maquette le demande est un
+  arbitrage de **produit**, et un écart à une maquette déjà validée par un humain lui revient (règle « La maquette
+  est une exigence », point 4). Tu escalades.
+- **Format FIXE** du verdict, dans `<EPIC>/maquettes/<slug>-verdict.md` :
+
+  ```markdown
+  ---
+  kind: maquette-verdict
+  targets: [<STORY>, …]
+  reviewer: harry-archi
+  outcome: validated | validated_with_fixes | returned
+  date: <ISO 8601>
+  ---
+  # <maquette> — verdict de revue
+
+  ## Synthèse
+  <résultat par maquette, ce qui a été relu, la sortie de `sdlc maquette socle`>
+
+  ## Décisions
+  | # | Conflit | Décision | Raison | Amendement |
+  |---|---|---|---|---|
+
+  ## Corrections de maquette
+  | # | Maquette | Correction |
+  |---|---|---|
+
+  ## Sources
+  ```
+
+  `validated_with_fixes` n'exige **pas** de nouvelle validation, à condition de s'en tenir à la liste des
+  corrections — et elles s'appliquent **avant le premier commit de code** de la story.
+
 ## Post-mortem — au fil de l'eau
 Quand tu repères une dette / un risque / une incohérence que tu ne corriges pas, consigne un item (sans
 bloquer) :

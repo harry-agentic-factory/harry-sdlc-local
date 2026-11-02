@@ -281,3 +281,152 @@ def report(ticket, root: str | Path) -> dict:
             "gaps": [g.cause for g in gaps if g.doc == doc] if present else ([DOC_MISSING] if found.required else []),
         }
     return out
+
+
+# --- is a maquette built with the project design system? (story -3) -------------------------------------------
+#
+# Only the maquette's OWN rules are analysed. The verbatim copy of the design system is a copy, not an
+# invention, and flagging it would drown the signal. A maquette that separates neither is NOT declared conform:
+# it says so and fails, because a silent pass is what this whole epic exists to prevent.
+
+SIGNAL_TYPES = ("couleur", "taille", "graisse", "jeton inconnu", "correspondance manquante",
+                "règle neuve visant le socle")
+NO_BLOCK_CONVENTION = "convention de blocs absente"
+NO_SOCLE_PREFIX = "préfixe du socle non identifiable, le type « règle neuve visant le socle » est désactivé"
+
+_NEW_STYLE = re.compile(r"<style\b[^>]*\bid=[\"']new[\"'][^>]*>(.*?)</style>", re.S | re.I)
+_DS_STYLE = re.compile(r"<style\b[^>]*\bid=[\"']ds[\"'][^>]*>(.*?)</style>", re.S | re.I)
+_NEW_MARKER = re.compile(r"/\*\s*=+\s*NEW\b")
+_INLINE_STYLE = re.compile(r"""\bstyle=["']([^"']+)["']""")
+_TOKEN_DEF = re.compile(r"^\s*(--[A-Za-z0-9_-]+)\s*:", re.M)
+_VAR_USE = re.compile(r"var\(\s*(--[A-Za-z0-9_-]+)")
+_HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
+_FUNC_COLOR = re.compile(r"\b(?:rgba?|hsla?)\(", re.I)
+# Only `font-size` and `border-radius` are size-checked. Spacings in px are the practice of the socle, and the
+# manual verdict that this automates had already accepted them.
+_SIZE = re.compile(r"\b(font-size|border-radius)\s*:\s*([^;}]+)")
+_WEIGHT = re.compile(r"\bfont-weight\s*:\s*([^;}]+)")
+_CLASS_IN_FILE = re.compile(r"[.\"'\s]([a-z][a-z0-9]*-[a-z0-9-]+)")
+_NAMED_COLORS = frozenset({"red", "blue", "green", "black", "white", "grey", "gray", "orange", "purple",
+                           "yellow", "pink", "brown", "cyan", "magenta", "navy", "teal", "silver", "gold"})
+
+
+@dataclass(frozen=True)
+class Signal:
+    type: str
+    line: int
+    value: str
+    selector: str = ""
+    declared: bool = False
+
+
+def tokens_of(files: list[str | Path]) -> set[str]:
+    """Token NAMES defined by the project's socle. The generic `--<name>:` pattern is what makes this
+    project-agnostic: no project's token name is ever written in the engine."""
+    out: set[str] = set()
+    for path in files:
+        p = Path(path)
+        if p.is_file():
+            out |= set(_TOKEN_DEF.findall(p.read_text(encoding="utf-8", errors="replace")))
+    return out
+
+
+def socle_prefix(components: str | Path | None) -> str | None:
+    """The class prefix of the socle, derived from its own files — never hard-coded. None when no prefix
+    dominates: the check is then disabled rather than guessed."""
+    if not components or not Path(components).is_dir():
+        return None
+    counts: dict[str, int] = {}
+    for p in Path(components).rglob("*"):
+        if p.is_file() and p.suffix in (".css", ".ts", ".tsx", ".js", ".jsx"):
+            for name in _CLASS_IN_FILE.findall(p.read_text(encoding="utf-8", errors="replace")):
+                counts[name.split("-", 1)[0]] = counts.get(name.split("-", 1)[0], 0) + 1
+    if not counts:
+        return None
+    prefix, best = max(counts.items(), key=lambda kv: kv[1])
+    return prefix if best >= 5 else None
+
+
+def own_rules(html: str) -> tuple[list[tuple[int, str]], bool]:
+    """`(numbered lines of the maquette's own CSS, recognised)`. Two accepted conventions: a `<style id="new">`
+    block, or everything after a `/* ===== NEW` comment inside `<style id="ds">` — the form the maquettes
+    written before this rule already use."""
+    lines = html.splitlines()
+    block = _NEW_STYLE.search(html)
+    if block:
+        start = html[:block.start(1)].count("\n")
+        return [(start + i + 1, l) for i, l in enumerate(block.group(1).splitlines())], True
+    ds = _DS_STYLE.search(html)
+    if ds:
+        offset = html[:ds.start(1)].count("\n")
+        inner = ds.group(1).splitlines()
+        marker = next((i for i, l in enumerate(inner) if _NEW_MARKER.search(l)), None)
+        if marker is not None:
+            return [(offset + i + 1, l) for i, l in enumerate(inner) if i >= marker], True
+    return [], False
+
+
+def _selector_of(numbered: list[tuple[int, str]], index: int) -> str:
+    for _, line in reversed(numbered[:index + 1]):
+        if "{" in line:
+            return line.split("{", 1)[0].strip()
+    return ""
+
+
+def analyse_socle(html: str, known: set[str], prefix: str | None, items: list[Item] | None = None,
+                  deviations: str = "") -> dict:
+    """The shape of this result never changes. Degradations go to `notes`, never to new keys: a caller that
+    special-cases a key is a caller that breaks the next time one is added."""
+    signals: list[Signal] = []
+    notes: list[str] = []
+    numbered, recognised = own_rules(html)
+    if not recognised:
+        notes.append(NO_BLOCK_CONVENTION)
+    if prefix is None:
+        notes.append(NO_SOCLE_PREFIX)
+
+    inline = [(html[:m.start()].count("\n") + 1, m.group(1)) for m in _INLINE_STYLE.finditer(html)]
+    for idx, (line, text) in enumerate([*numbered, *inline]):
+        selector = _selector_of(numbered, idx) if idx < len(numbered) else "style="
+        for m in _HEX.finditer(text):
+            signals.append(Signal("couleur", line, m.group(0), selector))
+        for m in _FUNC_COLOR.finditer(text):
+            signals.append(Signal("couleur", line, m.group(0).rstrip("("), selector))
+        for prop, value in _SIZE.findall(text):
+            if "var(" not in value:
+                signals.append(Signal("taille", line, f"{prop}: {value.strip()}", selector))
+        for value in _WEIGHT.findall(text):
+            if "var(" not in value:
+                signals.append(Signal("graisse", line, f"font-weight: {value.strip()}", selector))
+        for name in _VAR_USE.findall(text):
+            if known and name not in known:
+                signals.append(Signal("jeton inconnu", line, name, selector))
+        low = text.lower()
+        for colour in _NAMED_COLORS:
+            if re.search(rf":\s*{colour}\b", low):
+                signals.append(Signal("couleur", line, colour, selector))
+        if prefix and selector and re.search(rf"\.{re.escape(prefix)}-[a-z0-9-]+", selector):
+            signals.append(Signal("règle neuve visant le socle", line, selector, selector))
+
+    for item in items or []:
+        if not item.token or item.token.strip() in ("", "—", "-"):
+            signals.append(Signal("correspondance manquante", 0, item.id))
+
+    seen, unique = set(), []
+    for s in signals:
+        # A selector-level finding is ONE finding, whatever the number of declarations inside the rule: per
+        # line it reported 44 signals for 6 rules on a real maquette, which is noise.
+        key = ((s.type, s.selector) if s.type == "règle neuve visant le socle"
+               else (s.type, s.line, s.value, s.selector))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(Signal(s.type, s.line, s.value, s.selector,
+                             declared=bool(deviations) and s.value in deviations))
+    return {
+        "signalements": [{"type": s.type, "ligne": s.line, "valeur": s.value, "sélecteur": s.selector,
+                          "déclaré": s.declared} for s in unique],
+        "règles neuves": len(numbered) if recognised else None,
+        "jetons connus": len(known),
+        "notes": notes,
+    }

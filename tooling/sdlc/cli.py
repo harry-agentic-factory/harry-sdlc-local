@@ -174,6 +174,11 @@ def run(argv: list[str] | None = None) -> dict:
     b = m.add_parser("verdict", help="compare une checklist et des mesures ; CODE DE RETOUR 1 s'il y a un écart")
     b.add_argument("checklist", help="sortie de `maquette extract`")
     b.add_argument("measures", help="JSON {<id>: {\"obtenu\": \"<valeur>\"}}")
+    b = m.add_parser("socle", help="une maquette est-elle construite avec les jetons et composants du socle ? "
+                                   "CODE DE RETOUR 1 s'il y a un signalement, 2 sans socle déclaré")
+    b.add_argument("maquette", help="chemin du .html de la maquette")
+    b.add_argument("--repo", required=True, help="repo dont le socle fait référence (manifest `socle.<repo>`)")
+    b.add_argument("--spec", help="spec portant la table, pour contrôler la correspondance et les écarts")
     a = sub.add_parser("config", help="manifest résolu du projet (deploy/recette/credentials…)")
     a.add_argument("--raw", action="store_true", help="config brute non résolue")
     a = sub.add_parser("skills", help="skills matchés par la stack de chaque repo (repo → stack → skills)")
@@ -317,8 +322,25 @@ def run(argv: list[str] | None = None) -> dict:
                                   for d in deviations],
                        "mesurés": len(items) - sum(1 for d in deviations if d.cause == maquette.NOT_MEASURED),
                        "éléments": len(items)}
-            # The only subcommand with a business exit code: a deviation must fail a script that calls it.
+            # The only subcommands with a business exit code: a deviation must fail a caller.
             return CommandResult(payload, exit_code=1 if deviations else 0)
+        if args.sub == "socle":
+            socle = (resolved_manifest(args.project).get("socle") or {}).get(args.repo)
+            if not socle:
+                return CommandResult({"error": f"aucun socle déclaré pour {args.repo} "
+                                               f"(manifest : `socle.{args.repo}`)"}, exit_code=2)
+            items, deviations = None, ""
+            if args.spec:
+                section = maquette.read_section(Path(args.spec).read_text(encoding="utf-8"))
+                if section is not None:
+                    items, deviations = section.items, section.deviations or ""
+            payload = maquette.analyse_socle(
+                Path(args.maquette).read_text(encoding="utf-8", errors="replace"),
+                maquette.tokens_of(socle.get("tokens") or []),
+                maquette.socle_prefix(socle.get("components")),
+                items, deviations)
+            undeclared = [s for s in payload["signalements"] if not s["déclaré"]]
+            return CommandResult(payload, exit_code=1 if (undeclared or payload["notes"]) else 0)
         raise SystemExit(2)
     if args.cmd == "projects":
         from .project import list_projects
