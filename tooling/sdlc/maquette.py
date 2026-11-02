@@ -31,10 +31,12 @@ PSEUDO_PROPS = frozenset({"icône", "icone", "présence", "presence"})
 # A shorthand's computed value carries what nobody measures (`1px dashed rgb(…)`), so string comparison could
 # never match it. Only longhand is accepted.
 SHORTHANDS = frozenset({
-    "animation", "background", "border", "border-bottom", "border-color", "border-left", "border-radius",
-    "border-right", "border-style", "border-top", "border-width", "flex", "font", "gap", "grid", "grid-area",
-    "grid-template", "inset", "list-style", "margin", "outline", "overflow", "padding", "place-content",
-    "place-items", "text-decoration", "transition",
+    "all", "animation", "background", "border", "border-block", "border-bottom", "border-color", "border-image",
+    "border-inline", "border-left", "border-radius", "border-right", "border-style", "border-top", "border-width",
+    "columns", "flex", "flex-flow", "font", "gap", "grid", "grid-area", "grid-column", "grid-row",
+    "grid-template", "inset", "list-style", "margin", "mask", "offset", "outline", "overflow", "padding",
+    "place-content", "place-items", "place-self", "scroll-margin", "scroll-padding", "text-decoration",
+    "text-emphasis", "transition",
 })
 
 POSSIBLE_UNDECLARED = "maquette possible, non déclarée"
@@ -119,7 +121,7 @@ def parse_control(cell: str) -> tuple[Control | None, bool]:
     if m is None:
         return None, True
     prop = m.group("prop").strip()
-    if prop.lower() not in PSEUDO_PROPS and prop.lower() in SHORTHANDS:
+    if prop.lower() in SHORTHANDS:
         return None, True
     return Control(m.group("selector").strip(), prop, m.group("value").strip()), False
 
@@ -141,14 +143,13 @@ def read_section(text: str) -> Section | None:
         return None
     end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     body, out, in_deviations, deviations = lines[start + 1:end], Section(), False, []
-    header_seen = False
-    for line in body:
-        stripped = line.strip()
+    rows = [(i, l.strip()) for i, l in enumerate(body)]
+    for index, stripped in rows:
         if stripped.startswith("### "):
             in_deviations = slug(stripped[4:]) == slug("Écarts déclarés")
             continue
         if in_deviations:
-            deviations.append(line)
+            deviations.append(body[index])
             continue
         if out.path_line is None and stripped.lower().startswith("maquette :"):
             out.path_line = stripped.split(":", 1)[1].strip().strip("`")
@@ -158,10 +159,17 @@ def read_section(text: str) -> Section | None:
         cells = _cells(stripped)
         if _is_separator(cells):
             continue
-        if not header_seen:
-            header_seen = True  # the column names
+        # A header row is the one a separator FOLLOWS — in Markdown it always does. Skipping "the first row"
+        # instead would silently drop the first element of a table written without a header.
+        following = next((c.strip() for _, c in rows[index + 1:] if c.strip()), "")
+        if following.startswith("|") and _is_separator(_cells(following)):
             continue
+        # A truncated row (no `Contrôle` cell) does NOT respect the closed form, so it is kept and marked
+        # invalid — never dropped. Dropping it removed a visual element from the checklist in silence, which is
+        # the very defect this module exists to close.
         if len(cells) < 4:
+            out.items.append(Item(slug(cells[0]), cells[0], cells[1] if len(cells) > 1 else "",
+                                  cells[2] if len(cells) > 2 else "", None, True))
             continue
         control, invalid = parse_control(cells[3])
         out.items.append(Item(slug(cells[0]), cells[0], cells[1], cells[2], control, invalid))

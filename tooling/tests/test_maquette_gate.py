@@ -271,3 +271,13 @@ def test_no_note_when_the_epic_draws_no_maquette(tmp_path, run):
     rc, out, err = run("fidelity", "E", ws=ws)
     assert rc == 0, err
     assert "notes" not in out and all("note" not in s for s in out["stories"])
+
+
+def test_every_gate_declares_the_documents_it_controls():
+    """The two dictionaries must stay in step: a gate added to GATES without its documents used to raise a
+    KeyError at gate time. The fallback now covers it, and this test keeps the omission visible."""
+    from sdlc import gates
+
+    assert set(gates._MAQUETTE_DOCS) == set(gates.GATES), "a gate has no declared maquette documents"
+    for docs in gates._MAQUETTE_DOCS.values():
+        assert set(docs) <= set(maquette.DOCS)

@@ -1,4 +1,7 @@
 """`sdlc status` : agrégat état + artefacts + extraction du bloc `## Recap`."""
+import re
+from pathlib import Path
+
 import pytest
 
 from sdlc.status_report import _recap, build_status
@@ -111,17 +114,13 @@ def test_the_one_pass_command_enumerates_the_same_sections():
     """`full-spec.md` has no ```markdown block: it duplicates the two fixed formats IN PROSE, and nothing used to
     check it. A section added to a format would silently miss that prompt, and the gate would then refuse specs
     written by following it."""
-    import re as _re
-    from pathlib import Path as _Path
-
-    text = (_Path(__file__).resolve().parents[2] / "claude" / "commands" / "full-spec.md").read_text()
+    text = (Path(__file__).resolve().parents[2] / "claude" / "commands" / "full-spec.md").read_text()
     for name, marker in (("spec-func.md", "spec-func.md` au **format FIXE**"),
                          ("spec-tech.md", "spec-tech.md` au **format FIXE**")):
         prose = text.split(marker, 1)[1].split("set-status", 1)[0]
-        cited = set(_re.findall(r"`## ([^`]+)`", prose))
-        assert set(expected_sections(name)) - {"Sources"} <= cited | {"Sources"}, name
-        for section, _index in __import__("sdlc.workspace", fromlist=["x"]).CONDITIONAL_SECTIONS.get(name, ()):
-            assert section in prose, f"{name}: the conditional section is missing from the prose enumeration"
+        cited = set(re.findall(r"`## ([^`]+)`", prose))
+        # EQUAL, not merely included: a section cited in excess is a drift too.
+        assert cited == set(expected_sections(name)), name
 
 
 def test_story_stubs_stay_unproduced(tmp_path):

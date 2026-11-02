@@ -281,14 +281,16 @@ def run(argv: list[str] | None = None) -> dict:
         if target is not None and not tickets:
             raise ValueError(f"fidelity: '{target}' est inconnu (ni ticket, ni épic)")
         stories = [maquette.report(t, s.ws.root) for t in tickets]
-        if len(stories) == 1:
+        by_id = {t.id: t for t in tickets}
+        if target is not None and target in by_id:   # the target IS a story, not an epic of one story
             return {"target": target, "stories": stories}
         # Over several stories the per-story note repeats for every story of an epic that draws maquettes —
         # measured at 86 of 126 on a real repository, which is noise, not a signal. One line per epic instead.
         notes, undeclared = [], {}
         for story in stories:
             if story.pop("note", None) == maquette.POSSIBLE_UNDECLARED:
-                undeclared[story["id"].rsplit("-", 1)[0]] = undeclared.get(story["id"].rsplit("-", 1)[0], 0) + 1
+                epic = by_id[story["id"]].epic          # authoritative, unlike slicing the identifier
+                undeclared[epic] = undeclared.get(epic, 0) + 1
         for epic, count in sorted(undeclared.items()):
             notes.append(f"{epic} : {count} stories sans maquette déclarée, alors que l'épic en contient "
                          f"(déclarez-la sur les stories d'écran — `sdlc link <STORY> maquette <chemin>`)")
@@ -320,7 +322,10 @@ def run(argv: list[str] | None = None) -> dict:
             deviations = maquette.compare(items, measures)
             payload = {"écarts": [{"id": d.id, "attendu": d.expected, "obtenu": d.obtained, "cause": d.cause}
                                   for d in deviations],
-                       "mesurés": len(items) - sum(1 for d in deviations if d.cause == maquette.NOT_MEASURED),
+                       # An invalid element has, by construction, no measure: counting it as measured would
+                       # put a false number in acceptance.md, which the recette skill pastes verbatim.
+                       "mesurés": len(items) - sum(1 for d in deviations
+                                                   if d.cause in (maquette.NOT_MEASURED, maquette.CHECK_INVALID)),
                        "éléments": len(items)}
             # The only subcommands with a business exit code: a deviation must fail a caller.
             return CommandResult(payload, exit_code=1 if deviations else 0)

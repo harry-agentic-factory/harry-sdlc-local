@@ -425,6 +425,8 @@ def debt_tag(gate: str, target: str, finding: str, role: str | None) -> str:
     return f"[{gate} {target} {role} {finding}]" if role else f"[{gate} {target} {finding}]"
 
 
+# The spec documents each gate controls. A gate absent from this map falls back to both documents rather than
+# raising: a new gate must not break at gate time.
 _MAQUETTE_DOCS = {"spec_func": ("spec-func.md",), "spec_tech": ("spec-tech.md",),
                   "feature": ("spec-func.md", "spec-tech.md")}
 
@@ -434,7 +436,8 @@ def _refuse_unfaithful_specs(root: Path, g: Gate, targets: list) -> None:
     anything is written. A story without a maquette is not read at all."""
     from . import maquette
 
-    gaps = [gap for t in targets for gap in maquette.check(t, root, _MAQUETTE_DOCS[g.name])]
+    docs = _MAQUETTE_DOCS.get(g.name, maquette.DOCS)
+    gaps = [gap for t in targets for gap in maquette.check(t, root, docs)]
     if gaps:
         raise GateRefused(f"{g.command}: a maquette is declared but its spec does not carry a conform "
                           f"« {maquette.SECTION} » section — {'; '.join(str(gap) for gap in gaps)}",

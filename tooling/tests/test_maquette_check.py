@@ -151,3 +151,81 @@ def test_extract_refuses_a_spec_without_the_section(tmp_path, capsys, monkeypatc
     spec.write_text("# S\n\n## Comportement\n\nrien.\n")
     assert cli.main(["maquette", "extract", str(spec)]) == 1
     assert maquette.SECTION in capsys.readouterr().err
+
+
+# --- a truncated or header-less table must never lose an element in silence -----------------------------------
+
+TRUNCATED = """## Fidélité à la maquette
+
+Maquette : a.html
+
+| Élément | Attendu | Socle | Contrôle |
+|---|---|---|---|
+| Icônes | quatre | Icon | `.a` → `font-style` = `normal` |
+| Trait | pointillé | à créer |
+| Italique | non |
+
+### Écarts déclarés
+
+aucun.
+"""
+
+NO_HEADER = """## Fidélité à la maquette
+
+Maquette : a.html
+
+| Icônes | quatre | Icon | `.a` → `font-style` = `normal` |
+| Trait | pointillé | à créer | `.b` → `border-left-style` = `dashed` |
+
+### Écarts déclarés
+
+aucun.
+"""
+
+
+def test_a_truncated_row_is_kept_and_marked_invalid():
+    """Dropping it removed a visual element from the checklist in silence: `extract` would not list it,
+    `verdict` would not claim it, and the screen would ship with an element nobody ever measured."""
+    items = items_of(TRUNCATED)
+    assert [i.id for i in items] == ["icones", "trait", "italique"]
+    assert [i.invalid for i in items] == [False, True, True]
+
+
+def test_a_truncated_row_refuses_a_gate(tmp_path):
+    from sdlc.workspace import Ticket, Workspace
+
+    ws = Workspace(tmp_path)
+    ws.create_epic("E", "t")
+    ws.create_story(Ticket(id="E-1", epic="E", title="t", artifacts={"maquette": "E/maquettes/a.html"}))
+    (tmp_path / "E" / "maquettes").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "E" / "maquettes" / "a.html").write_text("<html></html>")
+    for doc in ("spec-func.md", "spec-tech.md"):
+        (tmp_path / "E" / "stories" / "E-1" / doc).write_text(
+            TRUNCATED.replace("Maquette : a.html", "Maquette : E/maquettes/a.html"))
+    gaps = maquette.check(ws.load("E-1"), tmp_path)
+    assert [g.cause for g in gaps] == [maquette.CHECK_MALFORMED, maquette.CHECK_MALFORMED]
+
+
+def test_a_table_without_a_header_keeps_its_first_element():
+    """A header row is the one a separator FOLLOWS. Skipping `the first row` dropped the first element."""
+    items = items_of(NO_HEADER)
+    assert [i.id for i in items] == ["icones", "trait"]
+    assert all(not i.invalid for i in items)
+
+
+def test_the_cli_counts_an_invalid_element_as_not_measured(tmp_path, capsys, monkeypatch):
+    """AC12's third case, at CLI level: the shape `mesurés` ends up verbatim in acceptance.md."""
+    from sdlc import cli
+
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path))
+    spec = tmp_path / "spec-func.md"
+    spec.write_text(TRUNCATED)
+    assert cli.main(["maquette", "extract", str(spec)]) == 0
+    checklist = tmp_path / "c.json"
+    checklist.write_text(capsys.readouterr().out)
+    measures = tmp_path / "m.json"
+    measures.write_text(json.dumps({"icones": {"obtenu": "normal"}}, ensure_ascii=False))
+    assert cli.main(["maquette", "verdict", str(checklist), str(measures)]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["éléments"] == 3 and payload["mesurés"] == 1
+    assert sorted(e["cause"] for e in payload["écarts"]) == [maquette.CHECK_INVALID, maquette.CHECK_INVALID]
