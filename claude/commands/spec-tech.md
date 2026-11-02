@@ -72,6 +72,8 @@ Un écart à une maquette **validée par un humain** ne se tranche pas : il remo
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 Dis à l'humain (règle « Écrire pour un humain » de la persona) : la spec technique est écrite, son plan en quelques lignes et le nombre d'invariants. **Puis
 la gate ci-dessous** — pas `/implement` directement.

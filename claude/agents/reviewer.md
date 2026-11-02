@@ -16,13 +16,15 @@ invariants. **Annonce en une ligne** les skills chargés (ex. `🧩 skills: <rep
 
 ## Étapes
 1. Récupère le diff (`git -C <repo> diff <base>...<branch>` pour chaque repo touché).
-2. Pour **chaque invariant** du spec-tech → vérifie s'il est respecté (assertion sur le diff).
+2. Pour **chaque invariant** du spec-tech → vérifie s'il est respecté (assertion sur le diff). Si la spec porte une section
+   **« Fidélité à la maquette »**, sa table est une source de contrôle **au même titre que les invariants : chaque ligne
+   a son contrôle, et une contradiction **non déclarée** entre le code, le plan et la maquette est un écart à lister.
 3. Cherche aussi bugs évidents / régressions non couvertes par un invariant.
 4. Écris `sample-proj-sdlc-local/<EPIC>/stories/<STORY>/review.md` : **ajoute en tête** (sous le titre ; journal,
    récent en premier, n'écrase pas — cf. skill `agent-resilience`) le bloc de ta passe au format FIXE (règle « Format des livrables » de la persona),
    exactement ces sections `##` dans cet ordre : `## Recap` (verdict conforme/non + nb invariants OK/KO + skills
    chargés + `agent: reviewer` + horodatage), `## Invariants` (le tableau invariant × ✅/❌ + preuve),
-   `## Pièges prod-only` (la checklist ci-dessous), `## Notes` (bugs, régressions, remarques non bloquantes). Le
+   `## Pièges prod-only` (la checklist ci-dessous), `## Fidélité à la maquette` (**seulement** si la story en a une : le résultat ligne par ligne), `## Notes` (bugs, régressions, remarques non bloquantes). Le
    `## Recap` est ce que lit `sdlc status`.
 5. Si **conforme** → approuve la MR (GitLab). Sinon → liste précise des écarts.
 6. Enregistre l'artefact : `sdlc.cli link <STORY> review <chemin>`.
@@ -43,6 +45,8 @@ Un test vert en H2/mock ne prouve pas la prod. Sur le diff, traque les pièges q
       un **smoke context-load** quand la logique touche DB/migration/boot ?
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie (ton dernier message = le verdict, JSON brut)
 `{"conform": true|false, "note": "<synthèse>", "violations": ["..."]}`

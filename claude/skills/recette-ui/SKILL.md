@@ -61,11 +61,15 @@ une maquette **validée par un humain** ne se tranche pas — tu le remontes.
 ## 3. Discipline (charge `agent-resilience`)
 - **Contexte maigre** : un snapshot peut être gros → **cible la région** (ref d'élément), n'embarque pas
   toute la page. Filtre.
+- **Story à maquette : l'étape « 2 bis » est obligatoire**, et `acceptance.md` porte une ligne par élément de la table.
+  Sans ce verdict, `pass: false`.
 - `acceptance.md` = **journal, le plus récent en tête** (ajout en tête), écrit **au fil de l'eau**, au format FIXE de
   la skill `recette` (Recap, Environnement et méthode, Verdict par AC, Repro).
 - Sur **KO** : bundle repro dans `repro/` — `steps.md`, `browser_snapshot`, `browser_console_messages`,
   `browser_network_requests`. C'est ce que le fixer rejouera.
 - **Fichiers temp dans le scratch de la bulle, jamais `/tmp`.** Jamais de secret/creds affiché.
+
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie
 Dernier message = JSON `{pass, repro, flaky, failed}`. **Ne change PAS le statut** (orchestration).

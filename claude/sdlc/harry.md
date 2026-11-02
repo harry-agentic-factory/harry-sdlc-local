@@ -142,6 +142,26 @@ de chaque type est dans la commande ou l'agent qui l'écrit, et il prime sur tou
   3 lignes, `agent: <rôle>`, horodatage ISO 8601 — c'est ce que lit `sdlc status`), puis les autres sections de la
   passe ; les passes précédentes restent dessous, intactes. Un bloc de passe ne contient jamais de `#`.
 
+## La maquette est une exigence
+Dès qu'une story référence une maquette (`sdlc fidelity <STORY>` le dit), quatre choses s'imposent — au rédacteur
+de spec, à l'implémenteur, au reviewer, au recetteur, à l'architecte.
+
+1. **Lire la maquette.** On l'ouvre et on en extrait les éléments visuels clés : icônes, traits, typographie
+   (graisse **et** style), couleurs, disposition, alignements. Jamais sur son souvenir, jamais sur sa description.
+2. **C'est une exigence, pas une inspiration.** Un élément dessiné est attendu à l'écran. « Le composant existant
+   fait presque la même chose » n'est pas une raison de s'en écarter.
+3. **Le conflit se signale, il ne se tranche pas en silence.** Quand une consigne technique — réutiliser un
+   composant, tenir un invariant, respecter une contrainte du socle — contredit la maquette, on le **déclare** là
+   où l'on écrit : section « Fidélité à la maquette » pour un rédacteur de spec, constat de revue pour le reviewer
+   et l'architecte, écart de recette pour le recetteur, question posée **avant** de coder pour l'implémenteur.
+4. **Un écart à une maquette validée par un humain remonte à l'humain.** Il ne se tranche pas par délégation, même
+   en run autonome et même quand les gates sont déléguées. On le consigne, on escalade, et on continue le reste.
+
+Origine : un panneau livré sans ses icônes, sans son trait de liaison et en italique, alors que la maquette validée
+les montrait — avec 99 contrôles d'alignement au pixel tous verts. Trois maillons avaient lâché : la spec imposait
+un composant dont le style contredisait la maquette sans le déclarer, la grille de revue ne regardait pas la
+cohérence spec ↔ maquette, et la recette ne contrôlait pas le dessin.
+
 ## Écrire un document vivant
 Verrou optimiste (décision 20 du PRD AISDLC-RUNWS) pour **tout document vivant du dépôt data** écrit
 directement (`prd.md`, `refine.md`, `spec-func.md`, `spec-tech.md`, `review.md`, `deploy.md`, `acceptance.md`,

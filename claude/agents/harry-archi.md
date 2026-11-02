@@ -20,6 +20,12 @@ tenue**, pas par « ça dépend ». Tu ne meurs pas après une réponse.
 gates et délègue ; **toi (`harry-archi`) tu es l'autorité de décision** que ce persona et les agents
 autonomes viennent consulter.
 
+## Hors de ton périmètre de décision
+Un **écart à une maquette validée par un humain** ne se tranche pas par délégation — règle « La maquette est une
+exigence » de la persona, point 4. Tu le consignes, tu rends `escalate: true` et tu dis ce qu'il faut demander, puis
+tu continues le reste. Ajouter un élément au design system parce que la maquette le demande est de la même eau :
+c'est un arbitrage de produit.
+
 ## Charge le skill (démarrage)
 1. `agent-resilience` — tu es long : contexte maigre, persistance au fil de l'eau, resume-safe.
 2. **Les skills de connaissance PROJET** : liste `<data>/skills/` (data workspace = `sdlc --project
@@ -163,6 +169,8 @@ sdlc --project <PREFIX> pm add --agent harry-archi --kind <debt|incident> \
 ```
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
+
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
 
 ## Sortie (ton message = la décision ; pour un appelant programmatique, termine par ce JSON brut)
 ```json

@@ -85,3 +85,86 @@ def test_the_closed_form_is_described_where_a_spec_is_written():
         text = (COMMANDS / f"{command}.md").read_text(encoding="utf-8")
         assert "forme fermée" in text and "longhand" in text
         assert "suite ordonnée" in text
+
+
+# --- the rule itself: written once, carried everywhere (story -2) ----------------------------------------------
+
+PERSONA = REPO / "claude" / "sdlc" / "harry.md"
+RULE_TITLE = "La maquette est une exigence"
+POINTER = ("> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona "
+           "(`~/.claude/sdlc/harry.md`).")
+CARRIERS = [f"claude/commands/{c}.md" for c in ("spec-func", "spec-tech", "full-spec", "implement")] + \
+           [f"claude/agents/{a}.md" for a in ("reviewer", "recetteur", "harry-archi")] + \
+           [f"claude/skills/{s}/SKILL.md" for s in ("recette", "recette-ui")]
+
+
+def test_the_rule_is_in_the_persona():
+    section = re.search(rf"^## {RULE_TITLE}.*?(?=^## )", PERSONA.read_text(encoding="utf-8"), re.M | re.S)
+    assert section, "the rule is missing from the persona"
+    body = section.group(0)
+    for key in ("Lire la maquette", "pas une inspiration", "se signale", "remonte à l'humain"):
+        assert key in body, key
+
+
+@pytest.mark.parametrize("rel", CARRIERS)
+def test_every_carrier_points_to_the_rule(rel):
+    assert POINTER in (REPO / rel).read_text(encoding="utf-8")
+
+
+def test_the_rule_is_written_once():
+    """The body lives only in the persona; the title appears only there and in the carriers — expressed on the
+    list, never on a literal count, which would be debt as soon as a prompt is added."""
+    holders = {str(p.relative_to(REPO)) for p in (REPO / "claude").rglob("*.md")
+               if RULE_TITLE in p.read_text(encoding="utf-8")}
+    assert holders == {"claude/sdlc/harry.md", *CARRIERS}
+    bodies = [p for p in (REPO / "claude").rglob("*.md") if "pas une inspiration" in p.read_text(encoding="utf-8")]
+    assert bodies == [PERSONA]
+
+
+def test_the_recetteur_carries_the_comparison_in_its_three_exit_statements():
+    """Amending one statement would leave the two others silent — the very defect the rule closes."""
+    text = (REPO / "claude" / "agents" / "recetteur.md").read_text(encoding="utf-8")
+    lines = [l for l in text.splitlines() if "pass=true" in l]
+    assert len(lines) == 3, f"an exit statement was added or removed: {len(lines)}"
+    body = "\n".join(text.splitlines())
+    for anchor in ("sans verdict de comparaison", "comparaison à la maquette est **verte",
+                   "verdict de comparaison consigné"):
+        assert anchor in body, anchor
+
+
+def test_the_reviewer_controls_the_table():
+    text = (REPO / "claude" / "agents" / "reviewer.md").read_text(encoding="utf-8")
+    assert maquette.SECTION in text and "non déclarée" in text
+    assert text.index("Fidélité à la maquette") < text.index("## Sortie")
+
+
+def test_both_recette_skills_make_the_step_mandatory():
+    for rel in ("claude/skills/recette/SKILL.md", "claude/skills/recette-ui/SKILL.md"):
+        text = (REPO / rel).read_text(encoding="utf-8")
+        assert "obligatoire" in text and "maquette" in text
+        assert "pass: false" in text, rel
+
+
+def test_harry_archi_escalates_a_human_validated_deviation():
+    text = HARRY_ARCHI.read_text(encoding="utf-8")
+    section = re.search(r"^## Hors de ton périmètre de décision.*?(?=^## )", text, re.M | re.S)
+    assert section and "escalate: true" in section.group(0)
+    assert "ne se tranche pas par délégation" in section.group(0)
+
+
+def test_the_implementer_treats_the_table_like_an_invariant():
+    text = (REPO / "claude" / "commands" / "implement.md").read_text(encoding="utf-8")
+    assert "attendus à l'écran" in text and "avant de coder" in text
+
+
+def test_what_this_epic_adds_carries_no_ticket_identifier():
+    """Scoped to the added text on purpose: the persona already cites older ticket ids, which is pre-existing
+    debt and not this epic's to rewrite."""
+    section = re.search(rf"^## {RULE_TITLE}.*?(?=^## )", PERSONA.read_text(encoding="utf-8"), re.M | re.S).group(0)
+    added = [section, POINTER]
+    for rel in ("claude/skills/recette-ui/SKILL.md", "claude/agents/harry-archi.md"):
+        text = (REPO / rel).read_text(encoding="utf-8")
+        added.append(text.split("Comparaison à la maquette", 1)[-1].split("\n## ", 1)[0])
+    for blob in added:
+        for forbidden in ("AISDLC-", "UIPOLISH", "UIFIDELITY"):
+            assert forbidden not in blob, forbidden

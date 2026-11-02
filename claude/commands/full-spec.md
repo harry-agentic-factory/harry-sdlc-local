@@ -57,6 +57,8 @@ reprends après. Voir `claude/commands/spec-tech.md` § Gate SPECS pour le déta
 
 > **Avant d'écrire un document vivant** du dépôt data : règle « Écrire un document vivant » de la persona (`~/.claude/sdlc/harry.md`).
 
+> **Quand la story a une maquette** : règle « La maquette est une exigence » de la persona (`~/.claude/sdlc/harry.md`).
+
 ## Sortie
 - **Arbre des docs produits** (prd, refine, et par story : spec-func éventuel + spec-tech).
 - **Tableau** stories × statut × deps × repos, + le **prochain actionnable** (`sdlc --project <PREFIX>
