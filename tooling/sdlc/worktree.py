@@ -114,6 +114,12 @@ def head_commit(repo: str | Path) -> str | None:
     return p.stdout.strip() or None if p.returncode == 0 else None
 
 
+def has_uncommitted_changes(repo: str | Path) -> bool:
+    """`git status --porcelain` is not empty (tracked changes or untracked files; ignored excluded)."""
+    p = _git(repo, "status", "--porcelain")
+    return p.returncode == 0 and bool(p.stdout.strip())
+
+
 def ensure_detached_worktree(repo: str | Path, name: str, commit: str) -> dict:
     """Create-or-reuse a worktree of `repo` DETACHED on `commit`, at the `name` path.
 

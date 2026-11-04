@@ -19,6 +19,7 @@ import shutil
 from pathlib import Path
 
 from . import worktree as wt
+from .brain import PREFER_LOCAL, BrainError, resolve_brain_ref
 from .config import resolved_manifest
 from .service import Sdlc
 from .workspace import Workspace
@@ -30,15 +31,29 @@ BRAIN_TRACE = "brain.json"        # trace file of the workspace: {repo, branch, 
 def _brain_pin(man: dict, story: str) -> dict:
     """Pin the brain for this story: detached worktree at the resolved commit, or the folder as is.
 
+    On a workstation an agent reads the head of the LOCAL brain branch, so this resolves the ref
+    itself under `PREFER_LOCAL` instead of reusing the commit of the manifest, which carries the
+    default (pushed) regime of `sdlc config`. Both can therefore name different commits; the trace
+    below is what the agent actually read.
+
     Returns the trace `{repo, branch, commit}` plus the `path` the bubble opens and the warning
     codes. A brain outside git, undeclared or unresolvable keeps the behaviour of the day (the
-    shared folder, a `null` commit) and says so with its code.
+    shared folder, a `null` commit) and says so with its code. An uncommitted change of the brain
+    does not move the pin: it only adds `brain_dirty`, because an agent points at a commit.
     """
     repo = man.get("brain")
     pin = {"repo": repo, "branch": man.get("brainRef"), "commit": man.get("brainCommit"),
            "path": repo, "warnings": [w for w in (man.get("brainWarning"),) if w]}
     if not repo or not pin["commit"]:
         return pin
+    try:
+        local = resolve_brain_ref(repo, pin["branch"], prefer=PREFER_LOCAL)
+    except BrainError as e:
+        pin["warnings"].append(e.code)
+        return pin
+    pin["branch"], pin["commit"] = local.ref, local.commit
+    if wt.has_uncommitted_changes(repo):
+        pin["warnings"].append("brain_dirty")
     pin["path"] = wt.ensure_detached_worktree(repo, story, pin["commit"])["path"]
     return pin
 

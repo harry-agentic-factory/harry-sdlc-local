@@ -15,13 +15,13 @@ from .mapping import (CATEGORIES, DEFAULT_EXCLUDES, DEFAULT_RULES, READER_PROFIL
                       is_excluded, match_glob, parse_mapping)
 from .normalize import normalize
 from .notes import Note, effective_excludes, list_notes, read_notes
-from .ref import ResolvedRef, resolve_brain_ref
+from .ref import PREFER_LOCAL, PREFER_ORIGIN, ResolvedRef, resolve_brain_ref
 from .snapshot import build_manifest, snapshot
 
 __all__ = [
     "CATEGORIES", "READER_PROFILE", "DEFAULT_EXCLUDES", "DEFAULT_RULES",
     "BrainError", "BrainNotGit", "BrainRefUnresolved",
-    "ResolvedRef", "Note", "Frontmatter", "Mapping",
+    "ResolvedRef", "Note", "Frontmatter", "Mapping", "PREFER_ORIGIN", "PREFER_LOCAL",
     "resolve_brain_ref", "list_notes", "read_notes", "effective_excludes", "extract_links",
     "lint", "build_manifest", "snapshot", "diff_refs", "diff_manifests", "diff_files", "history",
     "normalize", "parse_frontmatter", "match_glob", "is_excluded", "parse_mapping", "deduce",

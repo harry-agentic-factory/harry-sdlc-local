@@ -55,6 +55,49 @@ def _setup_git_brain(tmp_path):
     return repo, brain, ws, c1
 
 
+def _setup_three_state_brain(tmp_path):
+    """Brain clone at three states: a pushed commit, a local commit not pushed, and later a dirty file."""
+    repo, brain, ws = _setup(tmp_path, with_skill=False)
+    upstream = _init_repo(tmp_path / "brain-origin")
+    (upstream / "index.md").write_text("# pushed\n")
+    _git(upstream, "add", "-A"); _git(upstream, "commit", "-q", "-m", "pushed")
+    pushed = _git_out(upstream, "rev-parse", "HEAD")
+    subprocess.run(["git", "clone", "-q", str(upstream), str(brain)], capture_output=True,
+                   text=True, check=True)
+    _git(brain, "config", "user.email", "t@t"); _git(brain, "config", "user.name", "t")
+    (brain / "index.md").write_text("# local only\n")
+    _git(brain, "add", "-A"); _git(brain, "commit", "-q", "-m", "local only, never pushed")
+    local = _git_out(brain, "rev-parse", "HEAD")
+    assert _git_out(brain, "rev-parse", "refs/remotes/origin/main") == pushed != local
+    cli.main(["create-epic", "X-E", "e"])
+    cli.main(["create-ticket", "X-E", "X-1", "t", "--repos", "app"])
+    return brain, ws, pushed, local
+
+
+def test_ac20_the_bubble_pins_the_local_head(tmp_path, monkeypatch):
+    """A commit made minutes earlier, not yet pushed, is what the agent reads."""
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    brain, ws, pushed, local = _setup_three_state_brain(tmp_path)
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    assert res["brain"]["commit"] == local != pushed
+    assert json.loads(Path(res["brainTrace"]).read_text())["commit"] == local
+    assert _git_out(Path(res["brainPath"]), "rev-parse", "HEAD") == local
+    assert (Path(res["brainPath"]) / "index.md").read_text() == "# local only\n"
+    assert res["brainWarnings"] == []
+
+
+def test_ac20bis_a_dirty_brain_warns_without_moving_the_pin(tmp_path, monkeypatch):
+    """The warning changes what the human knows, never what the agent sees."""
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    brain, ws, pushed, local = _setup_three_state_brain(tmp_path)
+    (brain / "index.md").write_text("# modified, never committed\n")
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    assert res["brainWarnings"] == ["brain_dirty"]
+    assert res["brain"]["commit"] == local                      # identical to the clean case
+    assert json.loads(Path(res["brainTrace"]).read_text())["commit"] == local
+    assert (Path(res["brainPath"]) / "index.md").read_text() == "# local only\n"
+
+
 def test_i16_detached_worktree_per_story(tmp_path, monkeypatch):
     monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
     repo, brain, ws, c1 = _setup_git_brain(tmp_path)

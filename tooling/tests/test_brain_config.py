@@ -9,6 +9,7 @@ import pytest
 from sdlc import cli
 from sdlc.brain import resolve_brain_ref
 from sdlc.config import load_config, resolved_manifest
+from sdlc.runws.datarepo import DataRepoBackend
 from test_brain import fx_add_commit, fx_clone, git, make_fx_brain, make_fx_master, run
 
 BRAIN_KEYS = {"brainRef", "brainCommit", "brainRefFrom", "brainWarning"}
@@ -131,6 +132,33 @@ def test_resolve_order_origin_local_tag(tmp_path):
     git(fx.path, "branch", "v1", fx.c2)                  # a branch named like the tag wins over it
     rr = resolve_brain_ref(fx.path, "v1")
     assert (rr.commit, rr.source) == (fx.c2, "local")
+
+
+# --- AC20ter: the default regime stays the pushed version ---
+
+def _three_state_brain(tmp_path):
+    """The clone of `_clone_with_c3`, plus the third state: a file modified and not committed."""
+    fx, clone, c3 = _clone_with_c3(tmp_path)
+    assert git(clone, "rev-parse", "refs/heads/main") == fx.c2 != c3
+    (Path(clone) / "uncommitted.md").write_text("# never committed\n")
+    return fx, clone, c3
+
+
+def test_ac20ter_the_shared_default_is_the_pushed_version(tmp_path):
+    """The anti-drift test: whoever does not ask for the local regime keeps the pushed one."""
+    fx, clone, c3 = _three_state_brain(tmp_path)
+    rr = resolve_brain_ref(clone, "main")
+    assert (rr.commit, rr.source) == (c3, "origin")
+    local = resolve_brain_ref(clone, "main", prefer="local")
+    assert (local.commit, local.source) == (fx.c2, "local")
+
+
+def test_ac20ter_a_local_run_workspace_stays_on_the_default(tmp_path, monkeypatch):
+    """A run is a replayable artefact: its brain commit is one the others can see."""
+    fx, clone, c3 = _three_state_brain(tmp_path)
+    ws = project(tmp_path, monkeypatch, brain=str(clone))
+    tree = DataRepoBackend(resolved_manifest(workspace=ws)).brain()
+    assert (tree.commit, tree.source) == (c3, "origin")
 
 
 # --- AC14: engine non-regression ---
