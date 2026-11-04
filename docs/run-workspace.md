@@ -49,7 +49,7 @@ Default location: `<reposRoot or parent of the data repository>/_agentws/<PREFIX
 ├── in/                       read only for the agent
 │   ├── manifest.json         what the run received
 │   ├── settings.json         agent bubble (permissions)
-│   ├── brain/<path>.md       brain notes at the resolved commit
+│   ├── brain/                git clone of the brain, detached on the resolved commit
 │   ├── feature/atelier/<name>.md          every root *.md of the epic but _index.md
 │   ├── feature/stories/<US>/<doc>.md      every story of the epic, level 1, not journal.md
 │   ├── mission/brief.md, mission/sources/<path>.md   (mission run, instead of feature/)
@@ -65,25 +65,36 @@ Pull is **Markdown only**: `status.json`, `_index.md`, `journal.md`, binaries an
 (`repro/`...) are never copied. The core enforces it on the storage keys (below), whatever the backend
 returns.
 
-The brain is read **at the resolved commit** (`brainRef` of the project manifest, default `main` then
-`master`; `refs/remotes/origin/<ref>` first, then local ref, tag or sha; no fetch), with the exclusions of
-the brain library (`.claude/`, `hooks/`, `exclude:` of `brain-map.yaml` read at the commit). A file that is
-modified, added or ignored in the brain working copy is never seen.
+The brain is **not pulled**: `in/brain/` is a **subtree** written in one go by the `BrainTree` of the
+backend, like a neighbour repository, and has **no entry** in `files`. The pin is the resolved commit
+(`brainRef` of the project manifest, default `main` then `master`; `refs/remotes/origin/<ref>` first, then
+local ref, tag or sha; no fetch).
+
+The extraction is a **clone detached on the commit**, standalone (no remote, no `--shared`, no
+`--reference`, hence no alternates), with the exclusions of the brain library (`.claude/`, `hooks/`,
+`exclude:` of `brain-map.yaml` read at the commit) reapplied by `sparse-checkout --no-cone` **before** the
+checkout: what is excluded never touches the disk of the agent, and the tree stays clean for git. The
+markdown filter of the pull does **not** apply any more: every tracked file of the commit is there. A file
+that is modified, added or ignored in the brain working copy is never seen.
 
 | Brain situation | Result | Warning |
 |---|---|---|
-| resolved | notes at the commit, `brain: {ref, commit}` | none |
-| not declared or folder missing | `in/brain/` empty | `brain_missing` |
-| ref cannot be resolved | `in/brain/` empty, `brain.ref` = requested ref | `brain_ref_unresolved` |
-| not a git repository | working copy `*.md` (hidden folders, `node_modules`, `_toDelete`, `_wt`, `_agentws` skipped, same exclusions), `version: null` | `brain_not_git` |
-| `brain-map.yaml` invalid (commit or working copy) | `in/brain/` empty | `brain_map_invalid` |
+| resolved | clone detached on the commit, `brain: {ref, commit}` | none |
+| not declared | `in/brain/` absent | `brain_not_declared` |
+| folder missing | `in/brain/` absent | `brain_missing` |
+| ref cannot be resolved | `in/brain/` absent, `brain.ref` = requested ref | `brain_ref_unresolved` |
+| not a git repository | working copy `*.md`, **without `.git`** (hidden folders, `node_modules`, `_toDelete`, `_wt`, `_agentws` skipped, same exclusions), `brain.commit` = `null` | `brain_not_git` |
+| `brain-map.yaml` invalid (commit or working copy) | `in/brain/` absent | `brain_map_invalid` |
+| extraction failed | `in/brain/` absent, `brain.commit` = `null` | `brain_extract_failed` |
 
-A git failure of the brain library is a refusal (exit 2) raised before anything is written.
+A git failure of the brain library is a refusal (exit 2) raised before anything is written. An unreadable
+brain, on the other hand, never fails a run.
 
 ## `sdlc run init`
 
 Returns `{run_uid, root, in, rw, out, code, scratch, settings, manifest, brain: {ref, commit, from, files,
-bytes}, warnings}` (absolute paths; `files`/`bytes` = count and size of the brain notes copied; `warnings`
+bytes}, warnings}` (absolute paths; `files`/`bytes` = count and size of the extracted brain tree, `.git`
+excluded; `warnings`
 sorted). All validations and reads happen before the first write; the workspace is built in
 `<parent>/.<run_uid>.partial/` and renamed, so a run is never half visible. Refusals (nothing created):
 `agent_missing`, `agent_invalid`, `scope_invalid` (both or none of story/mission, or an invalid id),
@@ -116,7 +127,6 @@ with `path` = storage key `runs/<uid>/out/docs/<type>.md`.
   "schema_version": 1, "run_uid": "20260926-101500-0a1b2c",
   "scope": {"feature": "DEMO-E", "story": "DEMO-E-1", "mission": null},
   "files": [
-    {"key": "brain/adr/0001.md", "version": "<blob sha>", "sha256": "...", "size": 20, "origin": "adr/0001.md"},
     {"key": "feature/atelier/prd.md", "version": "<commit sha>", "sha256": "...", "size": 21, "origin": "DEMO-E/prd.md"}
   ],
   "brain": {"ref": "main", "commit": "<commit sha>"},
@@ -128,7 +138,7 @@ with `path` = storage key `runs/<uid>/out/docs/<type>.md`.
   included), `version` = opaque string or `null`, `sha256` of the bytes written, `origin` = path relative to
   the source repository (a storage object key on a platform). Sorted by `key`.
 - Data repository version = sha of the last commit touching the file at `HEAD`; untracked or modified
-  against `HEAD` ⇒ `null` and the key is listed in `dirty`. Brain version = git blob at `brain.commit`.
+  against `HEAD` ⇒ `null` and the key is listed in `dirty`. The brain has no entry: `brain.commit` pins it.
 - Neighbour entry (added by a later clone step, never produced here): `{key: "repos/<repo>", commit, role}`.
 - `scope` lets `doc read spec-tech` know the story of the run where `run.json` is not mounted.
 
@@ -144,15 +154,18 @@ with `path` = storage key `runs/<uid>/out/docs/<type>.md`.
 
 `A` = the workspace root, or `agent_root` (library: the root as the agent sees it, e.g. `/work`). With `A`
 absolute the rules read `Edit(//abs/in/**)`: in the Claude Code rule syntax `//` starts an absolute path.
-`allow` is omitted when the role has none. Neither the data repository nor the brain is in the file.
+`allow` is omitted when the role has none. Neither the data repository nor the path of the brain of the
+host is in the file.
 
 ## `sdlc doc read | list | add`
 
-A key is resolved **only among the file entries of the manifest** (never a free path, so no traversal).
+A key is resolved among the file entries of the manifest — except under `brain/`, resolved by its path in
+the subtree — never as a free path, so no traversal.
 Candidates in order, the first one present wins, otherwise `unknown_key:<k>; available: <keys>`:
 
 1. reserved keys: `prd`, `refine` ⇒ `feature/atelier/<k>.md`; `brief` ⇒ `mission/brief.md`;
-2. reserved prefixes: `atelier/<n>` ⇒ `feature/atelier/<n>.md`; `brain/<p>` ⇒ `brain/<p>.md`;
+2. reserved prefixes: `atelier/<n>` ⇒ `feature/atelier/<n>.md`; `brain/<p>` ⇒ `brain/<p>.md`, resolved **by
+   its path** under `in/brain/` (regular `.md` file, clean path) since the brain has no entry;
    `mission/<p>` ⇒ `mission/<p>.md`; `repro/…`, `repos/…` ⇒ steps 5-6 only;
 3. `<doc>` without `/` ⇒ `feature/stories/<story of the run>/<doc>.md`;
 4. `<US>/<doc>` (first segment not reserved) ⇒ `feature/stories/<US>/<doc>.md`;
@@ -183,7 +196,8 @@ documents and the manifest are published from the bytes read by the checks (neve
 | Check | Reason (sorted, workspace kept, `state: rejected`) |
 |---|---|
 | `in/manifest.json` / `in/settings.json` differ from `seal.json` | `in_modified:manifest.json`, `in_modified:settings.json` |
-| file under `in/` added, removed, changed, or any symbolic link (neighbour subtrees `repos/<repo>/` excluded: delegated to their git check; a `repos/<x>/` without neighbour entry is "added") | `in_modified:<path relative to in/>` |
+| file under `in/` added, removed, changed, or any symbolic link (the subtrees `repos/<repo>/` and `brain/` excluded: delegated to their git check; a `repos/<x>/` without neighbour entry is "added") | `in_modified:<path relative to in/>` |
+| `in/brain/` no longer on `brain.commit`, not a real repository, or tree not clean (nothing checked when `brain.commit` is `null`) | `in_modified:brain` |
 | anything under `rw/out/` other than a regular `docs/<type>.md` or the content of `sources/`, including **any** file under `git/` and any symbolic link | `unexpected_file:<path relative to rw/out/>` |
 | document larger than 1 MiB (`DOC_MAX_BYTES` = 1 048 576) | `too_large:docs/<type>.md` |
 
@@ -263,7 +277,6 @@ included (they are throwaway; traces live in the data repository).
 | `features/<E>/atelier/<name>.md` | `feature/atelier/<name>.md` | `<data>/<E>/<name>.md` (root `*.md` but `_index.md`) |
 | `features/<E>/stories/<US>/<doc>.md` | `feature/stories/<US>/<doc>.md` | `<data>/<E>/stories/<US>/<doc>.md` (level 1, not `journal.md`) |
 | `missions/<M>/brief.md`, `missions/<M>/sources/<p>.md` | `mission/brief.md`, `mission/sources/<p>.md` | `<data>/missions/<M>/…` (`sources/` recursive) |
-| `project/brain/@<commit>/<p>.md` | `brain/<p>.md` | brain repository at the commit; fallback `project/brain/@worktree/<p>.md` |
 | `runs/<uid>/run.json`, `runs/<uid>/manifest.json`, `runs/<uid>/out/docs/<type>.md` | (publication) | `<data>/runs/<uid>/…` |
 
 Nothing is committed: the data repository is left modified, as when an agent writes it. Git is used read
@@ -282,7 +295,7 @@ run_list(project=None, *, story=None, mission=None, backend=None) -> list[dict]
 doc_read(key, *, run=None) -> bytes
 doc_list(*, run=None) -> list[dict]
 doc_add(type, content: bytes, *, run=None) -> dict
-# also: DocumentRepository, RunSource, Entry, Scope, BrainPin, DataRepoBackend, RunError,
+# also: DocumentRepository, RunSource, Entry, Scope, BrainTree, DataRepoBackend, RunError,
 #       DOC_TYPES, RUN_STATES, RUN_JSON_KEYS, RUN_UID_RE, ROUND_HEADER_RE, SCHEMA_VERSION, DOC_MAX_BYTES
 ```
 
@@ -303,7 +316,7 @@ class DocumentRepository(Protocol):
 
 class RunSource(Protocol):
     def locate(self, *, story, mission) -> Scope: ...       # Scope(feature, story, mission)
-    def brain(self) -> BrainPin: ...                        # BrainPin(ref, commit, source, prefix, files_hint, warnings)
+    def brain(self) -> BrainTree: ...                       # ref, commit, source, warnings + extract(dest)
     def bubble(self, agent) -> dict: ...                    # {"allow": [...], "deny": [...]}
 ```
 
@@ -395,9 +408,10 @@ Without `code.json`: exactly the finish above. With it, in this order (all or no
    otherwise; each file ≤ `SOURCE_MAX_BYTES` = 50 MiB ⇒ `source_too_large:<rel>`; total ≤
    `RUN_SOURCES_MAX_BYTES` = 200 MiB ⇒ `sources_total_too_large`) and a file of `rw/out/git/` admitted only
    when the engine recorded it in `code.json.bundles` with exactly that sha256 (else `unexpected_file`).
-3. Git checks (read only): neighbours = real `.git` folder without `commondir`/alternates, `.git/config`
-   unchanged (checked **before** any git call), `HEAD` = manifest commit, `status --porcelain --ignored`
-   empty, else `in_modified:repos/<repo>`; targets = same structure (`code_invalid:<repo>`), story branch
+3. Git checks (read only): the brain = real `.git` folder without `commondir`/alternates, `HEAD` =
+   `brain.commit`, `status --porcelain --ignored` empty, else `in_modified:brain` (run with or without
+   code); neighbours = the same plus `.git/config` unchanged (checked **before** any git call), else
+   `in_modified:repos/<repo>`; targets = same structure (`code_invalid:<repo>`), story branch
    present (`branch_deleted:<repo>`), other branches/tags ignored (warning `extra_refs_ignored:<repo>`).
 4. Bundles (engine, idempotent): `rw/out/git/<repo>.bundle` = the only `refs/heads/<branch>` with the
    recorded `head` as prerequisite; no new commit ⇒ `"unchanged"`.
