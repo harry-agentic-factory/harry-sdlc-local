@@ -23,6 +23,30 @@ from .model import (CODE_OPTIONS, FINAL_STATES, RUN_UID_RE, SCHEMA_VERSION, RunE
 from .port import CodeHost, Scope
 
 
+def _extract_brain(brain, dest: Path, warnings: list[str]) -> tuple[str | None, dict]:
+    """Write the brain subtree, once, in the partial folder. Returns (pinned commit, tree counts).
+
+    An unreadable brain never fails a run: `in/brain/` stays absent, the commit is dropped so that
+    the integrity check of `finish` does not apply, and a warning code is added.
+    """
+    try:
+        brain.extract(dest)
+    except Exception:                        # noqa: BLE001 - any extraction failure is a warning
+        shutil.rmtree(dest, ignore_errors=True)
+        warnings.append("brain_extract_failed")
+        return None, {"files": 0, "bytes": 0}
+    count = size = 0
+    for dirpath, dirnames, filenames in os.walk(dest, followlinks=False):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        for n in filenames:
+            try:
+                st = os.lstat(Path(dirpath) / n)
+            except OSError:
+                continue
+            count, size = count + 1, size + st.st_size
+    return brain.commit, {"files": count, "bytes": size}
+
+
 def _default_backend(project: str | None):
     from .datarepo import DataRepoBackend
     return DataRepoBackend.from_project(project)
@@ -182,22 +206,22 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
                 code_warnings.append("repro_empty")
         elif repro_dir is not None:
             repro_files = repromod.from_dir(repro_dir)
-    pin = backend.brain()
+    brain = backend.brain()
+    brain_warnings: list[str] = []
     bubble = backend.bubble(agent)
-    prefixes = layout.pull_prefixes(scope) + ([pin.prefix] if pin.prefix else [])
+    prefixes = layout.pull_prefixes(scope)
     files: dict[str, dict] = {}
     contents: dict[str, bytes] = {}
     for prefix in prefixes:
         for entry in backend.list(prefix):
-            rel = layout.in_path(entry["key"], scope, pin.prefix)
+            rel = layout.in_path(entry["key"], scope)
             if rel is None or rel in files:
                 continue
             data = backend.get(entry["key"])
             contents[rel] = data
             files[rel] = {"key": rel, "version": entry.get("version"), "sha256": sha256(data),
                           "size": len(data), "origin": entry.get("origin")}
-    brain_rels = [r for r in files if r.startswith("brain/")]
-    dirty = sorted(r for r, e in files.items() if e["version"] is None and not r.startswith("brain/"))
+    dirty = sorted(r for r, e in files.items() if e["version"] is None)
     for rel, entry, data in repro_files:          # repro entries: common form, never "dirty"
         files[rel] = entry
         contents[rel] = data
@@ -216,13 +240,13 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
     final = parent / uid
     a = agent_root or str(final)
 
-    def manifest_bytes_of(extra: list[dict]) -> bytes:
+    def manifest_bytes_of(extra: list[dict], brain_commit: str | None) -> bytes:
         entries = {**{k: files[k] for k in files}, **{e["key"]: e for e in extra}}
         return dump_json({
             "schema_version": SCHEMA_VERSION, "run_uid": uid,
             "scope": {"feature": scope.feature, "story": scope.story, "mission": scope.mission},
             "files": [entries[k] for k in sorted(entries)],
-            "brain": {"ref": pin.ref, "commit": pin.commit}, "dirty": dirty,
+            "brain": {"ref": brain.ref, "commit": brain_commit}, "dirty": dirty,
         })
 
     settings_bytes = dump_json(layout.settings(a, bubble, code=is_code))
@@ -240,12 +264,13 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
             target = partial / "in" / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             _write(target, contents[rel])
+        brain_commit, brain_tree = _extract_brain(brain, partial / "in" / layout.BRAIN_DIR, brain_warnings)
         neighbours: list[dict] = []
         repos_json: dict = {}
         if is_code:
             repos_json, neighbours, code_json = codemod.prepare_code(partial, plan, final=final)
             _write(partial / codemod.CODE_JSON, dump_json(code_json))
-        manifest_bytes = manifest_bytes_of(neighbours)
+        manifest_bytes = manifest_bytes_of(neighbours, brain_commit)
         _write(partial / "in" / "manifest.json", manifest_bytes)
         _write(partial / "in" / "settings.json", settings_bytes)
         seal = {"manifest_sha256": sha256(manifest_bytes), "settings_sha256": sha256(settings_bytes),
@@ -266,9 +291,8 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
 
     res = {
         "run_uid": uid, **{k: v for k, v in layout.workspace_paths(final).items()},
-        "brain": {"ref": pin.ref, "commit": pin.commit, "from": pin.source, "files": len(brain_rels),
-                  "bytes": sum(files[r]["size"] for r in brain_rels)},
-        "warnings": sorted(set(pin.warnings) | set(code_warnings)),
+        "brain": {"ref": brain.ref, "commit": brain_commit, "from": brain.source, **brain_tree},
+        "warnings": sorted(set(brain.warnings) | set(brain_warnings) | set(code_warnings)),
     }
     if is_code:
         res["repos"] = repos_json
@@ -388,6 +412,7 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
         res = controls.check(root)
     reasons += res.reasons
     warnings = list(res.warnings)
+    reasons += codemod.check_brain(root, res.manifest)
     if code is not None and not reasons:
         more, warn = codemod.check_code(root, code, res.manifest)
         reasons += more

@@ -154,17 +154,20 @@ def test_ac1_init_creates_exact_tree(demo, cap):
     res = init(cap)
     root = Path(res["root"])
     assert root.parent == demo.root_base / "DEMO-E-1" and root.is_dir()
-    assert tree_dirs(root) == {
-        "in", "in/brain", "in/brain/adr", "in/feature", "in/feature/atelier", "in/feature/stories",
+    dirs = {d for d in tree_dirs(root) if not d.startswith("in/brain/")}
+    assert dirs == {
+        "in", "in/brain", "in/feature", "in/feature/atelier", "in/feature/stories",
         "in/feature/stories/DEMO-E-1", "in/feature/stories/DEMO-E-2", "rw", "rw/code", "rw/scratch",
         "rw/out", "rw/out/docs", "rw/out/sources", "rw/out/git"}
+    assert (root / "in" / "brain" / ".git").is_dir() and (root / "in" / "brain" / "adr").is_dir()
     assert set(res) == {"run_uid", "root", "in", "rw", "out", "code", "scratch", "settings", "manifest",
                         "brain", "warnings"}
     assert res["in"] == str(root / "in") and res["out"] == str(root / "rw" / "out")
     assert res["scratch"] == str(root / "rw" / "scratch") and res["code"] == str(root / "rw" / "code")
     assert res["warnings"] == []
-    assert res["brain"] == {"ref": "main", "commit": demo.c1, "from": "local", "files": 2,
-                            "bytes": len(BRAIN_INDEX_C1) + len(BRAIN_ADR)}
+    tracked = ["index.md", "adr/0001.md", "logo.png"]       # the whole tree, .md or not
+    assert res["brain"] == {"ref": "main", "commit": demo.c1, "from": "local", "files": 3,
+                            "bytes": sum((demo.brain / r).stat().st_size for r in tracked)}
 
 
 def test_ac1_run_json_exact_keys_and_values(demo, cap):
@@ -201,15 +204,15 @@ def test_ac2_pull_markdown_only(demo, cap):
     write(demo.story(), "repro/steps.md", b"# steps\n")
     res = init(cap)
     in_dir = Path(res["in"])
-    files = [p for p in in_dir.rglob("*") if p.is_file()]
+    files = [p for p in in_dir.rglob("*") if p.is_file() and p.relative_to(in_dir).parts[0] != "brain"]
     assert [p for p in files if p.suffix != ".md" and p.name not in ("manifest.json", "settings.json")] == []
     assert (in_dir / "brain" / "adr" / "0001.md").is_file()
-    assert not (in_dir / "brain" / "logo.png").exists()
+    assert (in_dir / "brain" / "logo.png").is_file()      # subtree, not pulled: no markdown filter
     assert not (in_dir / "feature" / "stories" / "DEMO-E-1" / "journal.md").exists()
     assert not (in_dir / "feature" / "stories" / "DEMO-E-1" / "repro").exists()
     man = json.loads((in_dir / "manifest.json").read_text())
     md = [p for p in files if p.suffix == ".md"]
-    assert len(man["files"]) == len(md) == 6
+    assert len(man["files"]) == len(md) == 4
 
 
 def test_ac2_excludes_status_journal_repro_index(demo, cap):
@@ -246,9 +249,7 @@ def test_ac3_versions_data_commit_brain_blob(demo, cap):
     prd = files["feature/atelier/prd.md"]
     assert prd["version"] == git(demo.data, "log", "-1", "--format=%H", "--", "DEMO-E/prd.md")
     assert prd["origin"] == "DEMO-E/prd.md"
-    adr = files["brain/adr/0001.md"]
-    assert adr["version"] == git(demo.brain, "rev-parse", f"{demo.c1}:adr/0001.md")
-    assert adr["origin"] == "adr/0001.md"
+    assert not [k for k in files if k.startswith("brain/")]     # subtree, pinned by brain.commit
     assert files["feature/stories/DEMO-E-2/spec-tech.md"]["origin"] == "DEMO-E/stories/DEMO-E-2/spec-tech.md"
 
 
@@ -348,15 +349,18 @@ def test_ac6_unknown_key_lists_keys(demo, cap, monkeypatch):
     rc, out, err = call(cap, "doc", "read", "unknown")
     assert rc != 0 and out == b""
     msg = json.loads(err)["error"]
-    assert msg.startswith("unknown_key:unknown; available:") and "prd" in msg and "brain/index" in msg
+    assert msg.startswith("unknown_key:unknown; available:") and "prd" in msg
+    assert "brain/index" not in msg                       # the brain is not an entry any more...
+    rc, out, _ = call(cap, "doc", "read", "brain/index")
+    assert rc == 0 and out == BRAIN_INDEX_C1              # ...but it is readable by its path
 
 
-def test_ac6_doc_list_six_entries(demo, cap):
+def test_ac6_doc_list_entries_without_brain(demo, cap):
     res = init(cap)
     lst = ok(cap, "doc", "list", "--run", res["root"])
-    assert len(lst) == 6
+    assert len(lst) == 4
     assert [d["key"] for d in lst] == sorted(["prd", "DEMO-E-1/spec-func", "DEMO-E-1/spec-tech",
-                                              "DEMO-E-2/spec-tech", "brain/adr/0001", "brain/index"])
+                                              "DEMO-E-2/spec-tech"])
     assert all(set(d) == {"key", "path", "version"} for d in lst)
     prd = next(d for d in lst if d["key"] == "prd")
     assert prd["path"] == "feature/atelier/prd.md" and prd["version"]
@@ -384,7 +388,7 @@ def test_doc_commands_without_project(demo, cap, monkeypatch):
     rc = cli.main(["doc", "read", "spec-tech"])
     assert rc == 0 and cap.readouterr().out == SPEC_TECH_1
     rc = cli.main(["doc", "list"])
-    assert rc == 0 and len(json.loads(cap.readouterr().out)) == 6
+    assert rc == 0 and len(json.loads(cap.readouterr().out)) == 4
     monkeypatch.setattr(sys, "stdin", SimpleNamespace(buffer=io.BytesIO(RECAP_DOC)))
     rc = cli.main(["doc", "add", "review", "-"])
     out = json.loads(cap.readouterr().out)
@@ -526,7 +530,7 @@ def test_in_file_removed_or_added_rejected(demo, cap, monkeypatch):
     os.symlink("/", Path(res["in"]) / "brain" / "link")
     rc, out, _ = call(cap, "run", "finish", res["run_uid"])
     assert rc == 1 and json.loads(out)["reasons"] == [
-        "in_modified:brain/index.md", "in_modified:brain/link", "in_modified:feature/extra.md"]
+        "in_modified:brain", "in_modified:feature/extra.md"]
 
 
 # --- AC11 ---
@@ -737,7 +741,7 @@ def test_brain_missing_warns(demo, cap):
     cfg = dict(demo.config)
     cfg.pop("brain")
     (demo.data / "sdlc.config.json").write_text(json.dumps(cfg))
-    assert init(cap)["warnings"] == ["brain_missing"]
+    assert init(cap)["warnings"] == ["brain_not_declared"]
 
 
 def test_brain_map_invalid_commit_and_worktree(demo, cap):

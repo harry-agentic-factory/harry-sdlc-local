@@ -158,6 +158,42 @@ def clone_target(name: str, url: str, dest: Path, *, branch: str, base: str, cre
     return _out(head)
 
 
+def sparse_patterns(excludes) -> list[str]:
+    """`--no-cone` patterns keeping everything but `excludes`.
+
+    `--no-cone` patterns are INCLUSION patterns: the kept set is `/*` minus one negation per
+    excluded path. A folder exclusion (`adr/`) covers its content (`/adr/**`); a pattern already
+    starting with `**/` stays depth free, every other one is anchored on the root, which is what the
+    brain matcher means (a pattern covers the whole path)."""
+    out = ["/*"]
+    for e in excludes:
+        pat = e + "**" if e.endswith("/") else e
+        out.append("!" + (pat if pat.startswith("**/") else "/" + pat.lstrip("/")))
+    return out
+
+
+def clone_brain(name: str, url: str, dest: Path, *, commit: str, excludes=()) -> str:
+    """Clone the brain at `commit`, detached, without remote, `excludes` left out of the work tree.
+
+    Same sequence as a neighbour, plus the exclusions: clone without checkout, sparse patterns, THEN
+    checkout -- posting the patterns after the checkout would write the whole tree and take it back.
+    The clone is standalone (no `--shared`, no `--reference`, hence no alternates): the agent tree
+    never depends on the repository it came from. Returns the commit checked out."""
+    steps = [
+        (("clone", "-q", "--no-checkout", "--origin", "origin", "--", url, str(dest)), None),
+        (("sparse-checkout", "set", "--no-cone", *sparse_patterns(excludes)), dest),
+        (("checkout", "-q", "--detach", commit), dest),
+        (("remote", "remove", "origin"), dest),
+    ]
+    for args, cwd in steps:
+        _check(_git_trusted(*args, cwd=cwd), name)
+    _drop_logs(dest)
+    head = _out(_check(_git_trusted("rev-parse", "--verify", "-q", "HEAD", cwd=dest), name))
+    if head != commit or not _clean_config(dest):
+        raise RunError("clone_failed", name, diagnostic="brain clone not detached on the pinned commit")
+    return head
+
+
 def clone_neighbour(name: str, url: str, dest: Path, *, ref: str | None) -> tuple[str, str]:
     """Shallow clone of a neighbour at `ref` (remote HEAD when None), no remote left.
     Returns (commit, sha256 of .git/config)."""

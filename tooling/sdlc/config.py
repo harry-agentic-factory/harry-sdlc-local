@@ -302,29 +302,33 @@ def resolve_deploy_target(cfg: dict, repo: str, env: str) -> dict:
 
 
 def _brain_ref_keys(brain: str | None, raw_ref: str | None) -> dict:
-    """`brainRef` / `brainCommit` / `brainRefFrom` of the manifest (resolved without any fetch).
+    """`brainRef` / `brainCommit` / `brainRefFrom` / `brainWarning` (resolved without any fetch).
 
-    Unresolvable ref or brain outside git: raw `brainRef`, null commit/source, and ONE JSON warning
-    line on stderr (never a key of the stdout JSON).
+    A brain that is not declared, or whose ref cannot be resolved, is reported BY THE OUTPUT ITSELF:
+    `brainWarning` carries a stable reason code (`brain_not_declared`, `brain_ref_unresolved`,
+    `brain_not_git`), on top of the JSON warning line on stderr. A reader must not have to parse a
+    log to know that the agents of this project will run without a brain.
     """
     if not brain:
-        return {"brainRef": None, "brainCommit": None, "brainRefFrom": None}
+        return {"brainRef": None, "brainCommit": None, "brainRefFrom": None,
+                "brainWarning": "brain_not_declared"}
     from .brain import BrainError, BrainRefUnresolved, resolve_brain_ref
     try:
         rr = resolve_brain_ref(brain, raw_ref)
     except BrainError as e:
         code = "brain_ref_unresolved" if isinstance(e, BrainRefUnresolved) else "brain_not_git"
         print(json.dumps({"warning": code, "message": e.message}, ensure_ascii=False), file=sys.stderr)
-        return {"brainRef": raw_ref, "brainCommit": None, "brainRefFrom": None}
-    return {"brainRef": rr.ref, "brainCommit": rr.commit, "brainRefFrom": rr.source}
+        return {"brainRef": raw_ref, "brainCommit": None, "brainRefFrom": None, "brainWarning": code}
+    return {"brainRef": rr.ref, "brainCommit": rr.commit, "brainRefFrom": rr.source,
+            "brainWarning": None}
 
 
 def resolved_manifest(project: str | None = None, workspace: str | Path | None = None, *,
                       with_brain_ref: bool = False) -> dict:
     """Vue **résolue** du manifest (chemins absolus) — la sortie de `sdlc config`, lue par les agents.
 
-    `with_brain_ref=True` (only `sdlc config`) adds `brainRef` (optional manifest key: branch, tag or
-    sha; default main then master), `brainCommit` and `brainRefFrom` (origin|local|tag|sha).
+    `with_brain_ref=True` adds `brainRef` (optional manifest key: branch, tag or sha; default main
+    then master), `brainCommit`, `brainRefFrom` (origin|local|tag|sha) and `brainWarning`.
     Default: unchanged keys, no git call.
     """
     ws = Path(workspace) if workspace else resolve_workspace(project)

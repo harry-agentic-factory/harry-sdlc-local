@@ -13,8 +13,9 @@ Storage keys (see `layout.py`) map to the data repository as follows:
     features/<E>/stories/<US>/<doc>.md    <ws>/<E>/stories/<US>/<doc>.md  (level 1, not journal.md)
     missions/<M>/brief.md, sources/...    <ws>/missions/<M>/...
     runs/<uid>/...                        <ws>/runs/<uid>/...  (+ out/sources/<rel>, out/git/<repo>.bundle)
-    project/brain/@<commit>/<p>.md        brain notes at <commit> (sdlc.brain library)
-    project/brain/@worktree/<p>.md        brain working copy (fallback when the brain is not git)
+
+The brain is not a storage key any more: `brain()` hands the core a `BrainTree` which clones the
+brain of the host detached on the pinned commit, exactly as a neighbour repository is cloned.
 """
 from __future__ import annotations
 
@@ -25,12 +26,13 @@ import stat
 import subprocess
 import tempfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
 from .. import agentws
-from ..brain import (DEFAULT_EXCLUDES, BrainError, BrainNotGit, BrainRefUnresolved, is_excluded,
-                     list_notes, parse_mapping, read_notes, resolve_brain_ref)
+from ..brain import (DEFAULT_EXCLUDES, BrainError, BrainNotGit, BrainRefUnresolved, effective_excludes,
+                     is_excluded, parse_mapping, resolve_brain_ref)
 from ..config import load_config, resolved_manifest
 from ..service import Sdlc
 from ..workspace import Workspace
@@ -38,12 +40,69 @@ from . import gitcode
 from .layout import repro_prefix, safe_segments
 from .model import (FINAL_STATES, ROUND_HEADER_BYTES_RE, RUN_UID_RE, RunError, iso, sha256, utc_now,
                     validate_run_uid, validate_scope_id)
-from .port import BrainPin, Entry, RepoSpec, Scope
+from .port import BrainTree, Entry, RepoSpec, Scope
 
 GIT_READ_SUBCOMMANDS = frozenset({"rev-parse", "ls-files", "diff", "log"})
 _SCRUBBED_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX")
 _BRAIN_WORKTREE_SKIP = {"node_modules", "_toDelete", "_wt", "_agentws"}
 BRAIN_MAP_FILE = "brain-map.yaml"
+
+
+@dataclass(frozen=True)
+class NoBrainTree:
+    """No readable brain: the core writes no `in/brain/` and keeps the warnings."""
+    warnings: tuple[str, ...]
+    ref: str | None = None
+    commit: str | None = None
+    source: str | None = None
+
+    def extract(self, dest: Path) -> None:
+        return None
+
+
+@dataclass(frozen=True)
+class GitBrainTree:
+    """A brain inside git: `in/brain/` is a standalone clone detached on `commit`."""
+    ref: str | None
+    commit: str | None
+    source: str | None
+    repo: str
+    excludes: tuple[str, ...]
+    warnings: tuple[str, ...] = ()
+
+    def extract(self, dest: Path) -> None:
+        gitcode.clone_brain("brain", self.repo, Path(dest), commit=self.commit, excludes=self.excludes)
+
+
+@dataclass(frozen=True)
+class PlainBrainTree:
+    """A brain outside git: filtered copy of the working tree, without `.git` (no commit to check)."""
+    root: str
+    excludes: tuple[str, ...]
+    warnings: tuple[str, ...] = ("brain_not_git",)
+    ref: str | None = None
+    commit: str | None = None
+    source: str | None = None
+
+    def extract(self, dest: Path) -> None:
+        root = Path(self.root)
+        dest = Path(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+        for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+            dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d not in _BRAIN_WORKTREE_SKIP
+                                 and not os.path.islink(os.path.join(dirpath, d)))
+            for n in sorted(filenames):
+                if not n.endswith(".md"):
+                    continue
+                rel = (Path(dirpath) / n).relative_to(root).as_posix()
+                if not safe_segments(rel) or is_excluded(rel, self.excludes):
+                    continue
+                data = _read_regular(root / rel)
+                if data is None:
+                    continue
+                target = dest / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
 
 
 def _read_regular(path: Path) -> bytes | None:
@@ -136,9 +195,6 @@ class DataRepoBackend:
         self.brain_ref = brain_ref
         self.permissions = manifest.get("permissions") or {}
         self._cache: dict[str, tuple[bytes, str | None]] = {}
-        self._brain_commit: str | None = None
-        self._brain_notes: list | None = None
-        self._brain_excludes: tuple[str, ...] = tuple(DEFAULT_EXCLUDES)
         # raw value of the optional `runWorkspace` key of the project (None when absent)
         self.run_workspace = manifest.get("runWorkspace")
 
@@ -269,46 +325,32 @@ class DataRepoBackend:
 
     # --- brain ---
 
-    def brain(self) -> BrainPin:
-        self._brain_commit, self._brain_notes = None, None
-        if not self.brain_path or not os.path.isdir(self.brain_path):
-            return BrainPin(None, None, None, None, None, ("brain_missing",))
+    def brain(self) -> BrainTree:
+        if not self.brain_path:
+            return NoBrainTree(("brain_not_declared",))
+        if not os.path.isdir(self.brain_path):
+            return NoBrainTree(("brain_missing",))
         try:
             rr = resolve_brain_ref(self.brain_path, self.brain_ref)
         except BrainNotGit:
             try:
-                self._brain_excludes = self._brain_worktree_excludes()
+                excludes = self._brain_worktree_excludes()
             except BrainError:
-                return BrainPin(None, None, None, None, None, ("brain_map_invalid", "brain_not_git"))
-            return BrainPin(None, None, None, "project/brain/@worktree/", None, ("brain_not_git",))
+                return NoBrainTree(("brain_map_invalid", "brain_not_git"))
+            return PlainBrainTree(self.brain_path, excludes)
         except BrainRefUnresolved:
-            return BrainPin(self.brain_ref, None, None, None, None, ("brain_ref_unresolved",))
+            return NoBrainTree(("brain_ref_unresolved",), ref=self.brain_ref)
         except BrainError as e:
             if e.code == "brain_not_found":
-                return BrainPin(None, None, None, None, None, ("brain_missing",))
+                return NoBrainTree(("brain_missing",))
             raise
         try:
-            notes = list_notes(self.brain_path, rr.commit)
+            excludes = effective_excludes(self.brain_path, rr.commit)
         except BrainError as e:
             if e.code.startswith("mapping_"):
-                return BrainPin(rr.ref, rr.commit, rr.source, None, None, ("brain_map_invalid",))
+                return NoBrainTree(("brain_map_invalid",), ref=rr.ref, commit=rr.commit, source=rr.source)
             raise
-        self._brain_commit, self._brain_notes = rr.commit, notes
-        return BrainPin(rr.ref, rr.commit, rr.source, f"project/brain/@{rr.commit}/", len(notes), ())
-
-    def _brain_commit_entries(self, commit: str) -> list[Entry]:
-        if self._brain_commit != commit or self._brain_notes is None:
-            self._brain_notes = list_notes(self.brain_path, commit)
-            self._brain_commit = commit
-        notes = self._brain_notes
-        contents = read_notes(self.brain_path, commit, [n.path for n in notes]) if notes else {}
-        out: list[Entry] = []
-        for n in notes:
-            data = contents[n.path]
-            key = f"project/brain/@{commit}/{n.path}"
-            self._cache[key] = (data, n.blob)
-            out.append(Entry(key=key, version=n.blob, sha256=sha256(data), size=len(data), origin=n.path))
-        return sorted(out, key=lambda e: e["key"])
+        return GitBrainTree(rr.ref, rr.commit, rr.source, self.brain_path, excludes)
 
     def _brain_worktree_excludes(self) -> tuple[str, ...]:
         """Default exclusions + `exclude:` of `brain-map.yaml` read on disk (BrainError if invalid)."""
@@ -317,32 +359,6 @@ class DataRepoBackend:
         if data is not None:
             excludes += parse_mapping(data, BRAIN_MAP_FILE).excludes
         return excludes
-
-    def _brain_worktree_list(self) -> list[Entry]:
-        """Fallback when the brain is not git: every `*.md` of its working copy."""
-        root = Path(self.brain_path)
-        out: list[Entry] = []
-        for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
-            dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d not in _BRAIN_WORKTREE_SKIP
-                                 and not os.path.islink(os.path.join(dirpath, d)))
-            for n in sorted(filenames):
-                if not n.endswith(".md"):
-                    continue
-                rel = (Path(dirpath) / n).relative_to(root).as_posix()
-                if is_excluded(rel, self._brain_excludes):
-                    continue
-                data = self._brain_worktree_read(rel)
-                if data is None:
-                    continue
-                key = f"project/brain/@worktree/{rel}"
-                self._cache[key] = (data, None)
-                out.append(Entry(key=key, version=None, sha256=sha256(data), size=len(data), origin=rel))
-        return sorted(out, key=lambda e: e["key"])
-
-    def _brain_worktree_read(self, rel: str) -> bytes | None:
-        if not safe_segments(rel):
-            return None
-        return _read_regular(Path(self.brain_path) / rel)
 
     # --- RunSource ---
 
@@ -420,15 +436,7 @@ class DataRepoBackend:
 
     def list(self, prefix: str) -> list[Entry]:
         parts = prefix.split("/")
-        if prefix.startswith("project/brain/@") and len(parts) >= 3:
-            at = parts[2][1:]
-            if at == "worktree":
-                if not self.brain_path:
-                    return []
-                entries = self._brain_worktree_list()
-            else:
-                entries = self._brain_commit_entries(at)
-        elif parts[0] == "features" and len(parts) >= 2 and parts[1]:
+        if parts[0] == "features" and len(parts) >= 2 and parts[1]:
             entries = self._entries(self._feature_keys(validate_scope_id(parts[1])), parts[1])
         elif parts[0] == "missions" and len(parts) >= 2 and parts[1]:
             m = validate_scope_id(parts[1])
@@ -448,27 +456,13 @@ class DataRepoBackend:
             return cached[0]
         if version is not None:
             raise KeyError(f"{key}@{version}")
-        if key.startswith("project/brain/@worktree/"):
-            data = self._brain_worktree_read(key[len("project/brain/@worktree/"):]) if self.brain_path else None
-        elif key.startswith("project/brain/@"):
-            at, _, rel = key[len("project/brain/@"):].partition("/")
-            try:
-                data = read_notes(self.brain_path, at, [rel])[rel] if self.brain_path and rel else None
-            except BrainError as e:
-                if e.code != "note_not_found":
-                    raise
-                data = None
-        else:
-            rel = self._data_rel(key)
-            data = _read_regular(self.ws / rel) if rel else None
+        rel = self._data_rel(key)
+        data = _read_regular(self.ws / rel) if rel else None
         if data is None:
             raise KeyError(key)
         return data
 
     def versions(self, key: str) -> list[str]:
-        cached = self._cache.get(key)
-        if key.startswith("project/brain/@"):
-            return [cached[1]] if cached and cached[1] else []
         rel = self._data_rel(key)
         if rel is None:
             return []

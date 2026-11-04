@@ -217,6 +217,21 @@ def targets(code: dict) -> list[str]:
 
 # --- checks (read only) ---
 
+def check_brain(root: Path, manifest: dict | None) -> list[str]:
+    """`in/brain/` still on the pinned commit, with a clean tree: the neighbour check on the brain.
+
+    A brain that was not cloned (absent, unreadable, or outside git) has no commit in the manifest:
+    there is nothing to compare and the subtree is left to the read only mount.
+    """
+    commit = ((manifest or {}).get("brain") or {}).get("commit")
+    if not commit:
+        return []
+    path = root / "in" / layout.BRAIN_DIR
+    ok = gitcode.scan_repo(path) is None and gitcode.head_commit(path) == commit \
+        and gitcode.neighbour_clean(path)
+    return [] if ok else [f"in_modified:{layout.BRAIN_DIR}"]
+
+
 def check_code(root: Path, code: dict, manifest: dict | None) -> tuple[list[str], list[str]]:
     """Neighbours intact, targets well formed with their story branch. (reasons, warnings)."""
     reasons: list[str] = []

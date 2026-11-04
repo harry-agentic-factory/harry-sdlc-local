@@ -2,12 +2,15 @@
 
 Only `<run>/in/manifest.json`, `<run>/in/` and `<run>/rw/out/` are used: no project, no registry,
 no storage backend. This works in a container where only the run folder is mounted.
-A key is resolved only among the file entries of the manifest (never a free path).
+A key is resolved among the file entries of the manifest, except under `brain/`: the brain is a
+subtree with no entry, so a brain key is resolved BY ITS PATH under `in/brain/` (clean relative
+path, `.md`, regular file). `doc list` still lists the entries only.
 """
 from __future__ import annotations
 
 import json
 import os
+import stat
 from pathlib import Path
 
 from . import layout
@@ -36,11 +39,24 @@ def _file_entries(man: dict) -> dict[str, dict]:
             if isinstance(e, dict) and isinstance(e.get("key"), str) and "sha256" in e}
 
 
-def _resolve(key: str, man: dict) -> str:
+def _is_brain_file(root: Path, rel: str) -> bool:
+    """`rel` (under `in/`) names a regular `.md` file of the brain subtree, by a clean path."""
+    sub = rel[len(layout.BRAIN_DIR) + 1:]
+    if not sub.endswith(".md") or not layout.safe_segments(sub):
+        return False
+    try:
+        return stat.S_ISREG(os.lstat(root / "in" / rel).st_mode)
+    except OSError:
+        return False
+
+
+def _resolve(key: str, man: dict, root: Path) -> str:
     entries = _file_entries(man)
     story = (man.get("scope") or {}).get("story")
     for cand in layout.alias_candidates(key, story):
         if cand in entries:
+            return cand
+        if cand.startswith(layout.BRAIN_DIR + "/") and _is_brain_file(root, cand):
             return cand
     available = sorted(layout.canonical_key(k) for k in entries)
     raise RunError("unknown_key", f"{key}; available: {', '.join(available)}")
@@ -49,7 +65,7 @@ def _resolve(key: str, man: dict) -> str:
 def doc_read(key: str, *, run: str | os.PathLike | None = None) -> bytes:
     """Raw bytes of the document `key` of the run."""
     root = run_root(run)
-    in_key = _resolve(key, _manifest(root))
+    in_key = _resolve(key, _manifest(root), root)
     path = root / "in" / in_key
     try:
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))

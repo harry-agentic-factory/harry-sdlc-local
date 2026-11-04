@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import sdlc.runws as runws
-from sdlc.runws import (DOC_TYPES, RUN_JSON_KEYS, RUN_STATES, BrainPin, DataRepoBackend, DocumentRepository,
+from sdlc.runws import (DOC_TYPES, RUN_JSON_KEYS, RUN_STATES, BrainTree, DataRepoBackend, DocumentRepository,
                         RunError, RunSource, Scope, doc_add, doc_list, doc_read, run_clean, run_finish, run_init,
                         run_list)
 from sdlc.runws import lifecycle
@@ -20,7 +20,27 @@ from test_run_workspace import RECAP_DOC, git, make_demo, porcelain, write
 
 PKG = Path(runws.__file__).parent
 COMMIT = "c" * 40
-BRAIN = f"project/brain/@{COMMIT}/"
+BRAIN_FILES = {"index.md": b"# index\n", "adr/0001.md": b"# adr\n"}
+
+
+class MemoryBrainTree:
+    """`BrainTree` of the memory backend: writes the subtree and records every call of `extract`.
+
+    `commit` is None (nothing to check at finish): the pinned clone is covered by the git tests.
+    """
+    ref, source, warnings = "main", "local", ()
+    commit = None
+
+    def __init__(self, files: dict[str, bytes] | None = None):
+        self.files = BRAIN_FILES if files is None else files
+        self.calls: list[str] = []
+
+    def extract(self, dest):
+        self.calls.append(str(dest))
+        dest = Path(dest)
+        for rel, data in self.files.items():
+            (dest / rel).parent.mkdir(parents=True, exist_ok=True)
+            (dest / rel).write_bytes(data)
 
 
 def sha(data: bytes) -> str:
@@ -37,9 +57,8 @@ class MemoryBackend:
             "features/DEMO-E/stories/DEMO-E-1/spec-func.md": b"# f1\n",
             "features/DEMO-E/stories/DEMO-E-1/spec-tech.md": b"# t1\n",
             "features/DEMO-E/stories/DEMO-E-2/spec-tech.md": b"# t2\n",
-            BRAIN + "index.md": b"# index\n",
-            BRAIN + "adr/0001.md": b"# adr\n",
         })
+        self.brain_tree = MemoryBrainTree()
         self.scope = scope or Scope("DEMO-E", "DEMO-E-1", None)
         self.bubble_perms = bubble or {"allow": [], "deny": []}
         self.puts: list[tuple[str, dict]] = []
@@ -81,7 +100,7 @@ class MemoryBackend:
         return self.scope
 
     def brain(self):
-        return BrainPin("main", COMMIT, "local", BRAIN, None, ())
+        return self.brain_tree
 
     def bubble(self, agent):
         return self.bubble_perms
@@ -104,8 +123,12 @@ def test_ac19_memory_backend_root_injected(tmp_path, monkeypatch):
     assert (root / "in" / "feature" / "atelier" / "prd.md").read_bytes() == b"# prd\n"
     assert (root / "in" / "brain" / "adr" / "0001.md").read_bytes() == b"# adr\n"
     man = json.loads(Path(res["manifest"]).read_text())
-    assert len(man["files"]) == 6 and man["brain"] == {"ref": "main", "commit": COMMIT}
+    assert len(man["files"]) == 4 and man["brain"] == {"ref": "main", "commit": None}
     assert {e["origin"] for e in man["files"]} == {"mem/" + k for k in mb.store}
+    assert not any(e["key"].startswith("brain/") for e in man["files"])
+    assert [p.name for p in Path(mb.brain_tree.calls[0]).parents[:1]] == ["in"]
+    assert len(mb.brain_tree.calls) == 1 and ".partial" in mb.brain_tree.calls[0]
+    assert isinstance(mb.brain_tree, BrainTree)
     assert porcelain(demo.data) == before and not (tmp_path / "_agentws").exists()
     assert isinstance(mb, DocumentRepository) and isinstance(mb, RunSource)
 
@@ -158,7 +181,7 @@ def test_runws_stdlib_only():
 
 def test_public_api_all():
     expected = {"run_init", "run_finish", "run_clean", "run_list", "doc_read", "doc_list", "doc_add",
-                "DocumentRepository", "RunSource", "Entry", "Scope", "BrainPin", "DataRepoBackend", "RunError",
+                "DocumentRepository", "RunSource", "Entry", "Scope", "BrainTree", "DataRepoBackend", "RunError",
                 "DOC_TYPES", "RUN_STATES", "RUN_JSON_KEYS", "RUN_UID_RE", "ROUND_HEADER_RE", "SCHEMA_VERSION",
                 "DOC_MAX_BYTES"}
     assert expected <= set(runws.__all__)
@@ -185,15 +208,15 @@ def test_core_filters_non_markdown(tmp_path):
         "features/OTHER/atelier/prd.md": b"# other epic\n",
         "features/DEMO-E/stories/DEMO-E-1/../../../escape.md": b"# escape\n",
         "missions/inc-1/brief.md": b"# not this scope\n",
-        BRAIN + "logo.png": b"png",
     })
     mb, res = mem_init(tmp_path, MemoryBackend(docs))
     keys = [e["key"] for e in json.loads(Path(res["manifest"]).read_text())["files"]]
-    assert keys == ["brain/adr/0001.md", "brain/index.md", "feature/atelier/prd.md",
+    assert keys == ["feature/atelier/prd.md",
                     "feature/stories/DEMO-E-1/spec-func.md", "feature/stories/DEMO-E-1/spec-tech.md",
                     "feature/stories/DEMO-E-2/spec-tech.md"]
     files = sorted(p.relative_to(res["in"]).as_posix() for p in Path(res["in"]).rglob("*") if p.is_file())
-    assert files == sorted(keys + ["manifest.json", "settings.json"])
+    brain_files = sorted("brain/" + r for r in BRAIN_FILES)
+    assert files == sorted(keys + brain_files + ["manifest.json", "settings.json"])
     assert not (tmp_path / "escape.md").exists() and not (tmp_path / "worker" / "escape.md").exists()
 
 
@@ -313,10 +336,11 @@ def test_finish_outcome_timeout_failed(tmp_path):
     assert json.loads(mb.store[f"runs/{res['run_uid']}/run.json"])["state"] == "timeout"
     assert run_finish(res["root"], backend=mb) == {"run_uid": res["run_uid"], "already": "timeout"}
     mb2, res2 = mem_init(tmp_path)
-    (Path(res2["in"]) / "brain" / "index.md").write_bytes(b"x")
+    touched = Path(res2["in"]) / "feature" / "atelier" / "prd.md"
+    touched.write_bytes(b"x")
     fin2 = run_finish(res2["root"], backend=mb2, outcome="failed")
     assert fin2["state"] == "rejected" and mb2.puts == []
-    (Path(res2["in"]) / "brain" / "index.md").write_bytes(b"# index\n")
+    touched.write_bytes(b"# prd\n")
     assert run_finish(res2["root"], backend=mb2, outcome="failed")["state"] == "failed"
 
 

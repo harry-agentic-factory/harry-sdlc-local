@@ -485,7 +485,7 @@ def test_push_never_uses_agent_git_dir(cdemo, cap, monkeypatch):
     for h, a, repo in calls:
         if h == "untrusted":
             assert a[0] in {"rev-parse", "for-each-ref", "bundle", "status"}
-            assert a[0] != "status" or "in/repos/" in str(repo)
+            assert a[0] != "status" or ("in/repos/" in str(repo) or str(repo).endswith("in/brain"))
 
 
 def test_untrusted_whitelist_and_options(tmp_path, monkeypatch):
@@ -984,7 +984,10 @@ def test_off_run_zero_gitcode_calls(tmp_path, monkeypatch, cap):
                         "brain", "warnings"}
     rc, fin = finish(cap, res["run_uid"])
     assert rc == 0 and set(fin) == {"run_uid", "state", "published", "warnings"}
-    assert calls == []
+    # the brain is cloned like a neighbour: the ONLY git calls of a run without code are its own
+    assert {a[0] for _, a, _ in calls} == {"clone", "sparse-checkout", "checkout", "remote",
+                                           "rev-parse", "config", "status"}
+    assert not any("rw/code" in str(x) for _, a, c in calls for x in (*a, c))
     mb = DataRepoBackend.from_project("DEMO")
     assert mb.run_workspace is None
 

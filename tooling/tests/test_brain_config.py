@@ -11,7 +11,7 @@ from sdlc.brain import resolve_brain_ref
 from sdlc.config import load_config, resolved_manifest
 from test_brain import fx_add_commit, fx_clone, git, make_fx_brain, make_fx_master, run
 
-BRAIN_KEYS = {"brainRef", "brainCommit", "brainRefFrom"}
+BRAIN_KEYS = {"brainRef", "brainCommit", "brainRefFrom", "brainWarning"}
 MANIFEST_KEYS = {"prefix", "workspace", "reposRoot", "repos", "roles", "stacks", "brain", "refBranch", "deploy",
                  "recette", "guidelines", "skillsByRepo", "credentials", "permissions", "escalation", "board",
                  "schemaVersion", "infra", "tracker",  # infra/tracker: trunk (investigate)
@@ -57,7 +57,7 @@ def test_ac11_unresolved_warns_exit_0(capsys, tmp_path, monkeypatch):
     rc, cfg, warnings = config(capsys)
     assert rc == 0
     assert (cfg["brainRef"], cfg["brainCommit"], cfg["brainRefFrom"]) == ("v9", None, None)
-    assert [w["warning"] for w in warnings] == ["brain_ref_unresolved"]
+    assert [w["warning"] for w in warnings] == ["brain_ref_unresolved"] == [cfg["brainWarning"]]
     assert "warning" not in cfg
 
 
@@ -102,16 +102,18 @@ def test_ac11_not_git_warns_and_snapshot_exit_2(capsys, tmp_path, monkeypatch):
     project(tmp_path, monkeypatch, brain=str(plain))
     rc, cfg, warnings = config(capsys)
     assert rc == 0 and cfg["brainCommit"] is None and cfg["brainRefFrom"] is None
-    assert [w["warning"] for w in warnings] == ["brain_not_git"]
+    assert [w["warning"] for w in warnings] == ["brain_not_git"] == [cfg["brainWarning"]]
     rc, _, err = run(capsys, "brain", "snapshot", "--repo", plain, "--ref", "main", "--out", tmp_path / "o")
     assert rc == 2 and json.loads(err)["code"] == "brain_not_git"
 
 
 def test_ac11_no_brain_three_null_keys(capsys, tmp_path, monkeypatch):
+    """Brain non déclaré : clés nulles, et le FAIT est dit par la sortie (code de raison stable)."""
     project(tmp_path, monkeypatch)
     rc, cfg, warnings = config(capsys)
     assert rc == 0 and warnings == []
-    assert {k: cfg[k] for k in BRAIN_KEYS} == dict.fromkeys(BRAIN_KEYS)
+    assert cfg["brainWarning"] == "brain_not_declared"
+    assert {k: cfg[k] for k in BRAIN_KEYS - {"brainWarning"}} == dict.fromkeys(BRAIN_KEYS - {"brainWarning"})
 
 
 def test_resolve_head_is_local(tmp_path):

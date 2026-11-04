@@ -1,8 +1,8 @@
 """Checks run by `finish` before anything is published. Read only.
 
 - `in/` intact: `seal.json` protects `in/manifest.json` and `in/settings.json`; every other file
-  under `in/` must be a file entry of the manifest with the same sha256 (neighbour subtrees
-  `repos/<repo>/` are delegated to their own git check). Symbolic links are never followed.
+  under `in/` must be a file entry of the manifest with the same sha256 (the subtrees
+  `repos/<repo>/` and `brain/` are delegated to their own git check). Symbolic links are never followed.
 - `rw/out/`: only `docs/<type>.md` (regular file, known type) and the content of `sources/`.
 - size of each document; warnings `no_recap` and `sources_not_published`.
 - code run (`publish_sources=True`, `engine_files`): `rw/out/sources/` holds regular files only, within
@@ -23,7 +23,7 @@ import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .layout import META_FILES
+from .layout import BRAIN_DIR, META_FILES
 from .model import DOC_MAX_BYTES, DOC_TYPES, RUN_SOURCES_MAX_BYTES, SOURCE_MAX_BYTES, sha256
 
 
@@ -101,9 +101,10 @@ def _check_in(root: Path, manifest: dict | None, res: CheckResult) -> None:
     if manifest is None:
         return
     files = {e["key"]: e for e in manifest.get("files", []) if isinstance(e, dict) and "sha256" in e}
-    neighbours = {e["key"] for e in manifest.get("files", []) if isinstance(e, dict) and "commit" in e}
+    subtrees = {e["key"] for e in manifest.get("files", []) if isinstance(e, dict) and "commit" in e}
+    subtrees.add(BRAIN_DIR)        # a repository, checked by `code.check_brain`, never file by file
     seen: set[str] = set()
-    for rel, is_link_dir in _walk(in_dir, neighbours):
+    for rel, is_link_dir in _walk(in_dir, subtrees):
         if is_link_dir:
             res.reasons.append(f"in_modified:{rel}")
             continue

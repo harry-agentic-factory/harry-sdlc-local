@@ -90,9 +90,11 @@ def test_agent_permissions_injected(tmp_path, monkeypatch):
     settings = _json.loads((Path(res["workspace"]) / ".claude" / "settings.json").read_text())
     perms = settings["permissions"]
     assert "Bash(python3:*)" in perms["allow"] and "Bash(kubectl:*)" in perms["allow"]
-    assert perms["deny"] == ["Bash(rm -rf:*)"]
+    brain_deny = [f"Edit(/{res['brainPath']}/**)", f"Write(/{res['brainPath']}/**)"]
+    assert perms["deny"] == ["Bash(rm -rf:*)", *brain_deny]
     assert perms["additionalDirectories"]                 # toujours présent
-    # sans --agent : pas d'allow (juste additionalDirectories)
+    # sans --agent : pas d'allow, mais le brain reste interdit en écriture (I17)
     res2 = build_agent_workspace("X", "X-1", branch="feat/X-1")
     s2 = _json.loads((Path(res2["workspace"]) / ".claude" / "settings.json").read_text())
     assert "allow" not in s2["permissions"]
+    assert s2["permissions"]["deny"] == brain_deny

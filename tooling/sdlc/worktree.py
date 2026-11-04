@@ -103,6 +103,56 @@ def ensure_worktree(repo: str | Path, branch: str, base: str | None = None) -> d
     return {"path": str(path), "reused": False, "created_branch": created_branch}
 
 
+def detached_path(repo: str | Path, name: str) -> Path:
+    """`<parent>/_wt/<repo>/<name>` — the worktree of a read only pin, named after the story."""
+    r = Path(repo).resolve()
+    return r.parent / "_wt" / r.name / name
+
+
+def head_commit(repo: str | Path) -> str | None:
+    p = _git(repo, "rev-parse", "--verify", "--quiet", "HEAD")
+    return p.stdout.strip() or None if p.returncode == 0 else None
+
+
+def ensure_detached_worktree(repo: str | Path, name: str, commit: str) -> dict:
+    """Create-or-reuse a worktree of `repo` DETACHED on `commit`, at the `name` path.
+
+    Reused as is when it already sits on `commit`, moved onto it otherwise: a story never gets two
+    worktrees, and never a version other than the one it was pinned to. Returns
+    {path, reused, moved}. The shared clone is never written: only `worktree add` and `checkout`
+    inside the worktree are run.
+    """
+    repo = Path(repo).resolve()
+    path = detached_path(repo, name)
+    if path.is_dir():
+        if head_commit(path) == commit:
+            return {"path": str(path), "reused": True, "moved": False}
+        cp = _git(path, "checkout", "--quiet", "--detach", commit)
+        if cp.returncode != 0:
+            raise RuntimeError(f"git checkout --detach a échoué ({path}, {commit}): {cp.stderr.strip()}")
+        return {"path": str(path), "reused": True, "moved": True}
+    _git(repo, "worktree", "prune")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cp = _git(repo, "worktree", "add", "--detach", str(path), commit)
+    if cp.returncode != 0:
+        raise RuntimeError(f"git worktree add --detach a échoué ({repo}, {commit}): {cp.stderr.strip()}")
+    return {"path": str(path), "reused": False, "moved": False}
+
+
+def remove_detached_worktree(repo: str | Path, name: str) -> dict:
+    """Retire le worktree détaché de `name` (aucune branche, aucun commit supprimé)."""
+    repo = Path(repo).resolve()
+    path = detached_path(repo, name)
+    removed = False
+    if path.exists():
+        cp = _git(repo, "worktree", "remove", "--force", str(path))
+        if cp.returncode != 0:
+            raise RuntimeError(f"git worktree remove a échoué: {cp.stderr.strip()}")
+        removed = True
+    _git(repo, "worktree", "prune")
+    return {"path": str(path), "removed": removed}
+
+
 def fetch_base(repo: str | Path, ref: str) -> str:
     """Fetches `ref` from origin and returns the revision a new branch must start from.
 

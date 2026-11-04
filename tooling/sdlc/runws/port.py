@@ -7,7 +7,8 @@ Keys are logical storage keys (see `docs/run-workspace.md`), never paths of a da
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol, TypedDict, runtime_checkable
 
 
@@ -26,14 +27,20 @@ class Scope:
     mission: str | None
 
 
-@dataclass(frozen=True)
-class BrainPin:
+@runtime_checkable
+class BrainTree(Protocol):
+    """The brain of a run, handed to the core as a subtree to write, never as documents to pull.
+
+    `extract` writes the tree of `commit` into `dest` (which it creates) and is called at most once,
+    in the partial folder of the run. The core knows nothing of git, of a mirror or of storage: a
+    backend that cannot read its brain says so with `warnings` and leaves `extract` unused."""
     ref: str | None                    # ref retained (requested or default), None when unknown
     commit: str | None                 # resolved commit, None when not resolved / not git
     source: str | None                 # where the resolution came from (origin|local|tag|sha)
-    prefix: str | None                 # storage prefix to list, None = nothing to pull
-    files_hint: int | None = None      # informational: number of notes the backend saw
-    warnings: tuple[str, ...] = field(default_factory=tuple)
+    warnings: tuple[str, ...]          # stable codes (brain_missing, brain_not_declared, ...)
+
+    def extract(self, dest: Path) -> None:
+        """Write the pinned tree into `dest` (nothing to do when there is no readable brain)."""
 
 
 @runtime_checkable
@@ -58,8 +65,8 @@ class RunSource(Protocol):
     def locate(self, *, story: str | None, mission: str | None) -> Scope:
         """Scope of the run (RunError `story_unknown` / `mission_unknown`)."""
 
-    def brain(self) -> BrainPin:
-        """Brain pin of the run (commit resolved without fetch)."""
+    def brain(self) -> BrainTree:
+        """Brain of the run (commit resolved without fetch, tree extracted on demand)."""
 
     def bubble(self, agent: str) -> dict:
         """`{"allow": [...], "deny": [...]}` rules of the project for this agent role."""

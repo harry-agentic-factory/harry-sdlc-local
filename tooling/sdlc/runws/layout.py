@@ -9,10 +9,12 @@ of level 1, `journal.md` and `_index.md` excluded): same filtering whatever the 
     features/<E>/stories/<US>/<doc>.md            feature/stories/<US>/<doc>.md
     missions/<M>/brief.md                         mission/brief.md
     missions/<M>/sources/<p>.md                   mission/sources/<p>.md
-    project/brain/@<commit>/<p>.md                brain/<p>.md
     runs/<uid>/{run.json,manifest.json,out/docs/<type>.md}   (publication only)
     runs/<uid>/out/sources/<rel>, runs/<uid>/out/git/<repo>.bundle   (code run publication)
     runs/<uid>/out/sources/repro/<p>.md           repro/<p>.md  (code run, `--repro <uid>`)
+
+The brain is not pulled: `in/brain/` is a subtree written in one go by the `BrainTree` of the backend
+(a clone detached on the pinned commit), like a neighbour repository. It has no `files` entry.
 
 A code run also has `rw/code/<repo>/` (targets, writable) and `in/repos/<repo>/` (neighbours, read only,
 manifest entry `{key: "repos/<repo>", commit, role: "neighbour"}`).
@@ -25,10 +27,10 @@ from pathlib import Path
 from .port import Scope
 
 RUNS_PREFIX = "runs/"
-BRAIN_PREFIX_RE = re.compile(r"^project/brain/@[^/]+/$")
+BRAIN_DIR = "brain"            # subtree root of the brain under `in/` (shared by controls, code, docs)
 
-IN_DIRS_STORY = ("in", "in/brain", "in/feature", "in/feature/atelier", "in/feature/stories")
-IN_DIRS_MISSION = ("in", "in/brain", "in/mission")
+IN_DIRS_STORY = ("in", "in/feature", "in/feature/atelier", "in/feature/stories")
+IN_DIRS_MISSION = ("in", "in/mission")
 RW_DIRS = ("rw", "rw/code", "rw/scratch", "rw/out", "rw/out/docs", "rw/out/sources", "rw/out/git")
 META_FILES = ("manifest.json", "settings.json")
 
@@ -100,13 +102,10 @@ def safe_segments(rel: str) -> bool:
     return all(s not in ("", ".", "..") for s in rel.split("/"))
 
 
-def in_path(key: str, scope: Scope, brain_prefix: str | None) -> str | None:
+def in_path(key: str, scope: Scope) -> str | None:
     """Path under `in/` of a storage key, or None when the key matches no pull pattern."""
     if not key.endswith(".md") or not safe_segments(key):
         return None
-    if brain_prefix and BRAIN_PREFIX_RE.fullmatch(brain_prefix) and key.startswith(brain_prefix):
-        rest = key[len(brain_prefix):]
-        return f"brain/{rest}" if rest else None
     parts = key.split("/")
     if scope.mission:
         if parts[:2] != ["missions", scope.mission]:
