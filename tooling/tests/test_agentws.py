@@ -3,8 +3,8 @@ import json
 import subprocess
 from pathlib import Path
 
-from sdlc import cli
-from sdlc.agentws import build_agent_workspace
+from sdlc import cli, worktree as wt
+from sdlc.agentws import build_agent_workspace, clean_workspace
 
 
 def _git(repo, *a):
@@ -30,6 +30,139 @@ def _setup(tmp_path, with_skill=True):
         sk = ws / "skills" / "deploy-cfea"; sk.mkdir(parents=True)
         (sk / "SKILL.md").write_text("---\nname: deploy-cfea\ndescription: projet\n---\nx\n")
     return repo, brain, ws
+
+
+# --- brain épinglé par workspace (worktree détaché, lecture seule, trace, nettoyage) ---
+
+BRAIN_REF_FIELDS = ("repo", "branch", "commit")      # mêmes noms que le bloc `brain` du manifeste
+
+
+def _git_out(repo, *a) -> str:
+    return subprocess.run(["git", "-C", str(repo), *a], capture_output=True, text=True,
+                          check=True).stdout.strip()
+
+
+def _setup_git_brain(tmp_path):
+    """Projet dont le brain est un dépôt git à deux commits, et deux tickets."""
+    repo, brain, ws = _setup(tmp_path, with_skill=False)
+    _init_repo(brain)
+    (brain / "index.md").write_text("# c1\n")
+    _git(brain, "add", "-A"); _git(brain, "commit", "-q", "-m", "c1")
+    c1 = _git_out(brain, "rev-parse", "HEAD")
+    cli.main(["create-epic", "X-E", "e"])
+    for us in ("X-1", "X-2"):
+        cli.main(["create-ticket", "X-E", us, "t", "--repos", "app"])
+    return repo, brain, ws, c1
+
+
+def test_i16_detached_worktree_per_story(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    repo, brain, ws, c1 = _setup_git_brain(tmp_path)
+    r1 = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    r2 = build_agent_workspace("X", "X-2", branch="feat/X-2")
+    w1, w2 = Path(r1["brainPath"]), Path(r2["brainPath"])
+    assert w1 == tmp_path / "_wt" / "brain" / "X-1" and w2 == tmp_path / "_wt" / "brain" / "X-2"
+    assert _git_out(w1, "rev-parse", "HEAD") == _git_out(w2, "rev-parse", "HEAD") == c1
+    assert w1 in [Path(d) for d in r1["additionalDirectories"]]
+    assert str(brain.resolve()) not in r1["additionalDirectories"]   # plus le clone partagé
+
+    # le clone partagé bouge : les worktrees épinglés ne bougent pas
+    _git(brain, "checkout", "-q", "-b", "other")
+    (brain / "index.md").write_text("# c2\n")
+    _git(brain, "add", "-A"); _git(brain, "commit", "-q", "-m", "c2")
+    assert _git_out(w1, "rev-parse", "HEAD") == _git_out(w2, "rev-parse", "HEAD") == c1
+
+    # relance : réutilisé, jamais un second worktree pour la même story
+    again = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    assert again["brainPath"] == r1["brainPath"]
+    assert len([e for e in wt.list_worktrees(brain) if "X-1" in e["path"]]) == 1
+
+
+def test_i16_worktree_repositioned_when_the_pin_moves(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    repo, brain, ws, c1 = _setup_git_brain(tmp_path)
+    r1 = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    (brain / "index.md").write_text("# c2\n")
+    _git(brain, "add", "-A"); _git(brain, "commit", "-q", "-m", "c2")
+    c2 = _git_out(brain, "rev-parse", "HEAD")
+    r2 = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    assert r2["brainPath"] == r1["brainPath"] and r2["brain"]["commit"] == c2
+    assert _git_out(Path(r2["brainPath"]), "rev-parse", "HEAD") == c2
+    assert len([e for e in wt.list_worktrees(brain) if "X-1" in e["path"]]) == 1
+
+
+def test_i17_brain_denied_to_write_with_and_without_role(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    repo, brain, ws, c1 = _setup_git_brain(tmp_path)
+    for agent in (None, "deployer"):
+        res = build_agent_workspace("X", "X-1", branch="feat/X-1", agent=agent)
+        perms = json.loads((Path(res["workspace"]) / ".claude" / "settings.json").read_text())["permissions"]
+        path = res["brainPath"]
+        assert f"Edit(/{path}/**)" in perms["deny"] and f"Write(/{path}/**)" in perms["deny"]
+        for rule in perms["deny"][-2:]:
+            assert rule.split("(", 1)[1].startswith("//")        # forme absolue
+        assert not [d for d in perms["deny"] if d.startswith(("Read(", "Glob(", "Grep("))]
+        assert path in perms["additionalDirectories"]
+        assert (Path(path) / "index.md").read_text() == "# c1\n"
+
+
+def test_i18_trace_in_the_output_and_in_a_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    repo, brain, ws, c1 = _setup_git_brain(tmp_path)
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    expected = {"repo": str(brain.resolve()), "branch": "main", "commit": c1}
+    assert tuple(res["brain"]) == BRAIN_REF_FIELDS and res["brain"] == expected
+    trace = json.loads(Path(res["brainTrace"]).read_text())
+    assert trace == expected and Path(res["brainTrace"]).parent == Path(res["workspace"])
+    assert len(trace["commit"]) == 40
+
+
+def test_i19_shared_clone_never_written(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    repo, brain, ws, c1 = _setup_git_brain(tmp_path)
+    before = (_git_out(brain, "rev-parse", "HEAD"), _git_out(brain, "branch", "--show-current"),
+              _git_out(brain, "status", "--porcelain"))
+    build_agent_workspace("X", "X-1", branch="feat/X-1")
+    clean_workspace("X", "X-1", branch="feat/X-1")
+    after = (_git_out(brain, "rev-parse", "HEAD"), _git_out(brain, "branch", "--show-current"),
+             _git_out(brain, "status", "--porcelain"))
+    assert before == after
+
+
+def test_i20_clean_removes_the_brain_worktree(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDLC_WORKSPACE", str(tmp_path / "data"))
+    repo, brain, ws, c1 = _setup_git_brain(tmp_path)
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    path = res["brainPath"]
+    assert any(Path(e["path"]) == Path(path) for e in wt.list_worktrees(brain))
+    out = clean_workspace("X", "X-1", branch="feat/X-1")
+    assert out["brain"] == {"path": path, "removed": True}
+    assert not Path(path).exists()
+    assert not any(Path(e["path"]) == Path(path) for e in wt.list_worktrees(brain))
+    assert _git_out(brain, "rev-parse", "HEAD") == c1
+
+
+def test_brain_not_git_falls_back_and_says_so(tmp_path, monkeypatch):
+    """Brain hors git : le dossier tel quel, l'avertissement existant, et un commit nul."""
+    repo, brain, ws = _setup(tmp_path, with_skill=False)
+    monkeypatch.setenv("SDLC_WORKSPACE", str(ws))
+    cli.main(["create-epic", "X-E", "e"]); cli.main(["create-ticket", "X-E", "X-1", "t", "--repos", "app"])
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    assert res["brainPath"] == str(brain.resolve()) and res["brain"]["commit"] is None
+    assert res["brainWarnings"] == ["brain_not_git"]
+    assert not (tmp_path / "_wt" / "brain").exists()
+
+
+def test_brain_not_declared_is_reported(tmp_path, monkeypatch):
+    repo, brain, ws = _setup(tmp_path, with_skill=False)
+    cfg = json.loads((ws / "sdlc.config.json").read_text())
+    cfg.pop("brain")
+    (ws / "sdlc.config.json").write_text(json.dumps(cfg))
+    monkeypatch.setenv("SDLC_WORKSPACE", str(ws))
+    cli.main(["create-epic", "X-E", "e"]); cli.main(["create-ticket", "X-E", "X-1", "t", "--repos", "app"])
+    res = build_agent_workspace("X", "X-1", branch="feat/X-1")
+    assert res["brainWarnings"] == ["brain_not_declared"] and res["brainPath"] is None
+    assert res["brain"] == {"repo": None, "branch": None, "commit": None}
 
 
 def test_build_agent_workspace(tmp_path, monkeypatch):
