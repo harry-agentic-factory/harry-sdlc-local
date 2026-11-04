@@ -412,11 +412,13 @@ def run_finish(run, *, backend=None, keep: bool = False, outcome: str | None = N
         res = controls.check(root)
     reasons += res.reasons
     warnings = list(res.warnings)
-    reasons += codemod.check_brain(root, res.manifest)
     if code is not None and not reasons:
         more, warn = codemod.check_code(root, code, res.manifest)
         reasons += more
         warnings += warn
+    # After the code checks, never before: a brain reason would otherwise make `reasons` non-empty
+    # and skip them, so a run rejected for two causes would only name one.
+    reasons += codemod.check_brain(root, res.manifest)
     if reasons:
         return _reject(root, current, uid, reasons, warnings)
 

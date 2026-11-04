@@ -2,8 +2,8 @@
 
 Assemble ce que les autres phases ont posé :
 - **worktrees** (Phase 4) : un code isolé par repo touché, sur la branche du ticket ;
-- **brain épinglé** : un worktree **détaché** du brain au commit résolu, un par ticket, jamais le
-  clone partagé dont la branche bouge sous les agents en cours ; écriture refusée par la bulle ;
+- **pinned brain**: a **detached** worktree of the brain at the resolved commit, one per ticket,
+  never the shared clone whose branch moves under the agents at work; writing is denied;
 - **settings.json** (`additionalDirectories`) : n'autorise QUE les worktrees + le brain + la data —
   plus de dépendance au workspace VS Code ni au home-grant global ;
 - **skills projet** (2-tiers) : symlink de `<data>/skills/*` dans le `.claude/skills` de la bulle ;
@@ -110,7 +110,7 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
         if repo_path:
             worktrees[name] = wt.ensure_worktree(repo_path, br)["path"]
 
-    # 2. additionalDirectories = worktrees + brain épinglé + data (scope minimal)
+    # 2. additionalDirectories = worktrees + pinned brain + data (smallest possible scope)
     brain = _brain_pin(man, story)
     add_dirs = list(worktrees.values())
     if brain["path"]:
@@ -131,7 +131,7 @@ def build_agent_workspace(project: str | None = None, story: str | None = None,
         if allow:
             perms["allow"] = allow
         deny += list(mperm.get("deny") or [])
-    # le brain reste en LECTURE quoi qu'il arrive : sans rôle, la bulle n'avait aucun deny
+    # The brain stays READ-ONLY whatever happens: without a role the bubble had no deny at all.
     deny += _deny_write([brain["path"]] if brain["path"] else [])
     if deny:
         perms["deny"] = deny

@@ -146,7 +146,7 @@ def ensure_detached_worktree(repo: str | Path, name: str, commit: str) -> dict:
 
 
 def remove_detached_worktree(repo: str | Path, name: str) -> dict:
-    """Retire le worktree détaché de `name` (aucune branche, aucun commit supprimé)."""
+    """Remove the detached worktree of `name` (no branch and no commit is deleted)."""
     repo = Path(repo).resolve()
     path = detached_path(repo, name)
     removed = False
