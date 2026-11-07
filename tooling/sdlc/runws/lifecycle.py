@@ -17,9 +17,12 @@ from pathlib import Path, PurePosixPath
 
 from . import code as codemod
 from . import controls, layout, repro as repromod
-from .model import (CODE_OPTIONS, FINAL_STATES, RUN_UID_RE, SCHEMA_VERSION, RunError, build_run_json,
-                    dump_json, iso, new_run_uid, sha256, utc_now, validate_agent, validate_branch,
-                    validate_outcome, validate_phase, validate_run_uid, validate_scope_id)
+from .model import (CODE_OPTIONS, FINAL_STATES, MANIFEST_SCHEMA_VERSION, RUN_UID_RE,
+                    V1_NEIGHBOUR_PREFIX, WARN_BASE_DEFAULTED, WARN_SCOPE_EMPTY, Manifest, RepoRef,
+                    RunError,
+                    build_run_json, dump_json, iso, new_run_uid, read_manifest, sha256, utc_now,
+                    validate_agent, validate_branch, validate_outcome, validate_phase,
+                    validate_run_uid, validate_scope_id)
 from .port import CodeHost, Scope
 
 
@@ -189,7 +192,12 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
                 branch = finder(scope.story) if callable(finder) else None
                 if branch is not None:
                     validate_branch(branch)
-            base = base if base is not None else validate_branch(default_base)
+            if base is None:
+                # Written rather than guessed afterwards: a reader of the manifest must be able to
+                # tell a base somebody CHOSE from one the host supplied, without going back to the
+                # command line that is long gone.
+                code_warnings.append(WARN_BASE_DEFAULTED)
+                base = validate_branch(default_base)
             if any(s.role == "target" for s in specs):
                 if branch is None:
                     raise RunError("branch_required", scope.story)
@@ -240,13 +248,39 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
     final = parent / uid
     a = agent_root or str(final)
 
-    def manifest_bytes_of(extra: list[dict], brain_commit: str | None) -> bytes:
-        entries = {**{k: files[k] for k in files}, **{e["key"]: e for e in extra}}
+    def manifest_bytes_of(repos: list[RepoRef], brain_commit: str | None,
+                          warnings: list[str]) -> bytes:
+        """`in/manifest.json` v2 — the identity card of what this run was GIVEN.
+
+        Three things changed from v1, and each closes a hole that was measured:
+
+        - `repos` exists, and the TARGET is in it. Its starting commit used to live only in
+          `code.json`, which is never published, so nothing published could say which commit of the
+          project the agent started from.
+        - `files` holds DOCUMENTS only. In v1 the neighbours were entries of the same list under a
+          second, different shape — one list, two contracts.
+        - the Brain is a reference, not an inventory. Listing its notes one by one added volume that
+          `brain.commit` already pins, and that goes stale.
+
+        `brain` is `null` or three non-empty fields: never a commit without its branch, never the
+        reverse. Its `repo` is the DECLARED source carried by the pin, never the provenance of the
+        resolution — two plausible candidates for one key, and the wrong one would be silent.
+        """
         return dump_json({
-            "schema_version": SCHEMA_VERSION, "run_uid": uid,
+            "schema_version": MANIFEST_SCHEMA_VERSION, "run_uid": uid,
             "scope": {"feature": scope.feature, "story": scope.story, "mission": scope.mission},
-            "files": [entries[k] for k in sorted(entries)],
-            "brain": {"ref": brain.ref, "commit": brain_commit}, "dirty": dirty,
+            # `getattr`: only a brain INSIDE git carries a declared repository, and only such a
+            # brain resolves a commit — so the two always appear together. The value is the pin's
+            # own `repo`, the declared source, never `brain.source`, which says where the
+            # resolution came from (origin|local|tag|sha). Both are plausible for one key, and
+            # picking the wrong one would be silent: the manifest would carry a provenance where a
+            # reader expects a repository address.
+            "brain": ({"repo": getattr(brain, "repo", ""), "branch": brain.ref,
+                       "commit": brain_commit} if brain_commit else None),
+            "files": [files[k] for k in sorted(files)],
+            "repos": [{"repo": r.repo, "branch": r.branch, "commit": r.commit, "role": r.role}
+                      for r in sorted(repos, key=lambda r: r.repo)],
+            "dirty": dirty, "warnings": warnings,
         })
 
     settings_bytes = dump_json(layout.settings(a, bubble, code=is_code))
@@ -265,12 +299,20 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
             target.parent.mkdir(parents=True, exist_ok=True)
             _write(target, contents[rel])
         brain_commit, brain_tree = _extract_brain(brain, partial / "in" / layout.BRAIN_DIR, brain_warnings)
-        neighbours: list[dict] = []
+        mounted: list[RepoRef] = []
         repos_json: dict = {}
         if is_code:
-            repos_json, neighbours, code_json = codemod.prepare_code(partial, plan, final=final)
+            repos_json, mounted, code_json = codemod.prepare_code(partial, plan, final=final)
             _write(partial / codemod.CODE_JSON, dump_json(code_json))
-        manifest_bytes = manifest_bytes_of(neighbours, brain_commit)
+        # Computed ONCE, here, and handed both to the manifest and to the return value: `run init`
+        # used to build this list after the fact, so the warnings an operator read and the warnings
+        # the run carried were two lists that nothing kept equal.
+        if not files:
+            # The run goes on — an empty perimeter is legitimate — but the fact is WRITTEN. Silence
+            # is what made it look like a missing document rather than a missing scope.
+            brain_warnings.append(WARN_SCOPE_EMPTY)
+        warnings = sorted(set(brain.warnings) | set(brain_warnings) | set(code_warnings))
+        manifest_bytes = manifest_bytes_of(mounted, brain_commit, warnings)
         _write(partial / "in" / "manifest.json", manifest_bytes)
         _write(partial / "in" / "settings.json", settings_bytes)
         seal = {"manifest_sha256": sha256(manifest_bytes), "settings_sha256": sha256(settings_bytes),
@@ -292,7 +334,7 @@ def run_init(project: str | None = None, *, agent: str | None, story: str | None
     res = {
         "run_uid": uid, **{k: v for k, v in layout.workspace_paths(final).items()},
         "brain": {"ref": brain.ref, "commit": brain_commit, "from": brain.source, **brain_tree},
-        "warnings": sorted(set(brain.warnings) | set(brain_warnings) | set(code_warnings)),
+        "warnings": warnings,
     }
     if is_code:
         res["repos"] = repos_json
@@ -344,11 +386,36 @@ def _check_identity(uid: str, current: dict, seal: dict) -> dict:
     return sealed
 
 
-def _check_scope(sealed: dict, manifest: dict | None) -> None:
+def _manifest_with_repos(raw: dict, man: Manifest, mounted: list[RepoRef]) -> dict:
+    """`raw` with the repositories just cloned, written IN THE VERSION IT DECLARES.
+
+    `run clone` adds code to a run that was opened without any, so it rewrites and reseals the
+    manifest. It does NOT upgrade it: a v1 workspace opened by an older engine stays v1. Upgrading
+    would mean inventing the `brain.repo` that v1 never recorded, and a manifest claiming v2 while
+    carrying an empty repository address is worse than one that honestly says v1.
+
+    The consequence is v1's own, not a loss introduced here: v1 has no place for the target, so a
+    v1 manifest still cannot say which commit the target started from. `code.json` records it, as
+    it always did.
+    """
+    out = dict(raw)
+    if man.schema_version == MANIFEST_SCHEMA_VERSION:
+        out["repos"] = [{"repo": r.repo, "branch": r.branch, "commit": r.commit, "role": r.role}
+                        for r in sorted(mounted, key=lambda r: r.repo)]
+        return out
+    entries = {e["key"]: e for e in raw.get("files", []) if isinstance(e, dict) and "key" in e}
+    for r in mounted:
+        if r.role != "target":
+            entries[V1_NEIGHBOUR_PREFIX + r.repo] = {"key": V1_NEIGHBOUR_PREFIX + r.repo,
+                                                     "commit": r.commit, "role": r.role}
+    out["files"] = [entries[k] for k in sorted(entries)]
+    return out
+
+
+def _check_scope(sealed: dict, manifest: Manifest | None) -> None:
     """The sealed identity names the scope the sealed manifest was pulled for."""
-    scope = manifest.get("scope") if isinstance(manifest, dict) else None
-    if not isinstance(scope, dict) or manifest.get("run_uid") != sealed["run_uid"] \
-            or any(scope.get(k) != sealed[k] for k in ("feature", "story", "mission")):
+    if manifest is None or manifest.run_uid != sealed["run_uid"] \
+            or any(manifest.scope.get(k) != sealed[k] for k in ("feature", "story", "mission")):
         raise RunError("run_invalid", "run identity differs from the scope of in/manifest.json")
 
 
@@ -526,10 +593,15 @@ def code_clone(root, *, backend=None, code_host=None, branch: str | None = None,
     man_bytes, set_bytes = man_path.read_bytes(), set_path.read_bytes()
     if sha256(man_bytes) != seal.get("manifest_sha256") or sha256(set_bytes) != seal.get("settings_sha256"):
         raise RunError("run_invalid", f"{root}: in/ differs from seal.json")
-    manifest = json.loads(man_bytes.decode("utf-8"))
+    raw_manifest = json.loads(man_bytes.decode("utf-8"))
+    # Through `read_manifest`, so the guard reads the SAME thing in both versions. Left as it was
+    # (`any("commit" in e for e in files)`), it would be forever false on a v2 manifest — where no
+    # entry of `files` carries a commit any more — and `run clone` could clone on top of a run that
+    # already has its code.
+    man = read_manifest(raw_manifest)
     existing = codemod.load(root)
     code_dir = root / "rw" / "code"
-    if any(True for _ in os.scandir(code_dir)) or any("commit" in e for e in manifest.get("files", [])) \
+    if any(True for _ in os.scandir(code_dir)) or man.repos \
             or (existing is not None and existing.get("repos")):
         raise RunError("clone_exists", uid)
 
@@ -552,11 +624,8 @@ def code_clone(root, *, backend=None, code_host=None, branch: str | None = None,
     created = [(code_dir if r.role == "target" else root / "in" / "repos") / r.name for r in plan.repos]
     had_repos_dir = os.path.lexists(root / "in" / "repos")
     try:
-        repos_json, neighbours, code_json = codemod.prepare_code(root, plan, final=root)
-        entries = {e["key"]: e for e in manifest.get("files", []) if isinstance(e, dict) and "key" in e}
-        entries.update({e["key"]: e for e in neighbours})
-        manifest["files"] = [entries[k] for k in sorted(entries)]
-        new_man = dump_json(manifest)
+        repos_json, mounted, code_json = codemod.prepare_code(root, plan, final=root)
+        new_man = dump_json(_manifest_with_repos(raw_manifest, man, mounted))
         settings = json.loads(set_bytes.decode("utf-8"))
         deny = settings.setdefault("permissions", {}).setdefault("deny", [])
         deny += [d for d in layout.GIT_DENY if d not in deny]

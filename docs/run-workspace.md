@@ -122,25 +122,51 @@ with `path` = storage key `runs/<uid>/out/docs/<type>.md`.
 
 ### `in/manifest.json`
 
+**Schema 2 since 0.10.0.** It is a BREAKING change of a published contract — entries leave `files`,
+neighbours move to `repos` — which is why the engine took a minor and not a patch. The contract was declared
+"frozen for 0.7.x, additive keys only" (§ 9); that promise is deliberately broken here, and this is where it
+is written. `MANIFEST_SCHEMA_VERSION` is **distinct** from the `schema_version` of `run.json`, which stays `1`.
+
 ```json
 {
-  "schema_version": 1, "run_uid": "20260926-101500-0a1b2c",
+  "schema_version": 2, "run_uid": "20260926-101500-0a1b2c",
   "scope": {"feature": "DEMO-E", "story": "DEMO-E-1", "mission": null},
+  "brain": {"repo": "<declared source>", "branch": "main", "commit": "<commit sha>"},
   "files": [
     {"key": "feature/atelier/prd.md", "version": "<commit sha>", "sha256": "...", "size": 21, "origin": "DEMO-E/prd.md"}
   ],
-  "brain": {"ref": "main", "commit": "<commit sha>"},
-  "dirty": []
+  "repos": [
+    {"repo": "app-repo", "branch": "feat/DEMO-E-1", "commit": "<commit sha>", "role": "target"},
+    {"repo": "web-repo", "branch": "main", "commit": "<commit sha>", "role": "neighbour"}
+  ],
+  "dirty": [], "warnings": []
 }
 ```
 
 - File entry = exactly `{key, version, sha256, size, origin}`: `key` = path relative to `in/` (extension
   included), `version` = opaque string or `null`, `sha256` of the bytes written, `origin` = path relative to
   the source repository (a storage object key on a platform). Sorted by `key`.
+- `files` holds **documents only**. No key under `brain/` or `repos/`: in v1 the neighbours were entries of
+  this same list under a second, different shape, and the brain was listed note by note.
 - Data repository version = sha of the last commit touching the file at `HEAD`; untracked or modified
   against `HEAD` ⇒ `null` and the key is listed in `dirty`. The brain has no entry: `brain.commit` pins it.
-- Neighbour entry (added by a later clone step, never produced here): `{key: "repos/<repo>", commit, role}`.
+- `repos` = one entry per repository mounted, **target included**, sorted by `repo`. `commit` is the commit the
+  run STARTED from (`HEAD` right after the clone, before any commit of the agent); `role` ∈ `target`,
+  `neighbour`; `branch` is never `null` — the story branch for a target, the ref actually resolved for a
+  neighbour (`"HEAD"` when the clone fell back to the remote default, which `warnings` then says).
+  Before v2 the target was absent and its starting commit only reached `code.json`, which is never published.
+- `brain` is `null` **or** three non-empty fields — never a commit without its branch. `repo` is the source
+  **declared** by the pin, never where the resolution came from.
+- `warnings` = sorted list of stable codes, empty by default: `scope_empty` (no document in the perimeter —
+  the run goes on, but the fact is written), `base_defaulted` (the base comes from the host default, not from
+  a choice), plus the brain and code codes. Same list as the one `run init` returns.
 - `scope` lets `doc read spec-tech` know the story of the run where `run.json` is not mounted.
+
+**Reading.** `read_manifest(data)` is the only door, and every reader of the engine goes through it. It accepts
+schema `1` and `2`, plus the historical bare array of a light run; it IGNORES keys it does not know, so a future
+additive key needs no new version; and it refuses anything else with `manifest_unsupported` rather than reading
+half of it. A v1 workspace stays readable, controllable and publishable — a run open at the version bump is not
+broken, and `run clone` on a v1 manifest leaves it in v1.
 
 ### `in/settings.json` (bubble)
 

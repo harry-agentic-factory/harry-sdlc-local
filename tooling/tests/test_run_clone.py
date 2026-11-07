@@ -288,8 +288,10 @@ def test_ac4_neighbour_shallow_manifest_commit(cdemo, cap):
     assert git(web, "rev-list", "--count", "HEAD") == "1" and git(web, "rev-parse", "HEAD") == second
     assert git(web, "remote") == ""
     man = json.loads(Path(res["manifest"]).read_text())
-    entry = [e for e in man["files"] if e["key"] == "repos/web-repo"]
-    assert entry == [{"key": "repos/web-repo", "commit": second, "role": "neighbour"}]
+    # v2: a neighbour is a `repos` entry carrying its branch, and `files` holds documents only.
+    assert [e for e in man["files"] if e["key"].startswith("repos/")] == []
+    assert [r for r in man["repos"] if r["repo"] == "web-repo"] == [
+        {"repo": "web-repo", "branch": "main", "commit": second, "role": "neighbour"}]
     assert res["repos"]["web-repo"] == {"role": "neighbour", "path": str(web), "branch": None, "base": "main",
                                         "head": second, "created": False}
     assert not (Path(res["root"]) / "in" / "repos" / "app-repo").exists()
@@ -1174,3 +1176,61 @@ def test_clone_failed_reports_redacted_git_diagnostic(cdemo, cap):
     assert rc != 0 and body["error"] == "clone_failed:app-repo"
     assert body["diagnostic"].startswith("git ls-remote (rc=") and "s3cret" not in body["diagnostic"]
     assert agentws(cdemo) == []
+
+
+# --- AISDLC-RUNMANIFEST-2: the manifest publishes the target, with its starting commit ---
+
+def test_the_target_is_in_the_manifest_with_the_commit_code_json_recorded(cdemo, cap):
+    """I5, and the hole the whole story exists to close.
+
+    Before v2, the starting commit of the repository being MODIFIED reached `code.json` only — a
+    file that is never published. Nothing published could answer "which commit of my own code did
+    this agent start from?". The equality below is not cosmetic: the manifest and `code.json` must
+    carry the SAME value because it is computed once, not twice.
+    """
+    res = rinit(cap)
+    man = json.loads(Path(res["manifest"]).read_text())
+    code = json.loads((Path(res["root"]) / "code.json").read_text())
+    target = [r for r in man["repos"] if r["role"] == "target"]
+    assert len(target) == 1, "the target is missing from the manifest"
+    assert target[0]["repo"] == "app-repo" and target[0]["branch"] == BRANCH
+    assert target[0]["commit"] == code["repos"]["app-repo"]["head"]
+    assert target[0]["commit"] == res["repos"]["app-repo"]["head"]
+
+
+def test_files_holds_documents_only_and_repos_holds_repositories(cdemo, cap):
+    """I4: one list, one contract. In v1 a neighbour was an entry of `files` under a second shape,
+    and the brain was listed note by note in the same place."""
+    man = json.loads(Path(rinit(cap)["manifest"]).read_text())
+    assert man["files"], "the perimeter was empty, so this proves nothing"
+    for e in man["files"]:
+        assert not e["key"].startswith(("repos/", "brain/")), e["key"]
+        assert set(e) == {"key", "version", "sha256", "size", "origin"}
+    for r in man["repos"]:
+        assert set(r) == {"repo", "branch", "commit", "role"}
+        assert r["branch"], "I6/Q6: a branch is never null — the ref resolved, or HEAD"
+
+
+def test_the_manifest_version_moves_but_run_json_stays(cdemo, cap):
+    """I2 measured on ONE run: the two schemas are distinct, and only the manifest moved."""
+    res = rinit(cap)
+    man = json.loads(Path(res["manifest"]).read_text())
+    run = json.loads((Path(res["root"]) / "run.json").read_text())
+    assert man["schema_version"] == 2 and run["schema_version"] == 1
+
+
+def test_the_warnings_of_the_manifest_are_the_warnings_of_run_init(cdemo, cap):
+    """I9: one list, computed once. They used to be built twice — what an operator read and what
+    the run carried were two lists nothing kept equal."""
+    res = rinit(cap)
+    man = json.loads(Path(res["manifest"]).read_text())
+    assert man["warnings"] == res["warnings"] == sorted(man["warnings"])
+
+
+def test_a_base_that_comes_from_the_host_default_is_written(cdemo, cap):
+    """I9: `base_defaulted` says the base was not chosen. Silence here is what made a run look
+    deliberate when it had simply fallen back."""
+    man = json.loads(Path(rinit(cap)["manifest"]).read_text())
+    assert "base_defaulted" in man["warnings"]
+    chosen = json.loads(Path(rinit(cap, "--base", "main")["manifest"]).read_text())
+    assert "base_defaulted" not in chosen["warnings"], "a chosen base was reported as a default"

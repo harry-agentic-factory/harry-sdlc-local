@@ -117,7 +117,7 @@ def test_i7_no_brain_entry_and_subtree_tolerated(demo, cap, monkeypatch):
     res = init(cap)
     man = json.loads(Path(res["manifest"]).read_text())
     assert not [e for e in man["files"] if e["key"].startswith("brain")]
-    assert man["brain"] == {"ref": "main", "commit": demo.c1}
+    assert man["brain"] == {"repo": str(demo.brain), "branch": "main", "commit": demo.c1}
     add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
     write(in_brain(res), "untracked.md", b"# written by nobody\n")
     rc, out, _ = call(cap, "run", "finish", res["run_uid"])
@@ -217,7 +217,8 @@ def test_i9_extract_failure_is_a_warning(demo, cap, monkeypatch):
     assert not in_brain(res).exists() and res["brain"] == {
         "ref": "main", "commit": None, "from": "local", "files": 0, "bytes": 0}
     man = json.loads(Path(res["manifest"]).read_text())
-    assert man["brain"] == {"ref": "main", "commit": None}
+    # I6: no commit resolved ⇒ `null`, never a branch alone. The cause is in `warnings`.
+    assert man["brain"] is None
     add(cap, monkeypatch, "review", RECAP_DOC, res["root"])
     rc, fin = call(cap, "run", "finish", res["run_uid"])[:2]
     assert rc == 0 and json.loads(fin)["state"] == "published"

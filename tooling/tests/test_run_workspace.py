@@ -233,13 +233,15 @@ def test_ac2_excludes_status_journal_repro_index(demo, cap):
 def test_ac3_manifest_entry_keys_and_sha256(demo, cap):
     res = init(cap)
     man = json.loads(Path(res["manifest"]).read_text())
-    assert list(man) == ["schema_version", "run_uid", "scope", "files", "brain", "dirty"]
+    assert list(man) == ["schema_version", "run_uid", "scope", "brain", "files", "repos",
+                         "dirty", "warnings"]
+    assert man["schema_version"] == 2 and man["repos"] == [] and man["warnings"] == []
     assert man["scope"] == {"feature": "DEMO-E", "story": "DEMO-E-1", "mission": None}
     assert {",".join(sorted(e)) for e in man["files"]} == {"key,origin,sha256,size,version"}
     for e in man["files"]:
         data = (Path(res["in"]) / e["key"]).read_bytes()
         assert e["sha256"] == sha(data) and e["size"] == len(data)
-    assert man["brain"] == {"ref": "main", "commit": demo.c1}
+    assert man["brain"] == {"repo": str(demo.brain), "branch": "main", "commit": demo.c1}
     assert man["dirty"] == []
 
 
@@ -663,7 +665,7 @@ def test_ac15_brain_default_main_commit_only(demo, cap):
     assert (in_brain / "adr" / "0001.md").read_bytes() == git_show(demo.brain, f"{c2}:adr/0001.md") == BRAIN_ADR
     assert not (in_brain / "draft.md").exists()
     man = json.loads(Path(res["manifest"]).read_text())
-    assert man["brain"] == {"ref": "main", "commit": c2}
+    assert man["brain"] == {"repo": str(demo.brain), "branch": "main", "commit": c2}
 
 
 def _brain_c2(demo) -> str:
@@ -678,7 +680,8 @@ def test_ac15_brain_ref_tag(demo, cap):
     res = init(cap)
     assert (Path(res["in"]) / "brain" / "index.md").read_bytes() == BRAIN_INDEX_C1
     assert res["brain"]["ref"] == "v1" and res["brain"]["commit"] == demo.c1 and res["brain"]["from"] == "tag"
-    assert json.loads(Path(res["manifest"]).read_text())["brain"] == {"ref": "v1", "commit": demo.c1}
+    assert json.loads(Path(res["manifest"]).read_text())["brain"] == {
+        "repo": str(demo.brain), "branch": "v1", "commit": demo.c1}
 
 
 def test_ac15_brain_ref_unresolved_warns(demo, cap):
@@ -686,7 +689,9 @@ def test_ac15_brain_ref_unresolved_warns(demo, cap):
     res = init(cap)
     assert [p for p in (Path(res["in"]) / "brain").rglob("*") if p.is_file()] == []
     assert res["warnings"] == ["brain_ref_unresolved"]
-    assert json.loads(Path(res["manifest"]).read_text())["brain"] == {"ref": "v9", "commit": None}
+    # I6: never a branch without its commit. No commit resolved ⇒ the block is `null`, and the
+    # reason lives in `warnings`, not in a half-filled reference.
+    assert json.loads(Path(res["manifest"]).read_text())["brain"] is None
 
 
 def test_ac15_origin_first_no_fetch(demo, cap):
@@ -728,7 +733,7 @@ def test_ac15_brain_not_git_fallback(demo, cap):
         "index.md", "sub/n.md"]
     assert res["warnings"] == ["brain_not_git"]
     man = json.loads(Path(res["manifest"]).read_text())
-    assert man["brain"] == {"ref": None, "commit": None}
+    assert man["brain"] is None
     brain_entries = [e for e in man["files"] if e["key"].startswith("brain/")]
     assert all(e["version"] is None for e in brain_entries)
     assert not any(k.startswith("brain/") for k in man["dirty"])
@@ -777,7 +782,9 @@ def _neighbour_run(demo, cap, monkeypatch):
     steps = write(in_dir, "repro/steps.md", b"# steps\n")
     man_path = Path(res["manifest"])
     man = json.loads(man_path.read_text())
-    man["files"].append({"key": "repos/web", "commit": "a" * 40, "role": "neighbour"})
+    # v2: a neighbour is a `repos` entry, not a `files` one. In v1 both lived in `files` under two
+    # different shapes — the very mix the version was bumped to end.
+    man["repos"].append({"repo": "web", "branch": "main", "commit": "a" * 40, "role": "neighbour"})
     man["files"].append({"key": "repro/steps.md", "version": None, "sha256": sha(steps.read_bytes()),
                          "size": steps.stat().st_size, "origin": "repro/steps.md"})
     data = (json.dumps(man, indent=2, ensure_ascii=False) + "\n").encode()
@@ -1051,3 +1058,25 @@ def test_finish_publishes_checked_bytes_not_a_later_swap(demo, cap, monkeypatch)
     published = (demo.story("DEMO-E-1") / "review.md").read_bytes()
     assert published.endswith(RECAP_DOC) and b"secret" not in published
     assert (demo.data / "runs" / res["run_uid"] / "manifest.json").read_bytes() == manifest_bytes
+
+
+# --- AISDLC-RUNMANIFEST-2: an empty perimeter is written, never silent ---
+
+def test_an_empty_perimeter_is_a_written_warning_not_a_silence(demo, cap):
+    """I9. The run goes on — an empty perimeter is legitimate — but a reader must not have to guess
+    between "no document was pulled" and "the scope resolved to nothing"."""
+    for name in ("DEMO-E/prd.md", "DEMO-E/stories/DEMO-E-1/spec-func.md",
+                 "DEMO-E/stories/DEMO-E-1/spec-tech.md",
+                 "DEMO-E/stories/DEMO-E-2/spec-tech.md"):
+        (demo.data / name).unlink()
+    commit_all(demo.data, "empty perimeter")
+    res = init(cap)
+    man = json.loads(Path(res["manifest"]).read_text())
+    assert man["files"] == []
+    assert "scope_empty" in man["warnings"] and "scope_empty" in res["warnings"]
+
+
+def test_a_perimeter_with_documents_never_claims_to_be_empty(demo, cap):
+    """The reciprocal, so the guard above cannot be satisfied by always posing the warning."""
+    man = json.loads(Path(init(cap)["manifest"]).read_text())
+    assert man["files"] and "scope_empty" not in man["warnings"]

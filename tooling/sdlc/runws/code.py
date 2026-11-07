@@ -24,7 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import gitcode, layout
-from .model import RunError, dump_json, sha256, validate_branch
+from .model import (V1_NEIGHBOUR_PREFIX, Manifest, RepoRef, RunError, dump_json, sha256,
+                    validate_branch)
 from .port import RepoSpec
 
 CODE_JSON = "code.json"
@@ -99,12 +100,17 @@ def plan(specs: list[RepoSpec], *, branch: str | None, base: str | None, default
     return p
 
 
-def prepare_code(dest: Path, p: CodePlan, *, final: Path) -> tuple[dict, list[dict], dict]:
+def prepare_code(dest: Path, p: CodePlan, *, final: Path) -> tuple[dict, list[RepoRef], dict]:
     """Clone the plan into the workspace being built at `dest` (paths reported under `final`).
 
-    Returns (repos block of the JSON, neighbour manifest entries, code.json)."""
+    Returns (repos block of the JSON, the repositories mounted, code.json).
+
+    The TARGET is among them, and that is the point of the v2 manifest: its starting commit used to
+    reach `code.json` only, a file that is never published, so nothing published could answer "which
+    commit of my own code did this agent start from?". The very `head` written to `code.json` is the
+    one handed back here — one computation, not two."""
     repos_json: dict[str, dict] = {}
-    entries: list[dict] = []
+    refs: list[RepoRef] = []
     code = {"schema_version": CODE_SCHEMA_VERSION, "branch": p.branch, "base": p.base, "repos": {},
             "bundles": {}}
     if p.neighbours:
@@ -116,14 +122,19 @@ def prepare_code(dest: Path, p: CodePlan, *, final: Path) -> tuple[dict, list[di
             repos_json[r.name] = {"role": "target", "path": str(final / "rw" / "code" / r.name),
                                   "branch": p.branch, "base": p.base, "head": head, "created": r.created}
             code["repos"][r.name] = {"role": "target", "ref": p.branch, "head": head, "created": r.created}
+            refs.append(RepoRef(repo=r.name, branch=p.branch, commit=head, role="target"))
         else:
             head, cfg = gitcode.clone_neighbour(r.name, r.url, dest / "in" / "repos" / r.name, ref=r.ref)
             repos_json[r.name] = {"role": "neighbour", "path": str(final / "in" / "repos" / r.name),
                                   "branch": None, "base": r.ref, "head": head, "created": False}
             code["repos"][r.name] = {"role": "neighbour", "ref": r.ref or "HEAD", "head": head,
                                      "created": False, "config_sha256": cfg}
-            entries.append({"key": layout.neighbour_key(r.name), "commit": head, "role": "neighbour"})
-    return repos_json, entries, code
+            # `r.ref or "HEAD"`: the ref ACTUALLY resolved, the same value `code.json` records.
+            # A neighbour whose declared base was absent from the remote is cloned at the remote
+            # default; `branch` then reads `"HEAD"` rather than a null, and the warning
+            # `neighbour_base_fallback` already says it happened.
+            refs.append(RepoRef(repo=r.name, branch=r.ref or "HEAD", commit=head, role="neighbour"))
+    return repos_json, refs, code
 
 
 # --- code.json ---
@@ -217,34 +228,41 @@ def targets(code: dict) -> list[str]:
 
 # --- checks (read only) ---
 
-def check_brain(root: Path, manifest: dict | None) -> list[str]:
+def check_brain(root: Path, manifest: Manifest | None) -> list[str]:
     """`in/brain/` still on the pinned commit, with a clean tree: the neighbour check on the brain.
 
     A brain that was not cloned (absent, unreadable, or outside git) has no commit in the manifest:
     there is nothing to compare and the subtree is left to the read only mount.
     """
-    commit = ((manifest or {}).get("brain") or {}).get("commit")
-    if not commit:
+    brain = manifest.brain if manifest is not None else None
+    if brain is None or not brain.commit:
         return []
+    commit = brain.commit
     path = root / "in" / layout.BRAIN_DIR
     ok = gitcode.scan_repo(path) is None and gitcode.head_commit(path) == commit \
         and gitcode.neighbour_clean(path)
     return [] if ok else [f"in_modified:{layout.BRAIN_DIR}"]
 
 
-def check_code(root: Path, code: dict, manifest: dict | None) -> tuple[list[str], list[str]]:
-    """Neighbours intact, targets well formed with their story branch. (reasons, warnings)."""
+def check_code(root: Path, code: dict, manifest: Manifest | None) -> tuple[list[str], list[str]]:
+    """Neighbours intact, targets well formed with their story branch. (reasons, warnings).
+
+    Only NEIGHBOURS are checked here: they live under `in/`, read only, so a difference is a
+    modification. A target lives under `rw/code/` and is MEANT to move — its commit in the manifest
+    is where the agent started, not where it must still be, and comparing it would fail every run
+    that did its job.
+    """
     reasons: list[str] = []
     warnings: list[str] = []
-    entries = {e["key"]: e for e in (manifest or {}).get("files", [])
-               if isinstance(e, dict) and "commit" in e and isinstance(e.get("key"), str)}
-    for key in sorted(entries):
-        repo = key.split("/", 1)[1] if key.startswith("repos/") else key
+    mounted = {r.repo: r for r in (manifest.repos if manifest is not None else []) \
+               if r.role != "target"}
+    for repo in sorted(mounted):
+        key = V1_NEIGHBOUR_PREFIX + repo
         path = root / "in" / key
         recorded = (code["repos"].get(repo) or {}) if isinstance(code["repos"].get(repo), dict) else {}
         ok = gitcode.scan_repo(path) is None and recorded.get("config_sha256") is not None \
             and gitcode.config_sha256(path) == recorded["config_sha256"]
-        ok = ok and gitcode.head_commit(path) == entries[key]["commit"] and gitcode.neighbour_clean(path)
+        ok = ok and gitcode.head_commit(path) == mounted[repo].commit and gitcode.neighbour_clean(path)
         if not ok:
             reasons.append(f"in_modified:{key}")
     branch = code.get("branch")

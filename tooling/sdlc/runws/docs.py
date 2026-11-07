@@ -14,7 +14,7 @@ import stat
 from pathlib import Path
 
 from . import layout
-from .model import RunError, sha256, validate_type
+from .model import Manifest, RunError, read_manifest, sha256, validate_type
 
 
 def run_root(run: str | os.PathLike | None = None) -> Path:
@@ -24,19 +24,22 @@ def run_root(run: str | os.PathLike | None = None) -> Path:
     return Path(os.path.abspath(os.fspath(value)))
 
 
-def _manifest(root: Path) -> dict:
+def _manifest(root: Path) -> Manifest:
+    """The run's manifest, v1 or v2 alike. The agent side never learns there are two versions."""
     try:
         data = json.loads((root / "in" / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         raise RunError("run_invalid", f"{root}: no readable in/manifest.json") from e
-    if not isinstance(data, dict):
-        raise RunError("run_invalid", f"{root}: in/manifest.json is not an object")
-    return data
+    if not isinstance(data, dict | list):
+        raise RunError("run_invalid", f"{root}: in/manifest.json is neither an object nor a list")
+    return read_manifest(data)
 
 
-def _file_entries(man: dict) -> dict[str, dict]:
-    return {e["key"]: e for e in man.get("files", [])
-            if isinstance(e, dict) and isinstance(e.get("key"), str) and "sha256" in e}
+def _file_entries(man: Manifest) -> dict[str, dict]:
+    """The DOCUMENTS of the run. In v2 `files` already holds nothing else; in v1 a neighbour was an
+    entry of the same list, and `read_manifest` has already moved it to `repos`. The `sha256` guard
+    stays: a document entry without its digest is not one."""
+    return {k: e for k, e in man.files.items() if "sha256" in e}
 
 
 def _is_brain_file(root: Path, rel: str) -> bool:
@@ -50,9 +53,9 @@ def _is_brain_file(root: Path, rel: str) -> bool:
         return False
 
 
-def _resolve(key: str, man: dict, root: Path) -> str:
+def _resolve(key: str, man: Manifest, root: Path) -> str:
     entries = _file_entries(man)
-    story = (man.get("scope") or {}).get("story")
+    story = man.scope.get("story")
     for cand in layout.alias_candidates(key, story):
         if cand in entries:
             return cand

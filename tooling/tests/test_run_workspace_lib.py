@@ -123,7 +123,7 @@ def test_ac19_memory_backend_root_injected(tmp_path, monkeypatch):
     assert (root / "in" / "feature" / "atelier" / "prd.md").read_bytes() == b"# prd\n"
     assert (root / "in" / "brain" / "adr" / "0001.md").read_bytes() == b"# adr\n"
     man = json.loads(Path(res["manifest"]).read_text())
-    assert len(man["files"]) == 4 and man["brain"] == {"ref": "main", "commit": None}
+    assert len(man["files"]) == 4 and man["brain"] is None
     assert {e["origin"] for e in man["files"]} == {"mem/" + k for k in mb.store}
     assert not any(e["key"].startswith("brain/") for e in man["files"])
     assert [p.name for p in Path(mb.brain_tree.calls[0]).parents[:1]] == ["in"]

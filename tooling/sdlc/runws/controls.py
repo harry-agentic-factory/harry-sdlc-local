@@ -24,7 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .layout import BRAIN_DIR, META_FILES
-from .model import DOC_MAX_BYTES, DOC_TYPES, RUN_SOURCES_MAX_BYTES, SOURCE_MAX_BYTES, sha256
+from .model import (DOC_MAX_BYTES, DOC_TYPES, RUN_SOURCES_MAX_BYTES, SOURCE_MAX_BYTES,
+                    Manifest, read_manifest, sha256)
 
 
 @dataclass
@@ -34,7 +35,7 @@ class CheckResult:
     docs: list[str] = field(default_factory=list)      # types to publish, sorted
     doc_data: dict[str, bytes] = field(default_factory=dict)   # type -> checked bytes
     manifest_data: bytes | None = None                 # checked bytes of in/manifest.json
-    manifest: dict | None = None                       # parsed `manifest_data` (None if not a JSON object)
+    manifest: Manifest | None = None                   # parsed `manifest_data` (None if not JSON)
     source_data: dict[str, bytes] = field(default_factory=dict)   # rel to sources/ -> checked bytes
 
 
@@ -51,12 +52,21 @@ def _read_regular(path: Path) -> bytes | None:
         return f.read()
 
 
-def _parse(data: bytes) -> dict | None:
+def _parse(data: bytes) -> Manifest | None:
+    """Bytes of `in/manifest.json` → the ONE internal shape, or None when it is not JSON at all.
+
+    An unreadable file is a reason among others (`in_modified:manifest.json`), hence the None. A
+    manifest whose `schema_version` is neither 1 nor 2 is NOT that case: `read_manifest` raises, and
+    it must — an engine that cannot name what it is reading has to stop, never guess its way
+    through half of it.
+    """
     try:
         value = json.loads(data.decode("utf-8"))
     except ValueError:
         return None
-    return value if isinstance(value, dict) else None
+    if not isinstance(value, dict | list):
+        return None
+    return read_manifest(value)
 
 
 def _walk(top: Path, prune: set[str]) -> list[tuple[str, bool]]:
@@ -81,7 +91,7 @@ def _walk(top: Path, prune: set[str]) -> list[tuple[str, bool]]:
     return out
 
 
-def _check_in(root: Path, manifest: dict | None, res: CheckResult) -> None:
+def _check_in(root: Path, manifest: Manifest | None, res: CheckResult) -> None:
     in_dir = root / "in"
     seal = None
     try:
@@ -100,8 +110,12 @@ def _check_in(root: Path, manifest: dict | None, res: CheckResult) -> None:
                 res.manifest_data, res.manifest = data, _parse(data)
     if manifest is None:
         return
-    files = {e["key"]: e for e in manifest.get("files", []) if isinstance(e, dict) and "sha256" in e}
-    subtrees = {e["key"] for e in manifest.get("files", []) if isinstance(e, dict) and "commit" in e}
+    files = {k: e for k, e in manifest.files.items() if "sha256" in e}
+    # Subtree roots are repositories: checked as a whole by `code.check_code`, never file by file.
+    # In v1 they were deduced from entries of `files` carrying a `commit`; in v2 they come from
+    # `repos`. `Manifest.subtree_roots` answers the same for both, so this walk never learns that
+    # there are two versions.
+    subtrees = set(manifest.subtree_roots)
     subtrees.add(BRAIN_DIR)        # a repository, checked by `code.check_brain`, never file by file
     seen: set[str] = set()
     for rel, is_link_dir in _walk(in_dir, subtrees):

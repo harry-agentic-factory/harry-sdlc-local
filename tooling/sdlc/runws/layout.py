@@ -77,10 +77,6 @@ def repro_in_key(rel: str) -> str:
     return f"repro/{rel}"
 
 
-def neighbour_key(repo: str) -> str:
-    return f"repos/{repo}"
-
-
 def trace_uid(key: str) -> str | None:
     """`<uid>` of a `runs/<uid>/run.json` key, else None."""
     m = re.fullmatch(r"runs/([^/]+)/run\.json", key)

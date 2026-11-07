@@ -7,6 +7,53 @@ release section header is exactly `## [X.Y.Z] - YYYY-MM-DD` (its body is the tex
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-07
+
+Le manifeste d'un run devient la fiche d'identité complète de ce qu'il a reçu : le Brain par son dépôt, sa branche
+et son commit ; les documents un à un ; les dépôts — **cible comprise** — par leur branche et leur commit de départ.
+
+Origine : la question « sur quel commit de mon propre code cet agent a-t-il travaillé ? » n'avait **aucune réponse
+dans ce qui est publié**. Le commit de départ de la cible n'allait que dans `code.json`, un fichier jamais publié.
+
+**Un mineur, pas un correctif** : v2 casse un contrat publié — des entrées quittent `files`, les voisins changent
+de place, et `MANIFEST_SCHEMA_VERSION` passe à 2. En 0.x, le mineur est le cran des ruptures.
+
+### Added
+
+- `MANIFEST_SCHEMA_VERSION = 2`, **distinct** de `SCHEMA_VERSION`, qui reste à `1` pour `run.json`. La constante
+  partagée aurait fait basculer tous les `run.json`, runs légers compris, sans le dire.
+- `read_manifest(data) -> Manifest` : la **seule** porte de lecture. Elle accepte v1 et v2, normalise vers une
+  forme interne unique (`BrainRef`, `RepoRef`), tolère les clés additives inconnues — c'est la **règle** qui est
+  décidée, pas un champ — et refuse tout le reste par son nom (`manifest_unsupported`), jamais à moitié.
+- `warnings` dans le manifeste, calculés **une seule fois** et partagés avec le retour de `run init` : les deux
+  listes étaient construites séparément et rien ne les gardait égales.
+- `scope_empty` : un périmètre vide est légitime, mais il est désormais **écrit**.
+- `base_defaulted` : dit qu'une base vient du défaut de l'hôte et non d'un choix.
+
+### Changed
+
+- `in/manifest.json` : clés `schema_version, run_uid, scope, brain, files, repos, dirty, warnings`.
+  `files` ne porte plus que des **documents** ; `repos` porte les dépôts montés, **cible comprise**, avec
+  `{repo, branch, commit, role}` ; `brain` est `null` ou `{repo, branch, commit}` — jamais un commit sans sa
+  branche. La liste des notes du Brain **disparaît** : `brain.commit` les fige déjà.
+- `brain.repo` vient du **pin** (la source déclarée), jamais de la provenance de la résolution.
+- `controls`, `code.check_code`, `docs` et la garde « déjà cloné » de `run clone` passent tous par
+  `read_manifest`. Laissée telle quelle, cette garde (`any("commit" in e for e in files)`) serait devenue
+  toujours fausse en v2 et `run clone` aurait pu cloner par-dessus un run qui a déjà son code.
+- `code.prepare_code` rend les dépôts montés plutôt que des entrées de manifeste ; le commit de la cible est **le
+  même objet** que celui écrit dans `code.json` — un calcul, pas deux.
+
+### Removed
+
+- `layout.neighbour_key` : plus aucun appelant.
+
+### Compatibility
+
+Un workspace **v1** reste lisible, contrôlable et publiable : un run ouvert au moment de la montée de version
+n'est pas cassé. `run clone` sur un manifeste v1 le laisse en v1 plutôt que de prétendre à une v2 dont il n'a pas
+le `brain.repo`.
+
+
 ## [0.9.0] - 2026-11-02
 
 Fidélité aux maquettes validées : quand une story d'écran a une maquette, le moteur la connaît, la nomme et la
