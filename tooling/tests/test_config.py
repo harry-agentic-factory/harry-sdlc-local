@@ -20,9 +20,9 @@ def _run(capsys, argv, workspace, monkeypatch):
 # --- résolution repos ---
 
 def test_resolve_repos_list_via_reposroot(tmp_path):
-    cfg = {"reposRoot": "/w/hia", "repos": ["back-tenant", "hia-ops"]}
+    cfg = {"reposRoot": "/w/proj", "repos": ["api-service", "ops-repo"]}
     m = resolve_repos(cfg)
-    assert m == {"back-tenant": "/w/hia/back-tenant", "hia-ops": "/w/hia/hia-ops"}
+    assert m == {"api-service": "/w/proj/api-service", "ops-repo": "/w/proj/ops-repo"}
 
 
 def test_resolve_repos_list_without_reposroot_is_none(tmp_path):
@@ -30,10 +30,10 @@ def test_resolve_repos_list_without_reposroot_is_none(tmp_path):
 
 
 def test_resolve_repos_map_mixed(tmp_path):
-    cfg = {"reposRoot": "/w/hia", "repos": {
+    cfg = {"reposRoot": "/w/proj", "repos": {
         "abs": "/opt/thing", "rel": "sub/dir", "null": None}}
     m = resolve_repos(cfg)
-    assert m == {"abs": "/opt/thing", "rel": "/w/hia/sub/dir", "null": "/w/hia/null"}
+    assert m == {"abs": "/opt/thing", "rel": "/w/proj/sub/dir", "null": "/w/proj/null"}
 
 
 # --- resolved_manifest defaults + brain ---
@@ -64,8 +64,8 @@ def test_credentials_source_overridable(tmp_path):
 
 
 def test_resolved_manifest_brain_relative_to_reposroot(tmp_path):
-    _write_cfg(tmp_path, {"prefix": "X", "reposRoot": "/w/hia", "brain": "hia-brain"})
-    assert resolved_manifest(workspace=tmp_path)["brain"] == "/w/hia/hia-brain"
+    _write_cfg(tmp_path, {"prefix": "X", "reposRoot": "/w/proj", "brain": "project-brain"})
+    assert resolved_manifest(workspace=tmp_path)["brain"] == "/w/proj/project-brain"
 
 
 def test_resolved_manifest_brain_absolute(tmp_path):

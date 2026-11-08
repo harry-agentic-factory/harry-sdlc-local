@@ -1,0 +1,49 @@
+<!doctype html>
+<!--
+  Fake maquette, built for the test suite. It depends on no project and no data repository.
+
+  It reproduces one precise case: a maquette that respects every value of the design system -- every
+  colour, size and weight comes from a token -- and yet reaches into the system twice, by restyling
+  two of its components from the page's own stylesheet. Those two reaches are the only thing the
+  analyser must report.
+
+  The two conflicts are deliberate and marked below. Everything else is conformant on purpose, so a
+  failure points at the rule being tested rather than at some accidental hard-coded value.
+-->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Visualiseur — maquette d'essai</title>
+
+  <!-- The design system, inert in the page: `media="not all"` is how a maquette carries it without
+       applying it. The analyser reads the page's OWN rules, in the block below, not this one. -->
+  <style id="ds" media="not all">
+    .ui-badge { color: var(--ink); font-size: var(--fs-13); border-radius: var(--r-md); }
+    .ui-icon  { color: var(--ink); }
+    .ui-card  { border-radius: var(--r-md); }
+  </style>
+
+  <!-- The maquette's own rules. This is what gets analysed. -->
+  <style id="new">
+    .vw-page   { color: var(--ink); font-size: var(--fs-13); }
+    .vw-title  { font-weight: var(--fw-semibold); }
+    .vw-meta   { color: var(--ink); }
+
+    /* CONFLICT 1 — the page restyles a component of the system instead of composing with it. */
+    .vw-card > .ui-badge { border-radius: var(--r-md); }
+
+    /* CONFLICT 2 — same reach, on another component. */
+    .vw-row .ui-icon { color: var(--ink); }
+  </style>
+</head>
+
+<body class="vw-page">
+  <h1 class="vw-title">Visualiseur</h1>
+
+  <div class="vw-card ui-card">
+    <p class="vw-meta">Trois éléments, deux conflits.</p>
+    <span class="ui-badge">prêt</span>
+    <span class="vw-row"><i class="ui-icon"></i> détail</span>
+  </div>
+</body>
+</html>

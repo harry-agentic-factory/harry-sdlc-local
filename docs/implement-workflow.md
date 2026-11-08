@@ -1,7 +1,7 @@
 # Workflow Implement & modes d'engagement du coding
 
 > Design du harness SDLC « Harry » — la **phase implement** (transition `spec_tech → reviewed`) et les
-> **modes d'engagement du coding**. Cross-projet (agnostique). Les exemples viennent du projet **HIA**
+> **modes d'engagement du coding**. Cross-projet (agnostique). Les exemples sont génériques
 > (repo open-source → référence assumée). Validé 2026-07-27.
 
 ## Principe
@@ -66,12 +66,12 @@ lancement ; persister la surface d'observation pour permettre la reprise humaine
 4. **Escalade** : full-auto ne remonte que sur **blocage** ou **décision produit** (route vers l'humain ou un
    agent « architecte/décideur »).
 
-## Validation empirique (projet HIA, session 2026-07-27)
-- **HIA-SETTINGS-1/2/3 = mode C** (l'orchestrateur code en session, artefacts normalisés) → reviewer / deployer /
+## Validation empirique (session 2026-07-27)
+- **SAMPLE-SETTINGS-1/2/3 = mode C** (l'orchestrateur code en session, artefacts normalisés) → reviewer / deployer /
   recetteur ont **enchaîné sans friction**. Les checks machine par boucle (build, e2e 8/8) + la **recette live**
   (indépendante) ont rattrapé les bugs — dont **CA4**, invisible en mock, capté **en live**. Preuve : l'objectivité
   vit dans les **checks machine + la vérif indépendante en sortie**, pas dans l'auto-review de l'orchestrateur.
-- **HIA-E2E-1 = tentative mode A dégénéré** (implémentateur plat, sans boucle ni orchestration des gates) : le
+- **SAMPLE-E2E-1 = tentative mode A dégénéré** (implémentateur plat, sans boucle ni orchestration des gates) : le
   corpus a été construit + testé live, mais la **gate reviewer restait à faire** → confirme que **A doit être un
   orchestrateur**, pas un coding-agent one-shot.
 

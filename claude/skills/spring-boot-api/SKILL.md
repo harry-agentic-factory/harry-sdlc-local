@@ -76,7 +76,7 @@ en entrée) ; filtre les données retournées selon les droits ; aucun secret jo
 §11).
 
 ## Intégration EasyMS — 🔴 MUST (ne rien inventer)
-Beaucoup de projets Harington utilisent le socle **EasyMS** (ex. `com.easyms:easyms-secured-rest-starter`,
+Beaucoup de projets utilisent le socle **EasyMS** (ex. `com.easyms:easyms-secured-rest-starter`,
 `com.easyms.rest.ms.rest.Validator`, un `RestExceptionHandler`/ControllerAdvice du projet, un modèle `ApiError`,
 des exceptions comme `UnprocessedEntityException`). **Ces noms sont des indices — vérifie-les dans le repo, ne
 les présume pas.** Quand EasyMS est présent :

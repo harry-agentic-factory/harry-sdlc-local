@@ -1,4 +1,4 @@
-"""Rule « Écrire un document vivant » (AISDLC-RUNWS-13): written once in the persona, pointed to by every
+"""Rule « Écrire un document vivant » (SAMPLE-WORKSPACE-13): written once in the persona, pointed to by every
 writer of a living document (AC15), reminded to the off-mode prompts of `run-ticket.js`, and a `conflict`
 returned by a role stops the workflow with `doc_conflict` (AC14).
 Skipped when `node` is absent, unless SDLC_REQUIRE_NODE=1 (then it fails).

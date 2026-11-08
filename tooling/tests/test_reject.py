@@ -58,9 +58,9 @@ def test_journal_newest_first(tmp_path):
 
 def test_status_surfaces_last_decision(tmp_path):
     s = _sdlc(tmp_path)
-    s.reject("E-1", "spec_tech", "à réétudier via back-hia", now="2026-07-22T10:00Z")
+    s.reject("E-1", "spec_tech", "à réétudier via api-service", now="2026-07-22T10:00Z")
     t = build_status(tmp_path, "E-1")["tickets"][0]
-    assert "REJECT" in t["lastDecision"] and "back-hia" in t["lastDecision"]
+    assert "REJECT" in t["lastDecision"] and "api-service" in t["lastDecision"]
 
 
 def test_cli_reject(tmp_path, capsys, monkeypatch):

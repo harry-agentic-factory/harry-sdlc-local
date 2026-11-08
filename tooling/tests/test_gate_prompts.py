@@ -1,4 +1,4 @@
-"""Gate prompts (AISDLC-POASSIST-2 AC8 form, AC9 content, invariant I2)."""
+"""Gate prompts (SAMPLE-GATES-2 AC8 form, AC9 content, invariant I2)."""
 from __future__ import annotations
 
 import re

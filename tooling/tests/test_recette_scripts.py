@@ -1,6 +1,6 @@
 """Outils normalisés du skill recette (générique) — logique PURE offline (build_url, filter_obj).
 Les parties réseau/port-forward (main) nécessitent l'infra ; l'auth spécifique projet vit dans un skill
-projet (ex. hia-sdlc-local/skills/hia-recette). Le token n'est jamais en argv/sortie."""
+projet (ex. sample-proj-sdlc-local/skills/sample-recette). Le token n'est jamais en argv/sortie."""
 import sys
 from pathlib import Path
 

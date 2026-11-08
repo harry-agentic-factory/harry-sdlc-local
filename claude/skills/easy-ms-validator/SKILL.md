@@ -34,7 +34,7 @@ Validator.throwException(Throwable)                                // utilitaire
   d'erreur à la main.** Sans `execute()`, **rien n'est levé** (piège classique : oublier `.execute()`).
 
 ## Exception & message
-Passe soit une **`String`** (clé d'erreur i18n, ex. `HiaMessage.hia_convention_family_required.getErrorKey()`),
+Passe soit une **`String`** (clé d'erreur i18n, ex. `AppMessage.convention_family_required.getErrorKey()`),
 soit un **`Supplier<X>`** d'exception métier (`() -> new UnprocessedEntityException("…")`,
 `() -> new ResourceAccessException(HiaMessage.x.getErrorKey())`). Préfère la **clé i18n** quand elle existe.
 

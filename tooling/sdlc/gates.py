@@ -1,4 +1,4 @@
-"""Spec and feature gates: the agent recommends, a human decides (PRD AISDLC-POASSIST D7-D14).
+"""Spec and feature gates: the agent recommends, a human decides (PRD SAMPLE-GATES D7-D14).
 
 A gate is recorded by `sdlc validate-spec-func | validate-spec-tech | validate-feature <target> --verdict <path>`.
 The command never validates anything by itself: it checks that the verdict written by `/process-review` exists
@@ -112,7 +112,7 @@ def review_findings(text: str) -> dict[str, str]:
     return {m.group(1): m.group(1)[0] for m in _FINDING_ROW.finditer(text)}
 
 
-# --- finding roles (AISDLC-POASSIST-14, PRD D27) ----------------------------------------------------------------
+# --- finding roles (SAMPLE-GATES-14, PRD D27) ----------------------------------------------------------------
 # At the feature gate the agent review assigns each finding to a role in a `Rôle` column; each role verdict
 # decides only the findings assigned to it. A review without that column (or a finding without a readable
 # role) keeps the historical rule: both roles decide it.

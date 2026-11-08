@@ -15,10 +15,10 @@ D=<chemin du skill>/scripts        # dossier scripts/ à côté de ce SKILL.md
 # GET authentifié (token lu d'un FICHIER, jamais en argv ; direct --base ou via --pf) :
 python3 $D/api_get.py --pf <ns>/<kind>/<name>:<port> --path <p> --token-file <f> --fields <csv>
 ```
-**Auth = skill PROJET** (2-tiers, dans le repo data `<projet>-sdlc-local/skills/`). Ex. HIA `hia-recette` :
+**Auth = skill PROJET** (2-tiers, dans le repo data `<projet>-sdlc-local/skills/`). Ex. `sample-recette` :
 ```bash
 # mint le token admin (creds du compte de test via ENV, jamais hardcodés) -> fichier 600, jamais affiché :
-python3 <data>/skills/hia-recette/scripts/hia_admin_token.py --keycloak <kc> --service-name <tenant> --out <scratch>/token
+python3 <data>/skills/sample-recette/scripts/admin_token.py --keycloak <kc> --service-name <tenant> --out <scratch>/token
 ```
 Le token **ne surface jamais** (fichier scratch `600`, lu en interne par `api_get.py`). **Scripts temp dans le
 scratch de la bulle, jamais `/tmp`.** Allowlist recetteur = `Bash(python3 …/scripts/*.py:*)`.

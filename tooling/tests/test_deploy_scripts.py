@@ -16,7 +16,7 @@ import k8s_version                   # noqa: E402
 
 
 def test_job_url():
-    assert job_url("prod/hia-back-tenant/ci") == "/job/prod/job/hia-back-tenant/job/ci"
+    assert job_url("prod/api-service/ci") == "/job/prod/job/api-service/job/ci"
     assert job_url("/prod/app/ci/") == "/job/prod/job/app/job/ci"
 
 
@@ -44,6 +44,6 @@ def test_extract_main_script_absent_raises():
 
 
 def test_parse_image_tag():
-    assert k8s_version.parse_image_tag("acr.azurecr.io/hia-back-tenant:1.0.0-117") \
-        == ("acr.azurecr.io/hia-back-tenant", "1.0.0-117")
+    assert k8s_version.parse_image_tag("acr.azurecr.io/api-service:1.0.0-117") \
+        == ("acr.azurecr.io/api-service", "1.0.0-117")
     assert k8s_version.parse_image_tag("nginx") == ("nginx", None)

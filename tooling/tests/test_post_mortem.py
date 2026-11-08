@@ -71,12 +71,12 @@ def test_to_ticket(tmp_path):
     ws = Workspace(tmp_path)
     ws.create_epic("DEBT", "dette")
     store = PostMortemStore(tmp_path)
-    store.add(agent="reviewer", kind="debt", text="RBAC à refondre côté back-tenant\nligne 2 ignorée")
-    res = store.to_ticket("PM-001", Sdlc(ws), debt_epic="DEBT", repos=["back-tenant"])
+    store.add(agent="reviewer", kind="debt", text="RBAC à refondre côté api-service\nligne 2 ignorée")
+    res = store.to_ticket("PM-001", Sdlc(ws), debt_epic="DEBT", repos=["api-service"])
     assert res == {"id": "PM-001", "ticket": "DEBT-1"}
     story = ws.load("DEBT-1")
-    assert story.epic == "DEBT" and story.repos == ["back-tenant"]
-    assert story.title == "RBAC à refondre côté back-tenant"   # 1re ligne du text
+    assert story.epic == "DEBT" and story.repos == ["api-service"]
+    assert story.title == "RBAC à refondre côté api-service"   # 1re ligne du text
     item = store.get("PM-001")
     assert item.status == "ticketed" and item.target == "DEBT-1"
 
@@ -121,7 +121,7 @@ def test_cli_to_ticket(tmp_path, capsys, monkeypatch):
     _run(capsys, ["pm", "add", "--agent", "fixer", "--kind", "debt",
                   "--text", "nettoyer KeycloakAdminService"], tmp_path, monkeypatch)
     rc, out = _run(capsys, ["pm", "to-ticket", "PM-001", "--epic", "DEBT",
-                            "--repos", "back-tenant"], tmp_path, monkeypatch)
+                            "--repos", "api-service"], tmp_path, monkeypatch)
     assert rc == 0 and out == {"id": "PM-001", "ticket": "DEBT-1"}
     rc, out = _run(capsys, ["pm", "show", "PM-001"], tmp_path, monkeypatch)
     assert out["status"] == "ticketed" and out["target"] == "DEBT-1"
