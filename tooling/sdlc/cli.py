@@ -148,6 +148,14 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("story", help="ID story")
     a.add_argument("status", help="spec_func|spec_func_validated|spec_tech|spec_validated|feature_validated|"
                    "implemented|reviewed|deployed|recette_ok|accepted|done")
+    a = sub.add_parser("source", help="provenance d'une story, ou story(s) issues d'un signalement")
+    a.add_argument("ref", help="ID story (sa provenance) OU référence de signalement (carte, ticket)")
+    a = sub.add_parser("set-source", help="attache à une story le signalement dont elle est issue")
+    a.add_argument("story", help="ID story")
+    # No default tracker: the engine knows none, and a source whose kind is guessed is half a record.
+    a.add_argument("--kind", required=True, help="type de tracker, tel que le projet le nomme")
+    a.add_argument("--id", required=True, dest="ref", help="identifiant du signalement dans ce tracker")
+    a.add_argument("--url", help="URL du signalement"); a.add_argument("--at", help="horodatage d'ingestion (ISO)")
     a = sub.add_parser("link", help="attache un artefact (doc) à une story")
     a.add_argument("story", help="ID story")
     a.add_argument("kind", help="type : prd|spec_func|spec_tech|implement|review|deploy|acceptance|demo|review_spec_func|…")
@@ -403,6 +411,17 @@ def run(argv: list[str] | None = None) -> dict:
         return {"epic": args.epic, "next": s.next(args.epic)}
     if args.cmd == "set-status":
         return dataclasses.asdict(s.set_status(args.story, args.status))
+    if args.cmd == "set-source":
+        return dataclasses.asdict(s.set_source(args.story, args.kind, args.ref, args.url, args.at))
+    if args.cmd == "source":
+        # Une story → sa provenance. Autre chose → les stories issues de ce signalement.
+        try:
+            t = s.get_ticket(args.ref)
+            return {"story": args.ref, "source": t.get("source")}
+        except KeyError:
+            found = s.find_by_source(args.ref)
+            return {"signalement": args.ref, "stories": [
+                {"id": t.id, "epic": t.epic, "status": t.status, "title": t.title} for t in found]}
     if args.cmd == "link":
         return dataclasses.asdict(s.link_artifact(args.story, args.kind, args.path))
     if args.cmd == "reject":

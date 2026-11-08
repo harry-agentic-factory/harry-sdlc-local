@@ -36,6 +36,9 @@ class Sdlc:
             "id": t.id, "epic": t.epic, "title": t.title, "status": t.status,
             "next": t.next_step, "deps": t.deps, "repos": t.repos,
             "branch": t.branch, "mr": t.mr, "artifacts": t.artifacts,
+            # La provenance fait partie de la réhydratation : un agent qui reprend une story doit
+            # pouvoir remonter au signalement d'origine sans relire le fichier à la main.
+            "source": t.source,
         }
 
     def list_backlog(self, status: str | None = None) -> list[Ticket]:
@@ -62,6 +65,29 @@ class Sdlc:
         t.artifacts[kind] = path
         self.ws.save(t)
         return t
+
+    # --- provenance : quel signalement a produit cette story ---
+
+    def set_source(self, story: str, kind: str, ref: str, url: str | None = None,
+                   at: str | None = None) -> Ticket:
+        """Attache au ticket le signalement dont il est issu (carte de tracker, ticket externe…)."""
+        t = self.ws.load(story)
+        t.source = {"kind": kind, "id": ref, "url": url, "ingestedAt": at}
+        self.ws.save(t)
+        return t
+
+    def find_by_source(self, ref: str) -> list[Ticket]:
+        """Stories issues du signalement `ref` (id OU url contenant cet id).
+
+        C'est CE lookup qui répond à « une story existe-t-elle déjà pour cette carte ? ». Sans lui, on
+        ré-instruit un signalement déjà traité, et on crée un doublon à chaque passage.
+        """
+        out = []
+        for t in self.ws.all_tickets():
+            src = t.source or {}
+            if src.get("id") == ref or (src.get("url") or "").find(ref) >= 0:
+                out.append(t)
+        return out
 
     # --- rejet routé (gate humaine : review/recette KO → spec_func|spec_tech|implemented) ---
     def journal(self, story: str, entry: str, actor: str = "harry") -> dict:

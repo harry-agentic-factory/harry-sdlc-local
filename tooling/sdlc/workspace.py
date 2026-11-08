@@ -51,6 +51,11 @@ class Ticket:
     # Supersede bookkeeping (a story absorbed by another) — kept so `list`/`status` round-trip it.
     supersededBy: str | None = None
     supersededReason: str | None = None
+    # Where the story CAME FROM, when a tracker fed it: {kind, id, url, ingestedAt}. This is what makes
+    # "is there already a story for this card?" answerable. `load` drops unknown keys (it filters on the
+    # dataclass fields), so a value written by hand into status.json would vanish on the next save —
+    # the field has to live here.
+    source: dict | None = None
 
     @property
     def next_step(self) -> str | None:
@@ -109,6 +114,8 @@ class Workspace:
             payload["supersededBy"] = t.supersededBy
         if t.supersededReason is not None:
             payload["supersededReason"] = t.supersededReason
+        if t.source is not None:
+            payload["source"] = t.source
         self._status_path(t.epic, t.id).write_text(json.dumps(payload, indent=2, ensure_ascii=False))
 
     def load(self, story: str) -> Ticket:
