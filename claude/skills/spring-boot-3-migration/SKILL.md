@@ -1,9 +1,14 @@
 ---
 name: spring-boot-3-migration
-description: Ordered playbook to migrate a Spring Boot 2.x service (or a multi-module starter SDK) to Spring Boot 3.x — Java 17, javax→jakarta, Spring Security 5→6 (resource server replacing Keycloak adapters), spring.factories→AutoConfiguration.imports, bootstrap.yml→spring.config.import, springfox→springdoc, Spring Batch 4.3→5.0 incl. the batch metadata migrator. Load BEFORE touching any pom.xml of a 2.x→3.x upgrade, or when auditing whether a codebase is ready to migrate.
+description: WIP — written during a real migration that never reached its end, so no step is known to have been validated on a running service; read it as the best known state of an interrupted job, not as a method. Ordered playbook to migrate a Spring Boot 2.x service (or a multi-module starter SDK) to Spring Boot 3.x — Java 17, javax→jakarta, Spring Security 5→6 (resource server replacing Keycloak adapters), spring.factories→AutoConfiguration.imports, bootstrap.yml→spring.config.import, springfox→springdoc, Spring Batch 4.3→5.0 incl. the batch metadata migrator. Load BEFORE touching any pom.xml of a 2.x→3.x upgrade, or when auditing whether a codebase is ready to migrate.
 ---
 
 # Spring Boot 2.x → 3.x migration playbook
+
+> **WIP.** Écrit pendant une migration réelle qui n'est **pas** allée à son terme, et dont aucune
+> trace n'existe dans un dépôt data. On ne sait donc pas lesquelles de ces étapes ont été éprouvées
+> sur un vrai service, ni où le chantier s'est arrêté. À suivre avec cette réserve, et à mettre à
+> jour depuis la prochaine migration qui ira au bout.
 
 Grounded in a real migration: the EasyMS SDK (10 starters + 3 sample apps, 167 files changed,
 Boot 2.6.2 → 3.1.0) and its config server, plus the official Spring Batch 5.0 and Spring Boot 3
