@@ -107,7 +107,7 @@ def test_an_inline_style_is_controlled_like_a_rule(socle):
 
 
 def test_a_declared_deviation_is_marked_as_such(socle):
-    declared = analyse(OFFENDING, socle, deviations="la teinte #00ff00 du prototype — tranché par Anis")
+    declared = analyse(OFFENDING, socle, deviations="la teinte #00ff00 du prototype — tranché par Camille")
     assert any(s["déclaré"] for s in declared["signalements"] if s["valeur"] == "#00ff00")
 
 
@@ -188,27 +188,32 @@ def test_the_review_mode_has_its_fixed_format():
     assert "escalades" in mode or "escalade" in mode
 
 
-# --- AC11 and AC15: the real maquettes, when the data repository is reachable -----------------------------------
+# --- Two cases carried by the repository, so they run everywhere ------------------------------------------------
+#
+# These were replayed against a real data repository at a hardcoded path. One of the two had been skipping
+# silently for a while -- the reference checkout it named no longer existed, and nothing said so. A test that
+# depends on data outside the repository is a test that stops running without telling anyone.
+#
+# They now stand on two fake maquettes in `fixtures/maquette/`, built for the purpose and readable: one can open
+# them and see WHY the analyser answers what it answers, which 115 KB of someone else's screen never allowed.
 
-DATA = Path("/Users/anisbessa/dev/workspace/harington-common/_wt/aisdlc-sdlc-local/docs-aisdlc-uifidelity")
-REF = Path("/Users/anisbessa/dev/workspace/harington-common/_wt/harry-sdlc-ai-factory/ref-06a270d4")
+CASES = Path(__file__).resolve().parent / "fixtures" / "maquette"
 
 
-@pytest.mark.skipif(not (DATA.is_dir() and REF.is_dir()),
-                    reason="data repository or reference worktree not reachable")
-def test_rejeu_agentconv():
-    """The two conflicts the human verdict had found by hand (its decisions D1 and D12), and nothing else."""
-    html = (DATA / "AISDLC-AGENTCONV" / "maquettes" / "agentconv-5-visualiseur.html").read_text(errors="replace")
-    socle = {"tokens": [str(REF / "cockpit/src/v3/tokens.css")], "components": str(REF / "cockpit/src/v3/ui")}
-    out = analyse(html, socle)
+def test_a_maquette_conformant_on_values_can_still_reach_into_the_socle(socle):
+    """Every colour, size and weight comes from a token — and the page still restyles two components."""
+    out = analyse((CASES / "case-two-conflicts.html").read_text(encoding="utf-8"), socle)
+
     assert [t for t in types_of(out) if t in ("couleur", "taille", "graisse", "jeton inconnu")] == []
     hits = sorted(s["valeur"] for s in out["signalements"] if s["type"] == "règle neuve visant le socle")
-    assert len(hits) == 2
+    assert len(hits) == 2, hits
     assert any(".ui-badge" in h for h in hits) and any(".ui-icon" in h for h in hits)
 
 
-@pytest.mark.skipif(not DATA.is_dir(), reason="data repository not reachable")
-def test_the_validated_maquette_of_the_reference_case_cannot_be_analysed_silently():
-    html = (DATA / "AISDLC-UIPOLISH" / "maquettes" / "nouvelle-feature-v7.html").read_text(errors="replace")
-    out = maquette.analyse_socle(html, {"--ink"}, "ui")
-    assert out["règles neuves"] is None and maquette.NO_BLOCK_CONVENTION in out["notes"]
+def test_a_validated_maquette_without_the_block_convention_is_not_analysed_silently():
+    """Validated by a human is not a reason to report a count the analyser cannot stand behind."""
+    out = maquette.analyse_socle((CASES / "case-no-block-convention.html").read_text(encoding="utf-8"),
+                                 {"--ink"}, "ui")
+
+    assert out["règles neuves"] is None
+    assert maquette.NO_BLOCK_CONVENTION in out["notes"]

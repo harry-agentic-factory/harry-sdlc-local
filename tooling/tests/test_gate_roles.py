@@ -1,4 +1,4 @@
-"""AISDLC-POASSIST-14 (PRD D27) — at the feature gate each role verdict decides only its findings.
+"""SAMPLE-GATES-14 (PRD D27) — at the feature gate each role verdict decides only its findings.
 
 Fixture = the documents of live run #4 (FEAT-59643d4e743f): a review with a `Rôle` column, a PO verdict
 deciding M3/m1/m2/S1 and a tech-lead verdict deciding the rest. The platform test suite replays the SAME
@@ -20,7 +20,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "gate_roles"
 def _signed(text: str) -> str:
     text = re.sub(r"^status:.*$", "status: signed", text, count=1, flags=re.M)
     text = re.sub(r"^outcome:.*$", "outcome: validated_with_reserves", text, count=1, flags=re.M)
-    text = re.sub(r"^signed_by:.*$", "signed_by: Anis", text, count=1, flags=re.M)
+    text = re.sub(r"^signed_by:.*$", "signed_by: Camille", text, count=1, flags=re.M)
     return re.sub(r"^signed_at:.*$", "signed_at: 2026-09-30T14:00:00+00:00", text, count=1, flags=re.M)
 
 

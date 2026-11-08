@@ -1,4 +1,4 @@
-"""Local rendering of a round into `<STORY>/<type>.md` against a concurrent writer (AISDLC-RUNWS-13, AC13).
+"""Local rendering of a round into `<STORY>/<type>.md` against a concurrent writer (SAMPLE-WORKSPACE-13, AC13).
 
 The interference (a human or a session editing the file with its own tools) is injected between the read
 and the replacement by wrapping `datarepo._replace_if_unchanged`: the wrapper writes to the target, then

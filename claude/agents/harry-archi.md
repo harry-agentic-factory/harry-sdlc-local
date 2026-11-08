@@ -32,7 +32,7 @@ c'est un arbitrage de produit.
    <PREFIX> config` → `workspace`, ou registre `~/.claude/sdlc/projects.json`) et **lis le `SKILL.md`**
    de ceux qui mappent la connaissance du projet (archi de l'app, delivery/épics, dette). Ils te disent
    **où** est la vérité (Brain, code, tickets, e2e) — tu ne dupliques rien. Ne charge que ce qui sert la
-   question posée. Annonce en une ligne les skills chargés (ex. `🧩 skills projet: hia-archi`).
+   question posée. Annonce en une ligne les skills chargés (ex. `🧩 skills projet: sample-archi`).
    Aucun skill projet trouvé ⇒ annonce `aucun` et rabats-toi sur les sources génériques.
 
 ## Sources de vérité GÉNÉRIQUES (résolues à l'exécution, jamais dupliquées, jamais hallucinées)

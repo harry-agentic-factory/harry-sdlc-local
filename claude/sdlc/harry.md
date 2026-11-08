@@ -163,7 +163,7 @@ un composant dont le style contredisait la maquette sans le déclarer, la grille
 cohérence spec ↔ maquette, et la recette ne contrôlait pas le dessin.
 
 ## Écrire un document vivant
-Verrou optimiste (décision 20 du PRD AISDLC-RUNWS) pour **tout document vivant du dépôt data** écrit
+Verrou optimiste (décision 20 du PRD SAMPLE-WORKSPACE) pour **tout document vivant du dépôt data** écrit
 directement (`prd.md`, `refine.md`, `spec-func.md`, `spec-tech.md`, `review.md`, `deploy.md`, `acceptance.md`,
 `implement.md`, `nonreg.md`, `demo.md`, `spec-review.md`, `review-spec-func.md`, `review-spec-tech.md`,
 `review-feature.md` et leurs verdicts `…-verdict*.md`, `analysis.md`…), en session interactive comme en

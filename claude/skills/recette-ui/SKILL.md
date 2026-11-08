@@ -27,7 +27,7 @@ se corrompent** (un login écrase l'autre → assertions faussées).
 ## 1. Auth = étape CONTRÔLÉE, puis navigation LIBRE
 - **Connexion** : `browser_navigate` vers l'appli, effectue le **login** (page Keycloak / form) avec les
   **creds du compte de test via ENV** (jamais hardcodés, jamais affichés ; un **skill projet** fournit
-  l'URL/sélecteurs de login si besoin — 2-tiers, comme `hia-recette` côté API).
+  l'URL/sélecteurs de login si besoin — 2-tiers, comme `sample-recette` côté API).
 - **Une fois connecté → tu as le droit de NAVIGUER LIBREMENT** dans les pages (`browser_navigate`,
   `browser_click`, `browser_fill_form`) pour atteindre les écrans concernés. La contrainte porte sur
   **l'accès (auth)**, pas sur la navigation post-login.
@@ -75,7 +75,7 @@ une maquette **validée par un humain** ne se tranche pas — tu le remontes.
 Dernier message = JSON `{pass, repro, flaky, failed}`. **Ne change PAS le statut** (orchestration).
 
 > 2-tiers : ce skill est **générique** ; l'appli/URL/login spécifiques viennent du **manifest** + d'un
-> **skill projet** (ex. futur `hia-recette-ui`). Même philosophie que `recette` + `hia-recette` côté API.
+> **skill projet** (ex. futur `sample-recette-ui`). Même philosophie que `recette` + `sample-recette` côté API.
 
 ## Workspace de run
 

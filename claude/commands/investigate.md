@@ -3,7 +3,7 @@ Enquête sur un signalement jusqu'à établir sa cause : $ARGUMENTS
 `$ARGUMENTS` accepte indifféremment :
 - une **URL de carte** du tracker (ex. `https://trello.com/c/aB3dEf/12-le-titre`),
 - un **identifiant court** de carte (`aB3dEf`),
-- un **identifiant de story** SDLC (`HIA-BUG-20260924-USERFORM-1`).
+- un **identifiant de story** SDLC (`SAMPLE-BUG-20260101-FORM-1`).
 
 ## 1. Résous l'entrée — ne devine jamais le tracker
 

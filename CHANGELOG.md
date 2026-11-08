@@ -95,7 +95,7 @@ commande d'état et les sous-commandes d'analyse intactes.
 - Fixed deliverable formats: every document written by the commands and agents has exactly one `#` title and
   fixed `##` sections, with exact names, in order, without suffix; anything else is a `###` inside the matching
   section. Persona rule « Format des livrables » (`claude/sdlc/harry.md`) with the table of types and the headings
-  Harry tended to write instead (from the HIA and Talenteo history), and one template per writer:
+  Harry tended to write instead (from past engagements), and one template per writer:
   - `/scope` `prd.md`: Contexte, Besoin, Périmètre, Hors périmètre, Critères de succès, Sources;
   - `/refine` `refine.md`: Stories (the `| Story | Titre | Deps | Repos |` table, then one
     `### <STORY> — <titre> · deps: … · repos: …` per story), Ordre suggéré, Protocole de branches, Sources;
@@ -122,7 +122,7 @@ commande d'état et les sous-commandes d'analyse intactes.
 - `/process-review` speaks French to the human: the queue is announced in a sentence, evidences by their subject
   (id in parentheses), decision cards labelled « Appliquer la recommandation », « Autre correction », « Accepter avec
   réserve », « Rejeter le constat », « Passer outre », « En discuter », and the signature outcome asked in words; the
-  verdict still stores the same values (AISDLC-POASSIST-22 review).
+  verdict still stores the same values (SAMPLE-GATES-22 review).
 - Persona: profiles are kept without being announced (platform: the connected person's profile, PO by default);
   the register follows the person, not the profile a command adopts; paths only on request for technical profiles;
   the rule section is written without arrows; signature wording works both on the platform and locally.
@@ -133,7 +133,7 @@ commande d'état et les sous-commandes d'analyse intactes.
 
 ### Changed
 
-- Persona rule « Écrire pour un humain » (`claude/sdlc/harry.md`, AISDLC-POASSIST-22): every message to the human is
+- Persona rule « Écrire pour un humain » (`claude/sdlc/harry.md`, SAMPLE-GATES-22): every message to the human is
   written in sentences — no arrows as a writing device, no front-matter fields or internal values, no file paths, no
   command names; documents named by their title, finding counts in words, end-of-turn recap of at most 5 lines, never
   about the tooling, register by profile (PO/BA product language; techlead/dev/solo may add technical detail, still in
@@ -146,7 +146,7 @@ commande d'état et les sous-commandes d'analyse intactes.
 
 ### Added
 
-- Gate model « the agent recommends, the human decides » (AISDLC-POASSIST-2): slash commands
+- Gate model « the agent recommends, the human decides » (SAMPLE-GATES-2): slash commands
   `/validate-spec-func`, `/validate-spec-tech`, `/validate-feature` and `/process-review`. A gate is an agent review
   (`review-spec-func.md`, `review-spec-tech.md`, `review-feature.md`: numbered `B`/`M`/`m`/`S` findings with
   evidence, recommendation and consensus; a targeted re-review is a new version) and a human verdict
@@ -173,7 +173,7 @@ commande d'état et les sous-commandes d'analyse intactes.
 - `/spec-func`, `/spec-tech`, `/full-spec`, `/run-story`, the persona, the `loop-engineering` skill and doc and the
   README describe the new gates; `/run-story` runs unattended from `feature_validated` and stops at each gate
   signature.
-- Feature gate, role verdicts (AISDLC-POASSIST-14): when `review-feature.md` has a `Rôle` column, each role verdict
+- Feature gate, role verdicts (SAMPLE-GATES-14): when `review-feature.md` has a `Rôle` column, each role verdict
   (`po`, `techlead`) decides only the findings of its own role (`po+techlead` findings are decided by both); without
   the column the previous rule applies (every verdict decides every finding).
 
@@ -188,31 +188,31 @@ commande d'état et les sous-commandes d'analyse intactes.
 - Persona rule « Écrire un document vivant » (`claude/sdlc/harry.md`): optimistic locking for sessions and
   sub-agents writing a living document of the data repository (`git hash-object` on read, re-check before
   writing, Edit/Write only, `conflict` block on divergence); the 15 commands and agents that write such a
-  document point to it (AISDLC-RUNWS-13).
+  document point to it (SAMPLE-WORKSPACE-13).
 
 ### Changed
 
 - Local rendering of a round into `<STORY>/<type>.md` is a compare-and-swap: re-read just before the atomic
   rename, redone on the latest bytes if the file changed underneath (at most 3 times), then `put_conflict`
-  with the run left replayable (AISDLC-RUNWS-13).
+  with the run left replayable (SAMPLE-WORKSPACE-13).
 - `run-ticket` (off mode): the prompts that write a living document remind the rule, and a result with
   `conflict` stops the workflow with `doc_conflict` and the observed `status_now`, without transition. Run
-  workspace mode is unchanged (AISDLC-RUNWS-13).
+  workspace mode is unchanged (SAMPLE-WORKSPACE-13).
 
 ## [0.7.0] - 2026-09-26
 
 ### Added
 
 - Run workspace of an autonomous agent: `sdlc run init/finish/clean/list`, `sdlc doc read/list/add` and the
-  `sdlc.runws` library API (AISDLC-RUNWS-1).
+  `sdlc.runws` library API (SAMPLE-WORKSPACE-1).
 - Code runs: `sdlc clone`, `run-ticket.js` in run workspace mode and the per-project `runWorkspace` flag
-  (opt-in, absent means unchanged behaviour) (AISDLC-RUNWS-2).
+  (opt-in, absent means unchanged behaviour) (SAMPLE-WORKSPACE-2).
 - Brain tooling: `sdlc brain normalize|lint|snapshot|diff|history`, the `brainRef` manifest key and the
-  `sdlc.brain` library API (AISDLC-RUNWS-10).
+  `sdlc.brain` library API (SAMPLE-WORKSPACE-10).
 - Packaging and release: the `harry-sdlc` Python package (no dependency, `py.typed`), `sdlc --version`
   (`X.Y.Z (release)` or `X.Y.Z-dev+<sha>[.dirty] (dev: <path>)`), installation on a git tag under
   `HARRY_SDLC_HOME` with an atomic `current` link, the `ci` and `release` GitHub workflows and the release
-  scripts (`scripts/`) (AISDLC-RUNWS-3).
+  scripts (`scripts/`) (SAMPLE-WORKSPACE-3).
 
 ### Changed
 
@@ -225,4 +225,4 @@ commande d'état et les sous-commandes d'analyse intactes.
   working copy).
 - `run-ticket` deploys through the project manifest (PR #53).
 - Brain links: nothing is extracted inside fenced code blocks (```` ``` ```` / `~~~`) any more; inline code
-  is still scanned (AISDLC-RUNWS-10).
+  is still scanned (SAMPLE-WORKSPACE-10).

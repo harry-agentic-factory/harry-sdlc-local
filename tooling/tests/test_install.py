@@ -1,4 +1,4 @@
-"""install.sh in a throwaway HOME against a local bare repository (AC6-AC11 of AISDLC-RUNWS-3).
+"""install.sh in a throwaway HOME against a local bare repository (AC6-AC11 of SAMPLE-WORKSPACE-3).
 
 Never touches the real HOME: every call runs with the environment (E) of ``enginefx.env_e`` (reduced
 PATH without /usr/local/bin nor /opt/homebrew/bin, HOME/CLAUDE_HOME/HARRY_SDLC_HOME under tmp_path).
@@ -434,7 +434,7 @@ def test_install_script_guards():
 
 
 def test_gate_commands_are_installed(env, remote):
-    """AISDLC-POASSIST-2 AC8: the four gate commands are linked through `current`, like every engine command."""
+    """SAMPLE-GATES-2 AC8: the four gate commands are linked through `current`, like every engine command."""
     ok(env, remote.tag)
     _, cla, hsh, _ = paths(env)
     for name in ("validate-spec-func", "validate-spec-tech", "validate-feature", "process-review"):

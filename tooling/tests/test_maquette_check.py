@@ -13,9 +13,9 @@ import pytest
 
 from sdlc import maquette
 
-FIXTURE = Path(__file__).parent / "fixtures" / "maquette" / "uipolish3-parcours"
+FIXTURE = Path(__file__).parent / "fixtures" / "maquette" / "journey-panel-case"
 SPEC = FIXTURE / "spec-func.md"
-MEASURES = FIXTURE / "mesures-06a270d4.json"
+MEASURES = FIXTURE / "mesures.json"
 
 
 def items_of(text: str) -> list[maquette.Item]:
@@ -50,7 +50,7 @@ def test_a_shorthand_property_is_invalid():
 
 def test_the_path_line_and_the_deviations_are_read():
     section = maquette.read_section(SPEC.read_text(encoding="utf-8"))
-    assert section.path_line == "UIPOLISH/maquettes/nouvelle-feature-v7.html"
+    assert section.path_line == "SAMPLE-UI2/maquettes/nouvelle-feature-v7.html"
     assert section.deviations == "aucun."
 
 
@@ -99,7 +99,7 @@ def test_a_comma_list_is_an_ORDERED_sequence():
 
 # --- AC13: the replay of the reference case --------------------------------------------------------------------
 
-def test_rejeu_uipolish3():
+def test_replay_the_reference_case_of_the_journey_panel():
     """The three deviations the delivered screen carried, and nothing else."""
     items = items_of(SPEC.read_text(encoding="utf-8"))
     measures = json.loads(MEASURES.read_text(encoding="utf-8"))
@@ -116,7 +116,7 @@ def test_rejeu_uipolish3():
 def test_the_fixture_holds_data_only():
     """No maquette HTML, no source file of the screen under test: the engine does not carry third-party code.
     The proof of the MEASUREMENT lives in the story's acceptance.md, not here."""
-    assert sorted(p.name for p in FIXTURE.iterdir()) == ["mesures-06a270d4.json", "spec-func.md"]
+    assert sorted(p.name for p in FIXTURE.iterdir()) == ["mesures.json", "spec-func.md"]
 
 
 # --- the CLI, including its exit code --------------------------------------------------------------------------

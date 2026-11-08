@@ -25,7 +25,7 @@ def _init_repo(path: Path) -> Path:
 # --- chemin déterministe / slug ---
 
 def test_slug():
-    assert wt.slug("feat/HIA-1-x") == "feat-HIA-1-x"
+    assert wt.slug("feat/SAMPLE-1-x") == "feat-SAMPLE-1-x"
 
 
 def test_worktree_path_is_sibling(tmp_path):

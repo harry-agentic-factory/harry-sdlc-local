@@ -222,7 +222,7 @@ published this type; no aggregated file.
 
 ### Concurrency
 
-Optimistic locking on every document (decision 20 of the AISDLC-RUNWS PRD) — what it means for the engine:
+Optimistic locking on every document (decision 20 of the SAMPLE-WORKSPACE PRD) — what it means for the engine:
 
 - **Rounds are exempt.** A run writes its documents under its own key `runs/<uid>/out/docs/<type>.md`, once
   (add-only `put`: same bytes ⇒ no-op, other bytes ⇒ `put_conflict`), and its round is prepended to the

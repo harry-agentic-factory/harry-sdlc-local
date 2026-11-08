@@ -1,0 +1,35 @@
+<!doctype html>
+<!--
+  Fake maquette, built for the test suite. It depends on no project and no data repository.
+
+  This one was accepted by a human: it is a validated maquette. But it carries neither of the two
+  conventions that tell the analyser which rules belong to the page: it has no dedicated block for
+  the page's own rules, and no marker comment separating them inside the design system's block.
+
+  The analyser must therefore say so rather than report a count it cannot stand behind. Being
+  validated is not a reason to be read silently: a count of zero new rules and an unknown count are
+  different answers, and only one of them is honest here.
+
+  Do not spell either convention out above. The analyser reads the raw file, so naming a marker in
+  prose plants it -- an earlier draft of this comment quoted both, and the fixture recognised itself.
+-->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Panneau latéral — maquette d'essai</title>
+
+  <!-- One unmarked stylesheet. Nothing says where the system ends and the page begins. -->
+  <style>
+    .side        { left: 13px; font-size: 13px; }
+    .side-title  { font-weight: 600; }
+    .side-item   { color: var(--ink); }
+  </style>
+</head>
+
+<body>
+  <aside class="side">
+    <h2 class="side-title">Panneau</h2>
+    <p class="side-item">Validée par un humain, mais sans convention de blocs.</p>
+  </aside>
+</body>
+</html>

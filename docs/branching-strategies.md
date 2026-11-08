@@ -28,11 +28,11 @@ se recette, puis **merge dans le trunk** (MR story→trunk, **jamais** main). À
 
 ```
 main
- └─ epic/HIA-OBSERV                (trunk, off main)
-      ├─ feat/HIA-OBSERV-0  ──merge──▶ trunk     (story 0 validée)
-      ├─ feat/HIA-OBSERV-1  ──merge──▶ trunk     (branchée off trunk : voit le schéma de 0)
-      └─ feat/HIA-OBSERV-4  ──merge──▶ trunk
-   … puis, sur validation humaine : epic/HIA-OBSERV ──▶ main  (promote unique)
+ └─ epic/SAMPLE-OBSERV                (trunk, off main)
+      ├─ feat/SAMPLE-OBSERV-0  ──merge──▶ trunk     (story 0 validée)
+      ├─ feat/SAMPLE-OBSERV-1  ──merge──▶ trunk     (branchée off trunk : voit le schéma de 0)
+      └─ feat/SAMPLE-OBSERV-4  ──merge──▶ trunk
+   … puis, sur validation humaine : epic/SAMPLE-OBSERV ──▶ main  (promote unique)
 ```
 
 **Pourquoi c'est la stratégie préférée des épics :**

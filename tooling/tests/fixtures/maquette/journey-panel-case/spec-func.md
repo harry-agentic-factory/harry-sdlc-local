@@ -10,7 +10,7 @@ Le panneau liste les activités du parcours de la feature, une pastille par éta
 
 ## Fidélité à la maquette
 
-Maquette : UIPOLISH/maquettes/nouvelle-feature-v7.html
+Maquette : SAMPLE-UI2/maquettes/nouvelle-feature-v7.html
 
 | Élément | Attendu (maquette) | Jeton / composant du socle | Contrôle |
 |---|---|---|---|

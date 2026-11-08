@@ -1,4 +1,4 @@
-"""Spec and feature gates (AISDLC-POASSIST-2): the CLI records a gate only on a verdict signed by a human.
+"""Spec and feature gates (SAMPLE-GATES-2): the CLI records a gate only on a verdict signed by a human.
 
 Fixture F: epic E with stories E-1, E-2, review E/review-spec-func.md (findings B1, M1, m1, S1) and its verdict.
 """
@@ -45,7 +45,7 @@ DECISIONS = {"B1": ("applied", ""), "M1": ("reserve", "acceptable for V1"),
 
 
 def verdict_text(gate="spec_func", target="E", status="signed", outcome="validated_with_reserves",
-                 signed_by="Anis", review="E/review-spec-func.md", role=None, decisions=None,
+                 signed_by="Camille", review="E/review-spec-func.md", role=None, decisions=None,
                  review_version="1", extra_rows="") -> str:
     fm = [f"kind: verdict", f"gate: {gate}", f"target: {target}", f"review: {review}",
           f"review_version: {review_version}", f"status: {status}", f"outcome: {outcome}",
@@ -128,7 +128,7 @@ def test_every_engine_agent_is_an_agent_identity():
     assert agents
     for name in agents + ["harry", "Harry-Archi", "claude", "Claude-Code", ""]:
         assert gates.is_agent_identity(name), name
-    assert not gates.is_agent_identity("Anis Bessa")
+    assert not gates.is_agent_identity("Camille Martin")
 
 
 # --- AC1: names and aliases ------------------------------------------------------------------------------------
@@ -219,7 +219,7 @@ def test_ac2_refused_without_any_write(tmp_path, run, case, code, needle):
 
 def test_allowed_signer_passes(tmp_path, run):
     ws = make_f(tmp_path, run)
-    (ws / "sdlc.config.json").write_text(json.dumps({"gates": {"signers": ["anis", "Tech Lead"]}}))
+    (ws / "sdlc.config.json").write_text(json.dumps({"gates": {"signers": ["camille", "Tech Lead"]}}))
     (ws / "E" / "review-spec-func-verdict.md").write_text(verdict_text())
     rc, out, err = run("validate-spec-func", "E", "--verdict", "E/review-spec-func-verdict.md")
     assert rc == 0 and out["advanced"] == ["E-1", "E-2"], err
@@ -249,7 +249,7 @@ def test_ac3_ac4_signed_verdict_records_everything(tmp_path, run):
     assert rc == 0, err
     assert out["advanced"] == ["E-1", "E-2"] and out["outcome"] == "validated_with_reserves"
     assert out["validated"] == out["advanced"]          # pre-0.8.0 output key kept
-    assert out["signedBy"] == ["Anis"] and len(out["debt"]) == 2
+    assert out["signedBy"] == ["Camille"] and len(out["debt"]) == 2
     for sid in ("E-1", "E-2"):
         t = run("get", sid)[1]
         assert t["status"] == "spec_func_validated"
@@ -260,7 +260,7 @@ def test_ac3_ac4_signed_verdict_records_everything(tmp_path, run):
         journal = (ws / "E" / "stories" / sid / "journal.md").read_text()
         entry = journal.split("\n## ")[1]
         assert "spec_func -> spec_func_validated" in entry and "validated_with_reserves" in entry
-        assert "Anis" in entry.splitlines()[0]
+        assert "Camille" in entry.splitlines()[0]
         assert f"review-spec-func.md@{gates.blob_ref(ws / 'E/review-spec-func.md')}" in entry
         assert f"review-spec-func-verdict.md@{gates.blob_ref(ws / vrel)} (signed" in entry
     items = PostMortemStore(ws).list(kind="debt")
@@ -341,7 +341,7 @@ def test_story_not_in_source_state_is_refused(tmp_path, run):
 def _feature(ws, role, outcome="validated"):
     vrel = f"E/review-feature-verdict-{role}.md"
     (ws / vrel).write_text(verdict_text(gate="feature", target="E", review="E/review-feature.md", role=role,
-                                        outcome=outcome, signed_by="Anis" if role == "po" else "Tech Lead"))
+                                        outcome=outcome, signed_by="Camille" if role == "po" else "Tech Lead"))
     return vrel
 
 

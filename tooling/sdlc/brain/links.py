@@ -2,7 +2,7 @@
 `lint`, `snapshot` (`links.json`), `normalize` (`broken_links`) and library callers.
 
 Fenced code blocks are masked first: nothing inside them is extracted (decision of 2026-09-27,
-recommendation (b) of the AISDLC-RUNWS spec review). CommonMark rules: an opening fence is a line
+recommendation (b) of the SAMPLE-WORKSPACE spec review). CommonMark rules: an opening fence is a line
 indented by at most 3 spaces followed by at least 3 backticks or tildes (a backtick fence's info
 string holds no backtick); the closing fence uses the same character, is at least as long and is
 followed only by spaces or tabs; an unclosed block runs to the end of the file. Blocks indented by

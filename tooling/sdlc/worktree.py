@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 def slug(branch: str) -> str:
-    """`feat/HIA-1-x` → `feat-HIA-1-x` (nom de dossier sûr)."""
+    """`feat/SAMPLE-1-x` → `feat-SAMPLE-1-x` (nom de dossier sûr)."""
     return branch.replace("/", "-")
 
 

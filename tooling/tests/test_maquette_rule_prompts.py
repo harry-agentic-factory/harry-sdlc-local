@@ -157,6 +157,10 @@ def test_the_implementer_treats_the_table_like_an_invariant():
     assert "attendus à l'écran" in text and "avant de coder" in text
 
 
+# Uppercase tokens that look like a ticket but are not: acronyms the documentation legitimately uses.
+ALLOWED_UPPERCASE: set[str] = set()
+
+
 def test_what_this_epic_adds_carries_no_ticket_identifier():
     """Scoped to the added text on purpose: the persona already cites older ticket ids, which is pre-existing
     debt and not this epic's to rewrite."""
@@ -165,6 +169,9 @@ def test_what_this_epic_adds_carries_no_ticket_identifier():
     for rel in ("claude/skills/recette-ui/SKILL.md", "claude/agents/harry-archi.md"):
         text = (REPO / rel).read_text(encoding="utf-8")
         added.append(text.split("Comparaison à la maquette", 1)[-1].split("\n## ", 1)[0])
+    # Deny the SHAPE of a ticket identifier rather than a list of project names: a denylist of real
+    # names would have to name them, and it would miss the next project anyway.
+    ticket = re.compile(r"\b[A-Z][A-Z0-9]{2,}-[A-Z0-9]+(?:-\d+)?\b")
     for blob in added:
-        for forbidden in ("AISDLC-", "UIPOLISH", "UIFIDELITY"):
-            assert forbidden not in blob, forbidden
+        found = [m for m in ticket.findall(blob) if m not in ALLOWED_UPPERCASE]
+        assert not found, found

@@ -42,7 +42,7 @@ Si un détail fin manque (Jenkinsfile précis, quirk d'un job), le skill te renv
 (`.brain` du manifest) et le `CLAUDE.md` du repo — mais les **paramètres** restent ceux du manifest.
 
 ## Gotchas prod figés — vérifs obligatoires (anti-redécouverte)
-> Origine : rétro HIA-UDX (build sur commit périmé, CI qui skippe les tests, Replay/ingress redécouverts à
+> Origine : rétrospective d'un épic passé (build sur commit périmé, CI qui skippe les tests, Replay/ingress redécouverts à
 > chaud). Les **valeurs projet** (chemins de jobs, ns, host KC) restent dans le **manifest** / le **Brain**
 > (`technical/ci-cd.md`, `technical/keycloak.md`) — ci-dessous les **règles** qui font foi au runtime.
 
