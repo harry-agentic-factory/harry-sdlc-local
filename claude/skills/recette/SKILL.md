@@ -57,6 +57,29 @@ sdlc --project <PREFIX> config               # .recette.<repo>, .credentials, .d
 Si `baseUrl` absent mais `portForward` présent :
 `kubectl -n <ns> port-forward <kind>/<name> <local>:<port>` → `http://localhost:<local>`.
 
+### Environnement cible — quand le projet en déclare plusieurs
+
+Comme pour le déploiement, la recette raisonne en environnement **logique** : **`dev`** (pré-merge) ou
+**`integration`** (post-merge). Si `recette.<repo>.environments.<env>` existe, **ses clés surchargent**
+celles du bloc racine — mêmes noms, même sémantique :
+
+```json
+"recette": { "<repo>": {
+    "tool": "api", "health": "/actuator/health",
+    "environments": {
+      "dev":         { "baseUrl": "http://localhost:8099", "auth": "tenant-admin-local" },
+      "integration": { "portForward": "<ns>/deploy/<name>:<port>", "auth": "tenant-admin" }
+    }
+}}
+```
+
+Sans bloc `environments`, rien ne change : on lit `recette.<repo>` à plat (comportement historique).
+
+⚠️ **Un `dev` local ne prouve pas la même chose qu'une `integration`.** Si `deploy.<repo>.environments.<env>`
+déclare `mocked`, ces dépendances sont **simulées** : dis-le dans `acceptance.md`, critère par critère quand
+c'est pertinent. Un vert obtenu contre un mock atteste du comportement de notre code, **pas** du contrat
+avec le service réel.
+
 ## 2. Identité (jamais de secret exposé)
 `.credentials.source` : `host` = creds ambiantes (token via le flux d'auth du projet, `curl -s -n`/kube).
 Obtiens le token requis (`auth`) **sans jamais l'afficher** : mets-le dans un fichier/variable, ne
