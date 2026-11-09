@@ -121,9 +121,26 @@ Le verdict **référence** les constats par id, il ne les recopie pas. Seul l'ag
 jamais dans la revue ; une correction de spec après décision appelle une **revue ciblée** (nouvelle version) de
 `harry-archi`.
 
-## 4. Signature — un acte humain
+## 4. Vérifier avant de proposer la signature — obligatoire
 
-Quand plus aucun point n'est non décidé ni en `discuss`, **demande** à l'humain, en mots, l'issue (« Validé »,
+Quand plus aucun point n'est non décidé ni en `discuss`, **avant** d'aller vers l'humain :
+
+```
+sdlc --project <PREFIX> <commande de gate> <TARGET> --verdict <chemin> --check
+```
+
+Il rejoue **tous** les contrôles de contenu — chaque constat décidé, aucun constat inconnu, aucune décision en
+suspens, motif présent sur un rejet — **sans exiger la signature et sans rien écrire**. S'il refuse, corrige et
+relance ; ne propose **jamais** une signature sur un verdict non vérifié.
+
+Pourquoi à ce moment précis, et pas « quand ça paraît utile » : les contrôles de la gate sont ordonnés, et la
+**signature est vérifiée avant la complétude**. Sans ce passage, on signe pour apprendre ce qui manque — l'ordre
+inverse de celui qu'on veut. Et c'est exactement l'instant où tu **crois** que tout est couvert : ta conviction
+n'est pas le verdict de la gate, et c'est cet écart que le contrôle mesure.
+
+## 5. Signature — un acte humain
+
+Quand le `--check` est passé, **demande** à l'humain, en mots, l'issue (« Validé »,
 « Validé avec réserves », « Renvoyé pour correction », « Passé outre », que tu écris `validated`,
 `validated_with_reserves`, `returned`, `bypassed`) et **son nom**. Seulement sur sa réponse explicite, passe le
 verdict en `status: signed` avec `outcome`, `signed_by: <son nom>`, `signed_at: <ISO 8601>`. Sans réponse humaine

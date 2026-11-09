@@ -223,6 +223,10 @@ def run(argv: list[str] | None = None) -> dict:
                        help="verdict signé par un humain (review-<gate>-verdict.md) ; OBLIGATOIRE. "
                             "validate-feature : un par rôle (po, techlead), répétable")
         a.add_argument("--review", help="revue de l'agent (review-<gate>.md) ; défaut : celle du verdict")
+        a.add_argument("--check", action="store_true",
+                       help="vérifie le CONTENU du verdict sans exiger la signature et sans rien écrire : "
+                            "tout constat décidé, aucun constat inconnu, aucune décision en suspens. "
+                            "À passer AVANT de signer — sinon on signe pour apprendre ce qui manque")
 
     # --- worktrees / workspace agent ---
     a = sub.add_parser("worktree", help="crée/assure un git worktree par repo pour une story")
@@ -449,8 +453,11 @@ def run(argv: list[str] | None = None) -> dict:
     if args.cmd == "reject":
         return s.reject(args.story, args.to, args.note, actor=args.by)
     if args.cmd in _GATE_CMDS:
-        from .gates import run_gate
+        from .gates import check_gate, run_gate
         signers = (load_config(resolve_workspace(args.project)).get("gates") or {}).get("signers")
+        if getattr(args, "check", False):
+            return check_gate(s, _GATE_CMDS[args.cmd], args.target, args.verdict, review=args.review,
+                              signers=signers)
         return run_gate(s, _GATE_CMDS[args.cmd], args.target, args.verdict, review=args.review, signers=signers)
     if args.cmd == "deploy-target":
         return resolve_deploy_target(load_config(resolve_workspace(args.project)), args.repo, args.env)
