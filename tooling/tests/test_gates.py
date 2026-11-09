@@ -175,6 +175,9 @@ def test_ac1_ambiguous_prefix_is_refused(tmp_path, run):
     ("no_review_version", "stale_verdict", "version"),
     ("unknown_finding", "unknown_finding", "B9"),
     ("not_allowed", "signer_not_allowed", "gates.signers"),
+    # A review that states its findings as sections yields none to the parser, and every decision then
+    # looks unknown — blaming the verdict for the review's shape. Measured on a 47-finding review.
+    ("sections_only", "review_without_findings", "Constats"),
 ])
 def test_ac2_refused_without_any_write(tmp_path, run, case, code, needle):
     ws = make_f(tmp_path, run)
@@ -204,6 +207,10 @@ def test_ac2_refused_without_any_write(tmp_path, run, case, code, needle):
     elif case == "not_allowed":
         cfg = ws / "sdlc.config.json"
         cfg.write_text(json.dumps({"gates": {"signers": ["Someone Else"]}}))
+    elif case == "sections_only":
+        review = ws / "E" / "review-spec-func.md"
+        head = review.read_text().split("## Constats", 1)[0]
+        review.write_text(head + "## Constats\n\n### B1 — énoncé en section, pas en tableau\n\nPreuve : x.\n")
     if case != "missing_file":
         vpath.write_text(verdict_text(decisions=decisions, **kwargs))
     before = snapshot(ws)
@@ -426,3 +433,56 @@ def test_ac10_status_awaiting_names_the_gate(tmp_path, run, status, command):
     make_f(tmp_path, run, status=status)
     rc, out, _ = run("status", "E-1")
     assert rc == 0 and command in out["tickets"][0]["awaiting"]
+
+
+def test_review_findings_command_feeds_the_verdict_from_what_the_gate_reads(tmp_path, run):
+    """The verdict and the gate are two readers of one document; retyping the ids lets them diverge.
+    Measured once: a review stating 47 findings as sections showed the gate none, and the verdict that
+    decided them all came back as "unknown findings"."""
+    ws = make_f(tmp_path, run)
+    rc, out, err = run("review-findings", "E/review-spec-func.md")
+    assert rc == 0, err
+    assert out["count"] == len(out["findings"]) > 0
+    assert {f["id"] for f in out["findings"]} == set(gates.review_findings(
+        (ws / "E" / "review-spec-func.md").read_text()))
+    assert out["version"] == "1"
+    assert {f["severity"] for f in out["findings"]} <= {"bloquant", "majeur", "mineur", "suggestion"}
+
+    # A review whose findings are sections yields none: the command says zero rather than inventing ids.
+    review = ws / "E" / "review-spec-func.md"
+    review.write_text(review.read_text().split("## Constats", 1)[0]
+                      + "## Constats\n\n### B1 — en section\n\npreuve.\n")
+    rc, out, err = run("review-findings", "E/review-spec-func.md")
+    assert rc == 0 and out["count"] == 0, err
+
+    rc, out, err = run("review-findings", "E/absente.md")
+    assert rc == 1 and json.loads(err)["code"] == "review_not_found"
+
+
+def test_check_reports_on_content_before_a_signature_exists(tmp_path, run):
+    """The gate's checks are ordered and the signature comes first, so a draft was refused at
+    `not_signed` and never reached what was missing: one had to sign to learn it. `--check` answers
+    that question at the moment it is asked, and writes nothing."""
+    ws = make_f(tmp_path, run)
+    vpath = ws / "E" / "review-spec-func-verdict.md"
+    rel = str(vpath.relative_to(ws))
+
+    # A draft whose content is complete: refused for its signature, accepted by --check.
+    vpath.write_text(verdict_text(status="draft"))
+    rc, _, err = run("validate-spec-func", "E", "--verdict", rel)
+    assert rc == 1 and json.loads(err)["code"] == "not_signed"
+
+    before = snapshot(ws)
+    rc, out, err = run("validate-spec-func", "E", "--verdict", rel, "--check")
+    assert rc == 0, err
+    assert out["check"] == "ok" and out["verdicts"][0]["decisions"] == len(DECISIONS)
+    # The status stays draft: a check never signs, and never pretends the verdict is signed.
+    assert "status: draft" in vpath.read_text()
+    assert snapshot(ws) == before, "un check n'écrit rien"
+    assert status_of(run, "E-1", ws) == "spec_func", "un check ne fait avancer personne"
+
+    # A draft missing a decision is caught by --check, which is the whole point.
+    decisions = {k: v for k, v in DECISIONS.items() if k != "M1"}
+    vpath.write_text(verdict_text(status="draft", decisions=decisions))
+    rc, _, err = run("validate-spec-func", "E", "--verdict", rel, "--check")
+    assert rc == 1 and json.loads(err)["code"] == "undecided" and "M1" in err

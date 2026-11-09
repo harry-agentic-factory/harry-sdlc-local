@@ -288,10 +288,12 @@ def _rel(root: Path, p: str | Path) -> tuple[str, Path]:
 
 
 def check_verdict(root: str | Path, path: str, gate: str, target: str, review: str | None = None,
-                  signers: list[str] | None = None) -> Verdict:
+                  signers: list[str] | None = None, *, signature: bool = True) -> Verdict:
     """Return the verdict when it can carry the gate, raise `GateRefused` naming the cause otherwise.
 
     `signers`: optional allow-list (`gates.signers` of the project manifest); when set, `signed_by` must be in it.
+    `signature=False`: check the CONTENT only -- what is decided, against which review -- and let an unsigned
+    verdict through. For a dry check before signing; it can never record a gate, `run_gate` keeping it read-only.
     """
     root = Path(root)
     g = GATES[gate]
@@ -307,7 +309,7 @@ def check_verdict(root: str | Path, path: str, gate: str, target: str, review: s
     if fm.get("target") != target:
         raise GateRefused(f"{rel}: target is '{fm.get('target', '')}', expected '{target}'", "wrong_target")
     status = fm.get("status", "")
-    if status != "signed":
+    if signature and status != "signed":
         raise GateRefused(f"{rel}: verdict not signed (status: {status or 'missing'}) — a draft cannot carry the "
                           f"gate; the human signs it in /process-review", "not_signed")
     outcome = fm.get("outcome", "")
@@ -315,13 +317,13 @@ def check_verdict(root: str | Path, path: str, gate: str, target: str, review: s
         raise GateRefused(f"{rel}: outcome '{outcome}' invalid, expected one of {', '.join(OUTCOMES)}",
                           "bad_outcome")
     signed_by = fm.get("signed_by", "").strip()
-    if is_agent_identity(signed_by):
+    if signature and is_agent_identity(signed_by):
         raise GateRefused(f"{rel}: the verdict must be signed by a human (signed_by: '{signed_by}'); "
                           f"an agent never signs a gate", "agent_signer")
-    if signers and signed_by.lower() not in {s.strip().lower() for s in signers}:
+    if signature and signers and signed_by.lower() not in {s.strip().lower() for s in signers}:
         raise GateRefused(f"{rel}: '{signed_by}' is not in the signers allowed by the project (gates.signers)",
                           "signer_not_allowed")
-    if not fm.get("signed_at", "").strip():
+    if signature and not fm.get("signed_at", "").strip():
         raise GateRefused(f"{rel}: signed_at missing", "not_signed")
     role = fm.get("role") or None
     if g.roles and role not in g.roles:
@@ -347,6 +349,16 @@ def check_verdict(root: str | Path, path: str, gate: str, target: str, review: s
                           f"'{version or '?'}' — both are required and must match (process the targeted "
                           f"re-review first)", "stale_verdict")
     all_findings = review_findings(rtext)
+    # A review that states its findings as sections rather than the mandated `## Constats` table yields
+    # nothing here, and every decision then looks "unknown" -- which blames the verdict for the review's
+    # shape. Measured once: a 47-finding review listed all 47 as unknown ids. Say what is actually wrong.
+    # A review that genuinely found nothing stays legitimate: its verdict decides nothing, or only
+    # its own human additions (H…), and neither case trips this.
+    if not all_findings and any(not i.startswith("H") for i in verdict_decisions(text)):
+        raise GateRefused(
+            f"{rel}: no finding found — a review states its findings in the `## Constats` table "
+            f"(`| B1 | bloquant | … |`), not as sections; see the review format in the reviewer's definition",
+            "review_without_findings")
     # feature gate: a role verdict decides only the findings assigned to its role (D27); a decision it records on
     # another role's finding is informative only (neither required, nor checked, nor turned into debt)
     findings = findings_for_role(rtext, role) if g.roles else all_findings
@@ -442,6 +454,26 @@ def _refuse_unfaithful_specs(root: Path, g: Gate, targets: list) -> None:
         raise GateRefused(f"{g.command}: a maquette is declared but its spec does not carry a conform "
                           f"« {maquette.SECTION} » section — {'; '.join(str(gap) for gap in gaps)}",
                           "maquette_section_missing")
+
+
+def check_gate(sdlc, gate: str, target: str, verdicts: list[str] | None, review: str | None = None,
+               signers: list[str] | None = None) -> dict:
+    """What the gate would say about a verdict's CONTENT, without requiring a signature and without
+    writing anything. Answers « have I forgotten a finding? » at the moment one wants to ask it."""
+    g = GATES[gate]
+    root = Path(sdlc.ws.root)
+    if not verdicts:
+        raise GateRefused(f"{g.command}: --verdict <path> is required", "verdict_missing")
+    _targets(sdlc, g, target)
+    out = []
+    for v in verdicts:
+        checked = check_verdict(root, v, gate, target, review, signers, signature=False)
+        # The name, not a boolean: a draft may already carry one, and "signed: true" would then lie.
+        out.append({"verdict": v, "role": checked.role, "outcome": checked.outcome,
+                    "decisions": len(checked.decisions), "signed_by": checked.signed_by})
+    return {"gate": gate, "command": g.command, "target": target, "check": "ok",
+            "note": "contenu conforme ; la signature reste a poser, et c'est elle qui engage",
+            "verdicts": out}
 
 
 def run_gate(sdlc, gate: str, target: str, verdicts: list[str] | None, review: str | None = None,
