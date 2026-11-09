@@ -175,6 +175,9 @@ def test_ac1_ambiguous_prefix_is_refused(tmp_path, run):
     ("no_review_version", "stale_verdict", "version"),
     ("unknown_finding", "unknown_finding", "B9"),
     ("not_allowed", "signer_not_allowed", "gates.signers"),
+    # A review that states its findings as sections yields none to the parser, and every decision then
+    # looks unknown — blaming the verdict for the review's shape. Measured on a 47-finding review.
+    ("sections_only", "review_without_findings", "Constats"),
 ])
 def test_ac2_refused_without_any_write(tmp_path, run, case, code, needle):
     ws = make_f(tmp_path, run)
@@ -204,6 +207,10 @@ def test_ac2_refused_without_any_write(tmp_path, run, case, code, needle):
     elif case == "not_allowed":
         cfg = ws / "sdlc.config.json"
         cfg.write_text(json.dumps({"gates": {"signers": ["Someone Else"]}}))
+    elif case == "sections_only":
+        review = ws / "E" / "review-spec-func.md"
+        head = review.read_text().split("## Constats", 1)[0]
+        review.write_text(head + "## Constats\n\n### B1 — énoncé en section, pas en tableau\n\nPreuve : x.\n")
     if case != "missing_file":
         vpath.write_text(verdict_text(decisions=decisions, **kwargs))
     before = snapshot(ws)
