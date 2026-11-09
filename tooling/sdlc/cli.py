@@ -148,6 +148,10 @@ def run(argv: list[str] | None = None) -> dict:
     a.add_argument("story", help="ID story")
     a.add_argument("status", help="spec_func|spec_func_validated|spec_tech|spec_validated|feature_validated|"
                    "implemented|reviewed|deployed|recette_ok|accepted|done")
+    a = sub.add_parser("review-findings",
+                       help="les constats d'une revue de gate, tels que la gate les lit — "
+                            "a construire le verdict depuis eux, jamais en les retapant")
+    a.add_argument("review", help="chemin du review-<gate>.md, relatif au workspace ou absolu")
     a = sub.add_parser("source", help="provenance d'une story, ou story(s) issues d'un signalement")
     a.add_argument("ref", help="ID story (sa provenance) OU référence de signalement (carte, ticket)")
     a = sub.add_parser("set-source", help="attache à une story le signalement dont elle est issue")
@@ -413,6 +417,24 @@ def run(argv: list[str] | None = None) -> dict:
         return dataclasses.asdict(s.set_status(args.story, args.status))
     if args.cmd == "set-source":
         return dataclasses.asdict(s.set_source(args.story, args.kind, args.ref, args.url, args.at))
+    if args.cmd == "review-findings":
+        from . import gates
+        path = Path(args.review)
+        if not path.is_absolute():
+            path = s.ws.root / path
+        if not path.is_file():
+            raise gates.GateRefused(f"{args.review}: review not found", "review_not_found")
+        text = path.read_text(encoding="utf-8")
+        found = gates.review_findings(text)
+        severity = {"B": "bloquant", "M": "majeur", "m": "mineur", "S": "suggestion"}
+        return {
+            "review": str(path),
+            "version": gates.front_matter(text).get("version", ""),
+            "count": len(found),
+            # Ordered as the review states them, so a verdict reads in the same order as its source.
+            "findings": [{"id": fid, "severity": severity[letter]} for fid, letter in found.items()],
+        }
+
     if args.cmd == "source":
         # Une story → sa provenance. Autre chose → les stories issues de ce signalement.
         try:

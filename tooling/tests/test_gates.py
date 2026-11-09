@@ -426,3 +426,27 @@ def test_ac10_status_awaiting_names_the_gate(tmp_path, run, status, command):
     make_f(tmp_path, run, status=status)
     rc, out, _ = run("status", "E-1")
     assert rc == 0 and command in out["tickets"][0]["awaiting"]
+
+
+def test_review_findings_command_feeds_the_verdict_from_what_the_gate_reads(tmp_path, run):
+    """The verdict and the gate are two readers of one document; retyping the ids lets them diverge.
+    Measured once: a review stating 47 findings as sections showed the gate none, and the verdict that
+    decided them all came back as "unknown findings"."""
+    ws = make_f(tmp_path, run)
+    rc, out, err = run("review-findings", "E/review-spec-func.md")
+    assert rc == 0, err
+    assert out["count"] == len(out["findings"]) > 0
+    assert {f["id"] for f in out["findings"]} == set(gates.review_findings(
+        (ws / "E" / "review-spec-func.md").read_text()))
+    assert out["version"] == "1"
+    assert {f["severity"] for f in out["findings"]} <= {"bloquant", "majeur", "mineur", "suggestion"}
+
+    # A review whose findings are sections yields none: the command says zero rather than inventing ids.
+    review = ws / "E" / "review-spec-func.md"
+    review.write_text(review.read_text().split("## Constats", 1)[0]
+                      + "## Constats\n\n### B1 — en section\n\npreuve.\n")
+    rc, out, err = run("review-findings", "E/review-spec-func.md")
+    assert rc == 0 and out["count"] == 0, err
+
+    rc, out, err = run("review-findings", "E/absente.md")
+    assert rc == 1 and json.loads(err)["code"] == "review_not_found"

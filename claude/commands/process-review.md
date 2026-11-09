@@ -14,6 +14,21 @@ repo data.
 
 - Lis la revue : frontmatter (`gate`, `target`, `version`) et les constats `| # | Gravité | Constat | Preuve |
   Recommandation | Consensus |` (ids `B<n>` bloquant, `M<n>` majeur, `m<n>` mineur, `S<n>` suggestion).
+- **La table des décisions se construit depuis la revue, jamais à la main** :
+
+  ```
+  sdlc --project <PREFIX> review-findings <EPIC>/review-<gate>.md
+  ```
+
+  Une ligne de décision **par constat rendu**, dans cet ordre. Tu lis la prose pour **décider** ; tu prends les
+  **identifiants** de cette commande, qui lit exactement ce que la gate lira.
+
+  Pourquoi : le verdict et la gate sont deux lecteurs du même document, et retaper les ids les laisse diverger.
+  Mesuré une fois — une revue énonçait ses 47 constats en sections au lieu du tableau, la gate n'en a vu aucun, et
+  le verdict qui les décidait tous est ressorti en « decisions on unknown findings ». Vu de la gate, un verdict qui
+  décide des constats qu'elle ne voit pas est indiscernable d'un verdict inventé : elle a eu raison de refuser.
+  Un `count` à **0** sur une revue qui a manifestement trouvé des choses signale une revue mal formée — à corriger
+  dans la revue, pas à contourner dans le verdict.
 - **Gate feature — règle des rôles (D27)** : la revue attribue chaque constat à un rôle dans une colonne **`Rôle`**
   (lue par son nom d'en-tête ; synonymes `Role`/`Owner`/`Pour` ; valeurs `po`, `techlead`/`tech lead`/`tl`,
   `po+techlead`/`both`/`les deux`). **Le verdict d'un rôle ne décide QUE les constats de ce rôle** (un constat
