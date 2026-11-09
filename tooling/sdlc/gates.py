@@ -347,6 +347,16 @@ def check_verdict(root: str | Path, path: str, gate: str, target: str, review: s
                           f"'{version or '?'}' — both are required and must match (process the targeted "
                           f"re-review first)", "stale_verdict")
     all_findings = review_findings(rtext)
+    # A review that states its findings as sections rather than the mandated `## Constats` table yields
+    # nothing here, and every decision then looks "unknown" -- which blames the verdict for the review's
+    # shape. Measured once: a 47-finding review listed all 47 as unknown ids. Say what is actually wrong.
+    # A review that genuinely found nothing stays legitimate: its verdict decides nothing, or only
+    # its own human additions (H…), and neither case trips this.
+    if not all_findings and any(not i.startswith("H") for i in verdict_decisions(text)):
+        raise GateRefused(
+            f"{rel}: no finding found — a review states its findings in the `## Constats` table "
+            f"(`| B1 | bloquant | … |`), not as sections; see the review format in the reviewer's definition",
+            "review_without_findings")
     # feature gate: a role verdict decides only the findings assigned to its role (D27); a decision it records on
     # another role's finding is informative only (neither required, nor checked, nor turned into debt)
     findings = findings_for_role(rtext, role) if g.roles else all_findings
