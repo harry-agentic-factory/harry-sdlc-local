@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- ================================================================
+         Carries the Spring Batch metadata from the 4.3 layout
+         to the 5.0 layout, KEEPING THE EXISTING HISTORY.
+
+         Spring ships the new schema but no data migration. Its own
+         migration/5.0/migration-postgresql.sql is worse than nothing here: it
+         DROPs DATE_VAL / LONG_VAL / DOUBLE_VAL and renames TYPE_CD to
+         PARAMETER_TYPE without converting it, so every non-String parameter
+         loses its value and every row keeps a type ('LONG') that
+         Class.forName cannot resolve - measured: the official script leaves
+         clientId=NULL and makes every later read of the history throw.
+
+         The three differences between schema-postgresql.sql 4.3.4 and 5.0.2:
+           1. batch_job_execution_params: type_cd + key_name + 4 typed value
+              columns collapse into parameter_name / parameter_type / parameter_value.
+           2. batch_step_execution gains create_time NOT NULL, and start_time
+              becomes nullable.
+           3. batch_job_execution.job_configuration_location disappears from the
+              reference schema - and is deliberately LEFT IN PLACE here. It is
+              nullable, 5.0 never writes it and nothing reads it, while dropping
+              it would make the migration irreversible for no gain. Spring's own
+              migration script does not drop it either. The round-trip proof is
+              what surfaced this: the rollback came back with the column empty.
+
+         INVARIANT, not deducible from the column names: parameter_type holds a
+         FULLY QUALIFIED CLASS NAME, which JdbcJobExecutionDao resolves with
+         Class.forName, and parameter_value its string form, converted back by a
+         ConversionService. 'STRING' becomes 'java.lang.String', never 'STRING'.
+         A wrong value here does not fail the migration, it throws at the next
+         read of the history.
+
+         A 4.3 DATE parameter is deliberately NOT converted: it is a TIMESTAMP
+         without zone while 5.0 reads an ISO-8601 instant (UTC), so converting
+         would shift it by the writer's offset, which the data does not record.
+         batch50-01 HALTS on such a row instead of guessing, before any write.
+
+         REVERSIBLE: every changeset carries its rollback, and because the
+         conversion loses nothing it can be run backwards with the values intact
+         (`liquibase rollbackCount 11`), which is asserted by comparing a
+         fingerprint of the whole history before and after the round trip. Two things do not come back, and both
+         only concern rows written AFTER the migration: a parameter value longer
+         than the 250 characters of the old string_val, and a java.util.Date
+         parameter. The runbook checks both before rolling back.
+
+         Portable changes only (no <dbms> child): the same file runs on
+         PostgreSQL and on the in-memory database of the test slices, where it
+         migrates the 4.3 schema they have just created - so every build
+         replays this migration instead of trusting it.
+
+         Adapt before use: the changeset ids and the author, and the column
+         types if your 4.3 schema was not created from the stock
+         schema-<platform>.sql. Verify the latter with
+         scripts/reference-schema-diff.sh rather than assuming.
+         ================================================================ -->
+
+    <changeSet id="batch50-01-add-parameter-columns" author="batch-migration">
+        <preConditions onFail="HALT"
+                       onFailMessage="batch_job_execution_params holds rows whose type_cd is neither STRING, LONG nor DOUBLE (most likely DATE). Converting them needs a decision on the time zone they were written in: migrate them by hand, then re-run. Nothing has been modified.">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM batch_job_execution_params WHERE type_cd NOT IN ('STRING', 'LONG', 'DOUBLE')
+            </sqlCheck>
+        </preConditions>
+        <addColumn tableName="batch_job_execution_params">
+            <column name="parameter_name" type="VARCHAR(100)"/>
+            <column name="parameter_type" type="VARCHAR(100)"/>
+            <column name="parameter_value" type="VARCHAR(2500)"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="batch_job_execution_params">
+                <column name="parameter_name"/>
+                <column name="parameter_type"/>
+                <column name="parameter_value"/>
+            </dropColumn>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="batch50-02-fill-parameter-name" author="batch-migration">
+        <update tableName="batch_job_execution_params">
+            <column name="parameter_name" valueComputed="key_name"/>
+        </update>
+        <!-- Nothing to undo on its own: rolling back, batch50-07 rebuilds the legacy columns from the
+             new ones and batch50-01 then drops the new ones. An <update> has no automatic rollback, so
+             the empty element is what tells Liquibase this step is reversible, not unknown. -->
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="batch50-03-fill-string-parameters" author="batch-migration">
+        <update tableName="batch_job_execution_params">
+            <column name="parameter_type" value="java.lang.String"/>
+            <column name="parameter_value" valueComputed="string_val"/>
+            <where>type_cd = 'STRING'</where>
+        </update>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="batch50-04-fill-long-parameters" author="batch-migration">
+        <update tableName="batch_job_execution_params">
+            <column name="parameter_type" value="java.lang.Long"/>
+            <column name="parameter_value" valueComputed="CAST(long_val AS VARCHAR(2500))"/>
+            <where>type_cd = 'LONG'</where>
+        </update>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="batch50-05-fill-double-parameters" author="batch-migration">
+        <update tableName="batch_job_execution_params">
+            <column name="parameter_type" value="java.lang.Double"/>
+            <column name="parameter_value" valueComputed="CAST(double_val AS VARCHAR(2500))"/>
+            <where>type_cd = 'DOUBLE'</where>
+        </update>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="batch50-06-every-parameter-is-typed" author="batch-migration">
+        <preConditions onFail="HALT"
+                       onFailMessage="A parameter row came out of the conversion without a name or a type. The history would be unreadable: inspect batch_job_execution_params before going further.">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM batch_job_execution_params WHERE parameter_name IS NULL OR parameter_type IS NULL
+            </sqlCheck>
+        </preConditions>
+        <addNotNullConstraint tableName="batch_job_execution_params" columnName="parameter_name"
+                              columnDataType="VARCHAR(100)"/>
+        <addNotNullConstraint tableName="batch_job_execution_params" columnName="parameter_type"
+                              columnDataType="VARCHAR(100)"/>
+        <rollback>
+            <dropNotNullConstraint tableName="batch_job_execution_params" columnName="parameter_name"
+                                   columnDataType="VARCHAR(100)"/>
+            <dropNotNullConstraint tableName="batch_job_execution_params" columnName="parameter_type"
+                                   columnDataType="VARCHAR(100)"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="batch50-07-drop-legacy-parameter-columns" author="batch-migration">
+        <dropColumn tableName="batch_job_execution_params">
+            <column name="type_cd"/>
+            <column name="key_name"/>
+            <column name="string_val"/>
+            <column name="date_val"/>
+            <column name="long_val"/>
+            <column name="double_val"/>
+        </dropColumn>
+        <rollback>
+            <!-- The reverse conversion, value by value. This is what makes the migration
+                 reversible at all: nothing was thrown away on the way in. -->
+            <addColumn tableName="batch_job_execution_params">
+                <column name="type_cd" type="VARCHAR(6)"/>
+                <column name="key_name" type="VARCHAR(100)"/>
+                <column name="string_val" type="VARCHAR(250)"/>
+                <column name="date_val" type="TIMESTAMP"/>
+                <column name="long_val" type="BIGINT"/>
+                <column name="double_val" type="DOUBLE PRECISION"/>
+            </addColumn>
+            <update tableName="batch_job_execution_params">
+                <column name="key_name" valueComputed="parameter_name"/>
+            </update>
+            <update tableName="batch_job_execution_params">
+                <column name="type_cd" value="STRING"/>
+                <column name="string_val" valueComputed="parameter_value"/>
+                <where>parameter_type = 'java.lang.String'</where>
+            </update>
+            <update tableName="batch_job_execution_params">
+                <column name="type_cd" value="LONG"/>
+                <column name="long_val" valueComputed="CAST(parameter_value AS BIGINT)"/>
+                <where>parameter_type = 'java.lang.Long'</where>
+            </update>
+            <update tableName="batch_job_execution_params">
+                <column name="type_cd" value="DOUBLE"/>
+                <column name="double_val" valueComputed="CAST(parameter_value AS DOUBLE PRECISION)"/>
+                <where>parameter_type = 'java.lang.Double'</where>
+            </update>
+            <addNotNullConstraint tableName="batch_job_execution_params" columnName="type_cd"
+                                  columnDataType="VARCHAR(6)"/>
+            <addNotNullConstraint tableName="batch_job_execution_params" columnName="key_name"
+                                  columnDataType="VARCHAR(100)"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="batch50-08-add-step-execution-create-time" author="batch-migration">
+        <addColumn tableName="batch_step_execution">
+            <column name="create_time" type="TIMESTAMP"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="batch_step_execution" columnName="create_time"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="batch50-09-backfill-step-execution-create-time" author="batch-migration">
+        <comment>start_time was NOT NULL in the 4.3 layout, so it is the closest true instant a past
+            step execution can offer for a column that did not exist when it ran. Spring's own
+            script defaults it to 1970-01-01 instead, which dates every historical step to the epoch.
+        </comment>
+        <update tableName="batch_step_execution">
+            <column name="create_time" valueComputed="start_time"/>
+            <where>create_time IS NULL</where>
+        </update>
+        <rollback/>
+    </changeSet>
+
+    <changeSet id="batch50-10-step-execution-create-time-required" author="batch-migration">
+        <addNotNullConstraint tableName="batch_step_execution" columnName="create_time"
+                              columnDataType="TIMESTAMP"/>
+        <rollback>
+            <dropNotNullConstraint tableName="batch_step_execution" columnName="create_time"
+                                   columnDataType="TIMESTAMP"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="batch50-11-step-execution-start-time-optional" author="batch-migration">
+        <dropNotNullConstraint tableName="batch_step_execution" columnName="start_time"
+                               columnDataType="TIMESTAMP"/>
+        <rollback>
+            <!-- Restoring the constraint would fail on a row written by 5.0 with a null start_time,
+                 which is exactly what the runbook check looks for before rolling back. -->
+            <addNotNullConstraint tableName="batch_step_execution" columnName="start_time"
+                                  columnDataType="TIMESTAMP"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
