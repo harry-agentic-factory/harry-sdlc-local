@@ -90,6 +90,25 @@ validates that column against a fixed list.
   separate upgrade, usually a major bump, and they fail at runtime rather than at compile
   time.
 
+## Most of this is recipe-able -- the data migration is not
+
+`rewrite-spring` ships `org.openrewrite.java.spring.boot3.SpringBatch4To5Migration` (verified present
+in 4.36.0 by listing the recipe ids inside the jar). It handles the builders, the typed parameters and
+the annotation changes above:
+
+```bash
+mvn rewrite:dryRun -Drewrite.activeRecipes=org.openrewrite.java.spring.boot3.SpringBatch4To5Migration
+```
+
+**And that is exactly what makes this upgrade dangerous.** The code migrates in minutes, the build goes
+green, the application starts — and the metadata is still in the 4.3 layout, or worse, has been through
+the framework's own SQL script and lost its parameter values. A recipe cannot migrate data: the schema
+change collapses four typed columns into one, and the right value depends on a type the rows no longer
+carry.
+
+So: run the recipe for the code, and treat the metadata as a separate, reversible, proven piece of
+work -- the rest of this skill.
+
 ## Order of work
 
 1. Schema and data migration first, reversible and proven (that is the rest of this skill) —

@@ -42,6 +42,11 @@ Two independent defects, both from reading the script:
 
 So the data migration is yours to write. This skill is how.
 
+> **The code side has a recipe, the data side does not.**
+> `org.openrewrite.java.spring.boot3.SpringBatch4To5Migration` (in `rewrite-spring`) migrates the
+> builders and the typed parameters in minutes. Nothing migrates the rows. A green build after the
+> recipe is the most misleading moment of this upgrade.
+
 ## Decide first: keep the history, or start empty?
 
 | | Start empty | Migrate in place |
